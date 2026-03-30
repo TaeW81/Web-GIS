@@ -1,0 +1,167 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html> 
+<head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<title>VWORLD DEMO SAMPLE</title> 
+<SCRIPT language="JavaScript" type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9"></SCRIPT>
+</head> 
+<body>
+<script type="text/javascript">
+	var map = null;  
+	vworld.showMode = false; 
+   
+   // 통합지도 초기화
+	vworld.init(
+		"cont1"	// rootDiv
+		, "map-first" // mapType
+		,function() {         
+			map = this.vmap; 
+			map.setBaseLayer(map.vworldBaseMap); 
+			map.setControlsType({"simpleMap":true});	//간단한 화면	 
+			
+			//화면중심점과 레벨로 이동
+			map.setCenterAndZoom(14137792.751626197, 4092051.278263237, 8);  	
+		}
+		,function (obj){SOPPlugin = obj; }//initCallback
+		,function (msg){alert('vworld init fail');}//failCallback
+	);
+	
+	//========Polygon=============================
+	function createBounds(bounds){ // 폴리곤 생성 
+		var points = [];
+		points.push(new OpenLayers.Geometry.Point(bounds.left, bounds.top)); 
+		points.push(new OpenLayers.Geometry.Point(bounds.right, bounds.top)); 
+		points.push(new OpenLayers.Geometry.Point(bounds.right, bounds.bottom)); 
+		points.push(new OpenLayers.Geometry.Point(bounds.left, bounds.bottom)); 
+		
+		var style = {strokeColor: "#00FF00", fillColor: "#00FF00", strokeOpacity: 1, fillOpacity:0.1, strokeWidth: 2}; 
+		var poly = new vworld.Polygon(points, style);
+		
+		map.vectorLayer.addFeatures([poly]);
+	}
+	
+	
+	var Polygon
+	function createPolygon(){
+		map.setZoomLevel(14);
+		var center = map.getCenter();
+		
+		var style_green = {strokeColor: "#00FF00", strokeOpacity: 1, strokeWidth: 2}; 
+		var points = [];
+		points.push(new OpenLayers.Geometry.Point(center.lon, center.lat)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat - 1000)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat - 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat - 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat + 1000)); 
+		
+		Polygon = new vworld.Polygon(points, style_green);
+		
+		//Polygon = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LinearRing(points), style_green);
+		
+		map.vectorLayer.addFeatures([Polygon]); 
+		
+		return Polygon;
+		
+	}
+	function setPolygonLineStyle(){
+		var line;
+		if (Polygon == null){
+			line = createPolygon();
+		}else {
+			line = Polygon;
+		}
+		var oldw = line.getStyle();
+		line.setStyle("dot");
+	}
+	
+	function setPolygonLineWeight(w){
+		//map.setZoomLevel(14);
+		var line;
+		if (Polygon == null){
+			line = createPolygon();
+		}else {
+			line = Polygon;
+		}
+		var oldw = line.getWeight();
+		line.setWeight(w);
+		alert('기존굵기:' + oldw + ",변경굵기:" + w);
+	}
+	function setPolygonLineColor(color){
+		//map.setZoomLevel(14);
+		var line;
+		if (Polygon == null){
+			line = createPolygon();
+		}else {
+			line = Polygon;
+		}
+		var oldc = line.getColor();
+		line.setColor(color);
+		alert('라인기존색상:' + oldc + ",변경색상:" + color);
+	}
+	function setPolygonColor(color){
+		var line;
+		if (Polygon == null){
+			line = createPolygon();
+		}else {
+			line = Polygon;
+		}
+		var oldc = line.getFillColor();
+		line.setFillColor(color);
+		alert('면기존색상:' + oldc + ",변경색상:" + color);
+	}	
+	
+	function setPolygonOpacity(opacity){
+		var poly;
+		if (Polygon == null){
+			poly = createPolygon();
+		}else {
+			poly = Polygon;
+		}
+		var oldO = poly.getFillOpacity();
+		poly.setFillOpacity(opacity);
+		poly.setOpacity(opacity);
+		alert('면투명도:' + oldO + ",변경투명도:" + opacity);
+	}
+	function addPolygonPoint(){
+		//map.setZoomLevel(14);
+		var line;
+		if (Polygon == null){
+			line = createPolygon();
+		}else {
+			line = Polygon;
+		}
+		var center = map.getCenter();
+		line.addNewPoint(new OpenLayers.Geometry.Point(center.lon, center.lat));
+	}
+	
+	function getPolygonBound(){
+		var line;
+		if (Polygon == null){
+			line = createPolygon();
+		}else {
+			line = Polygon;
+		}
+		var oldb = line.getBounds();
+		createBounds(oldb);
+		alert('Bound:' + oldb);
+	}
+</script> 
+<div>
+	<button type="button" onclick="javascript:createPolygon();" name="pg_1" >Polygon(생성)</button>
+	<button type="button" onclick="javascript:setPolygonLineStyle();" name="pg_2" >라인스타일조회/지정</button>
+	<button type="button" onclick="javascript:setPolygonLineWeight(10);" name="pg_2" >라인굵기조회/지정</button>
+	<button type="button" onclick="javascript:setPolygonLineColor('#ff0000');" name="pg_3" >라인색상조회/지정</button>
+	<button type="button" onclick="javascript:setPolygonColor('#ff0000');" name="pg_6" >면색상조회/지정</button>
+	<button type="button" onclick="javascript:setPolygonOpacity(0.5);" name="pg_7" >투명도조회/지정</button>
+	<button type="button" onclick="javascript:addPolygonPoint();" name="pg_4" >포인트추가</button>
+	<button type="button" onclick="javascript:getPolygonBound();" name="pg_5" >Bound조회</button>
+</div>
+<div style="display:inline;float:left;width:100%;height:500px;left:0px;top:0px">
+<div id="cont1" style="width:100%;height:650px;left:0px;top:0px"></div>	
+</div>
+
+</body> 
+</html>

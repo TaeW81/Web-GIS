@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko" id="default">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+	<link href="http://apis.vworld.kr/css/sample/maps.comm.css" rel="stylesheet" type="text/css"/>
+	
+	<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
+	<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=5E35AE93-8291-33FE-B2A7-44C16B57636E"></script>
+	
+	<style>
+	.btn-ex-list { background-color:#4b4b4b; padding:5px 15px 5px 15px; color:#FFFFFF; font-family:"Nanum Gothic",'나눔 고딕'; font-weight:bold; border:1px solid #3e3e3e; text-shadow:1px 2px #484848; }
+	</style>
+<script type="text/javascript">
+
+var vw = window.vw || {};
+
+//지도에 그리는 폴리곤의 스타일 정의
+var pointControl;
+var sketchColor = '#0649FB';
+vw.sketchSymbolizers = {
+		'Polygon': {strokeWidth: 3,strokeOpacity: 0.6,strokeColor: '#0649FB',fillColor: '#0649FB',fillOpacity: 0.1}
+		,'NullPolygon': {strokeWidth: 3,strokeOpacity: 0.6,strokeColor: '#FB0649',fillColor: '#FB0649',fillOpacity: 0.0}
+	};
+
+//나의 위치 좌표정보
+vw.myPosition = {"x" : "14132764.704103", "y" : "4494194.1601525", "crs" : "EPGS:900913"};
+
+
+var map;
+vworld.init("map_area", "map-only", 
+	function() {
+		map = this.vmap;
+		map.addVWORLDControl("zoomBar");	// 웹사용
+		map.setCenterAndZoom("126.957","37.3942" , 16 , "EPSG:4326"); //안양시청
+		map.addVWORLDControl("indexMap");
+	}
+	,function (obj){
+
+	}
+	,function (msg){alert("oh my god");}//failCallback
+);
+
+$(window).load(function(){
+
+});
+
+
+/*
+ * 좌표값의 위치에 마커를 찍는다.
+ */
+function drawMarker(lon, lat){
+	
+	var imgurl = "http://user.vworld.kr/images/ps/user/marker/ico-mark-off.png";
+	var inSize = {w:21,h:30}; //마커크기 설정
+
+	var marker = new vworld.MarkerA(lon, lat, "", imgurl, "EPSG:900913", inSize);		
+	map.addMarker(marker);
+}
+
+
+//클릭으로 검색
+function pointSearch(){	
+
+		var pointOptions = {persist:true}
+		if (pointControl == null) {
+			pointControl = new OpenLayers.Control.Measure(OpenLayers.Handler.Point,{handlerOptions:pointOptions});
+	    	pointControl.events.on({
+	    		"measure": function(event){
+	    			initMap(); //맵 초기화
+	    			mapclick(event); // 클릭 이벤트
+	    		}
+	    	});
+	    	map.addControl(pointControl);
+		}
+		map.init();
+	    pointControl.activate();
+	}	
+
+function mapclick(event){
+	
+	var temp = event.geometry;
+	var pos = new OpenLayers.LonLat(temp.x, temp.y);
+	
+	drawMarker(pos.lon, pos.lat);
+
+	// 포인트 반경표시
+	var buffer = parseInt($("#bufferval").val(),10) || 500;
+	
+	var poly = new vworld.RegularPolygon({x:pos.lon, y:pos.lat}, buffer, 360, 0, vw.sketchSymbolizers['Polygon']);
+	map.vectorLayer.addFeatures([poly]);
+	
+	var points = [];
+	points.push(new OpenLayers.Geometry.Point(poly.geometry.bounds.left, poly.geometry.bounds.top)); 
+	points.push(new OpenLayers.Geometry.Point(poly.geometry.bounds.right, poly.geometry.bounds.top)); 
+	points.push(new OpenLayers.Geometry.Point(poly.geometry.bounds.right, poly.geometry.bounds.bottom)); 
+	points.push(new OpenLayers.Geometry.Point(poly.geometry.bounds.left, poly.geometry.bounds.bottom)); 
+	
+	var poly2 = new vworld.Polygon(points, vw.sketchSymbolizers['NullPolygon']);	
+	map.vectorLayer.addFeatures([poly2]);
+	
+	//경위도좌표로 보기
+	var bound = poly.geometry.bounds.clone().transform(new OpenLayers.Projection("EPSG:900913"),new OpenLayers.Projection("EPSG:4326"));
+	$("#start").val(bound.left + "," + bound.top);
+	$("#end").val(bound.right + "," + bound.bottom);
+	
+}
+
+// 맵 초기화
+function initMap()
+{
+	map.init();
+	vworldUtil._initInfos();
+	map.vectorLayer.removeAllFeatures();
+
+	//모든 마커 삭제
+	map.clearMarkers();
+}
+
+function fnaddDMSMarker(){
+	var lon = 0;
+	var lat = 0;
+	var zoom = map.getZoom();
+	lon = parseFloat($("#lon_d").val())*1 + 
+		parseFloat($("#lon_m").val()/60).toFixed(8)*1 + 
+		parseFloat($("#lon_s").val()/3600).toFixed(8)*1;
+	lat = parseFloat($("#lat_d").val())*1 + 
+		parseFloat($("#lat_m").val()/60).toFixed(8)*1 + 
+		parseFloat($("#lat_s").val()/3600).toFixed(8)*1;
+	
+	var message = "LONLAT(" + lon + "," + lat + ")";
+	var title = "도분초마커 테스트";
+	marker = new vworld.Marker(lon, lat,title, message,
+			'/images/map2/bul_poi_b_1.png',"EPSG:4326",{w:36,h:42});
+	
+	//marker id 생성
+	marker.id = OpenLayers.Util.createUniqueID('MarkerTest_');
+	
+	map.addMarker(marker);
+	
+	map.setCenterAndZoom(lon, lat, zoom,"EPSG:4326");
+	
+}
+
+function fnResizeOM(){
+	map.vworldIndex.setSize(300,300);
+}
+
+function rotateMarker(marker){
+	if (marker == null) {alert('마커를 먼저 생성하세요'); return;}
+	var degval= 45;
+	degval = parseInt($("#degval").val(),10) || 45;
+	
+	var mid = marker.icon.imageDiv.id;
+	$("#" + mid).css("transform", "rotate(" + degval + "deg)" );
+	
+	//위치설정
+	marker.setPosition({"lon":marker.lonlat.lon + 20,"lat":marker.lonlat.lat});
+}
+
+function fnRotateMarkers(){
+	//마커리스트를 돌면서 모두 갱신하기
+	for (var i=0; i< map.userMarkers.markers.length; i++){
+		//
+		rotateMarker(map.userMarkers.markers[i]);
+	}
+}
+
+</script>
+</head>
+<body>
+<div id="wrap">
+	
+	<div id="container">
+		<div id="map_area"></div>	
+	</div>
+	<div>
+	<button class="btn-ex-list" type="button" onclick="pointSearch();">반경그리기</button>
+	<input type="text" name='q' id='bufferval' value="1500" style="ime-mode:active;width:50px;"/>m
+	시작점 : <input type="text" id="start" style="width:200px;"/> 끝점 : <input type="text" id="end" style="width:200px;"/>
+	<br/>경도(LON)
+	<input type="text" name='q' id='lon_d' value="127" style="ime-mode:active;width:80px;"/>도
+	<input type="text" name='q' id='lon_m' value="39" style="ime-mode:active;width:80px;"/>분
+	<input type="text" name='q' id='lon_s' value="57.5" style="ime-mode:active;width:80px;"/>초
+	위도(LAT)
+	<input type="text" name='q' id='lat_d' value="37" style="ime-mode:active;width:80px;"/>도
+	<input type="text" name='q' id='lat_m' value="13" style="ime-mode:active;width:80px;"/>분
+	<input type="text" name='q' id='lat_s' value="57.5" style="ime-mode:active;width:80px;"/>초
+	<button class="btn-ex-list"  type="button" onclick="javascript:fnaddDMSMarker();" name="addpin" >도분초좌표로 마커찍기</button>	
+	<button class="btn-ex-list"  type="button" onclick="javascript:fnRotateMarkers();" name="rotatepin" >마커회전(입력값에 따름)</button>
+	<input type="text" name='q' id='degval' value="50" style="ime-mode:active;width:50px;"/>도	
+	<button class="btn-ex-list"  type="button" onclick="javascript:fnResizeOM();" name="addcache" >인덱스맵크기조정</button>
+	
+	</div>
+	
+</div>
+</body>
+</html>

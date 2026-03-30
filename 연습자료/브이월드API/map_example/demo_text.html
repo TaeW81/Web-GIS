@@ -1,0 +1,316 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html> <head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<title>VWORLD DEMO SAMPLE</title> 
+<SCRIPT language="JavaScript" type="text/javascript" src=http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9"></SCRIPT>
+
+</head> 
+
+<script type="text/javascript">  
+
+	var map = null;
+	var controls = null;  
+	//showMode : false 화면전환 버튼 감춘다.
+	//단, map-only, earth-only 인 경우 자동으로 버튼이 안보임.
+	vworld.showMode = true; 
+	vworld.init("PrintArea", "map-base",//"map-base",//"earth-first",//"raster", // 
+		function() {         
+			map = this.vmap; 					
+			map.setControlsType({"simpleMap":true});	//간단한 화면					
+			map.addVWORLDControl("layerSwitch");
+		}
+		,function (obj){
+		}//initCallback
+		,function (msg){alert('oh my god');}
+	);
+	
+	
+	function addTextLayer(fileObj){
+		var files = fileObj.files;
+		if(files.length != 0){
+			var fileName = files[0].name;
+			var ext = fileName.split('.').pop();
+				if(ext == 'txt' || ext == 'TXT' || ext == 'csv' || ext == 'CSV'){
+					if (window.File && window.FileReader && window.FileList && window.Blob) {
+					var value;
+				    if (files) {
+				        for (var i = 0, f; f = files[i]; i++) {
+				            var r = new FileReader();
+				            r.onload = (function (f) {
+				                return function (e) {
+				                    var contents = e.target.result;
+				                    value = contents;
+				                    addTextLayerFromClass(value);
+				                };
+				            })(f);
+				            r.readAsText(f);
+				        }
+				    } else {
+				        alert("Failed to load files");
+				    }
+				} else {
+				  alert('This browser is not supported File APIs');
+				}
+			}else{
+				alert("TEXT 형식이 아닙니다.");
+			}
+		}
+	}
+	
+	var vLayer;
+	var count = 1;
+	function addTextLayerFromClass(value){
+		
+		var colors = {
+				lowest: "#B5E28C",
+                low: "#990099", 
+                middle: "#0054FF", 
+                high: "#F15F5F",
+                highest: "#B70000"
+            };
+		var lowestRule = new OpenLayers.Rule({
+				filter: new OpenLayers.Filter.Comparison({
+					type: OpenLayers.Filter.Comparison.LESS_THAN,
+					property: "count",
+					value: 5
+				}),
+				symbolizer: {
+					fillColor: colors.lowest,
+					fillOpacity: 0.9, 
+					strokeColor: colors.lowest,
+					strokeOpacity: 0.5,
+					strokeWidth: 12,
+					pointRadius: 10,
+					label: "${count}",
+					labelOutlineWidth: 1,
+					fontColor: "#ffffff",
+					fontOpacity: 0.8,
+					fontSize: "12px"
+				}
+			});
+		var lowRule = new OpenLayers.Rule({
+                filter: new OpenLayers.Filter.Comparison({
+					type: OpenLayers.Filter.Comparison.BETWEEN,
+					property: "count",
+					lowerBoundary: 5,
+					upperBoundary: 30
+				}),
+                symbolizer: {
+                	fillColor: colors.low,
+                    fillOpacity: 0.9, 
+                    strokeColor: colors.low,
+                    strokeOpacity: 0.5,
+                    strokeWidth: 12,
+                    pointRadius: 10,
+                    label: "${count}",
+                    labelOutlineWidth: 1,
+                    fontColor: "#ffffff",
+                    fontOpacity: 0.8,
+                    fontSize: "12px"
+                }
+            });
+		var middleRule = new OpenLayers.Rule({
+                filter: new OpenLayers.Filter.Comparison({
+                    type: OpenLayers.Filter.Comparison.BETWEEN,
+                    property: "count",
+                    lowerBoundary: 31,
+                    upperBoundary: 100
+                }),
+                symbolizer: {
+                    fillColor: colors.middle,
+                    fillOpacity: 0.9, 
+                    strokeColor: colors.middle,
+                    strokeOpacity: 0.5,
+                    strokeWidth: 12,
+                    pointRadius: 15,
+                    label: "${count}",
+                    labelOutlineWidth: 1,
+                    fontColor: "#ffffff",
+                    fontOpacity: 0.8,
+                    fontSize: "12px"
+                }
+            });
+		var highRule = new OpenLayers.Rule({
+                filter: new OpenLayers.Filter.Comparison({
+                    type: OpenLayers.Filter.Comparison.BETWEEN,
+                    property: "count",
+                    lowerBoundary: 101,
+                    upperBoundary: 200
+                }),
+                symbolizer: {
+                    fillColor: colors.high,
+                    fillOpacity: 0.9, 
+                    strokeColor: colors.high,
+                    strokeOpacity: 0.5,
+                    strokeWidth: 12,
+                    pointRadius: 15,
+                    label: "${count}",
+                    labelOutlineWidth: 1,
+                    fontColor: "#ffffff",
+                    fontOpacity: 0.8,
+                    fontSize: "12px"
+                }
+            });
+        var highestRule = new OpenLayers.Rule({
+                filter: new OpenLayers.Filter.Comparison({
+                    type: OpenLayers.Filter.Comparison.GREATER_THAN,
+                    property: "count",
+                    value: 200
+                }),
+                symbolizer: {
+                    fillColor: colors.highest,
+                    fillOpacity: 0.9, 
+                    strokeColor: colors.highest,
+                    strokeOpacity: 0.5,
+                    strokeWidth: 12,
+                    pointRadius: 20,
+                    label: "${count}",
+                    labelOutlineWidth: 1,
+                    fontColor: "#ffffff",
+                    fontOpacity: 0.8,
+                    fontSize: "12px"
+                }
+            });
+        style = new OpenLayers.Style(null, {rules: [lowestRule,lowRule, middleRule, highRule, highestRule]});
+        
+        //파라미터1 : 레이어이름
+        //파라미터2 : TEXT 스트링
+        //파라미터3 : 좌표계(EPSG:4326, EPSG:900913)
+        //파라미터3 : option 오브젝트 (style, title, desc)
+        var epsg = document.getElementById('epsg').value;
+        var title = document.getElementById('title').value;
+        var desc = document.getElementById('desc').value;
+        
+        var option = {style:style, title:title, desc:desc};
+		vLayer = new vworld.TEXTLayer('myTextLayer_'+count, value, epsg, option);
+		
+		selectAdd('myTextLayer_'+count);
+		count++;
+	}
+	
+	function selectAdd(layerName){
+		var selectTag = document.getElementById("layers");
+		var layerOption = new Option(layerName,selectTag.length);
+		selectTag.add(layerOption);
+		selectTag.options[selectTag.length-1].selected = true;
+	}
+	
+	function removeLayer(){
+		var selectTag = document.getElementById("layers");
+		var option = selectTag.selectedIndex;
+		
+		//파라미터1 : 레이어이름 
+		vLayer.removeLayer(selectTag.options[option].text);
+		
+		selectTag.remove(option);
+	}
+	
+	function removeAllLayer(){
+		//파라미터 없음 : TEXT레이어 전체 삭제 
+		vLayer.removeLayer();
+		
+		var selectTag = document.getElementById("layers");
+		for(var i=selectTag.options.length; i>0; i--){
+			selectTag.remove(selectTag.options[i]);
+		}
+	}
+	
+	function getLayerIndex(){
+		var selectTag = document.getElementById("layers");
+		var option = selectTag.selectedIndex;
+		
+		//파라미터1 : 레이어이름 
+		alert(vLayer.getLayerIndex(selectTag.options[option].text));
+	}
+	
+	function setLayerIndex(order){
+		var selectTag = document.getElementById("layers");
+		var option = selectTag.selectedIndex;
+		
+		//TEXT레이어
+		//파라미터1 : 레이어이름 
+		//파라미터2 : 인덱스순서
+		//             1)top : 맨위로  2)bottom : 맨아래로
+		vLayer.setLayerIndex((selectTag.options[option].text), order);
+	}
+		
+	function registerClickEvent(){
+		var selectTag = document.getElementById("layers");
+		var option = selectTag.selectedIndex;
+		
+		//파라미터1 : 레이어이름 
+		vLayer.registerClickEvent(selectTag.options[option].text);
+	}
+	
+	function unregisterClickEvent(){
+		var selectTag = document.getElementById("layers");
+		var option = selectTag.selectedIndex;
+		
+		//파라미터1 : 레이어이름 
+		vLayer.unregisterClickEvent(selectTag.options[option].text);
+	}
+	
+	function hideLayer(){
+		var selectTag = document.getElementById("layers");
+		var option = selectTag.selectedIndex;
+		
+		//파라미터1 : 레이어이름 
+		vLayer.hideLayer(selectTag.options[option].text);
+	}
+	
+	function showLayer(){
+		var selectTag = document.getElementById("layers");
+		var option = selectTag.selectedIndex;
+		
+		//파라미터1 : 레이어이름 
+		vLayer.showLayer(selectTag.options[option].text);
+	}
+	
+	function hideAllLayer(){
+		//파라미터 없음 : TEXT레이어 전체 숨기기 
+		vLayer.hideLayer();
+	}
+	
+	function showAllLayer(){
+		//파라미터 없음 : TEXT레이어 전체 나타내기
+		vLayer.showLayer();
+	}
+	
+</script> 
+
+<body >
+	<div>	
+		<input type="file" id="file1" onchange="addTextLayer(this)" />
+		epsg
+		<select name="epsg" id="epsg">
+			<option value="EPSG:4326">EPSG:4326</option>
+			<option value="EPSG:900913">EPSG:900913</option>
+		</select>
+		title<input type="text" id="title" value="title"/>
+		desc<input type="text" id="desc" value="desc"/>
+		<br>
+		<select name="layers" id="layers"></select>
+		<input type="button" value="삭제" onclick="removeLayer()" />
+		<input type="button" value="전체삭제" onclick="removeAllLayer()" />
+		<input type="button" value="인덱스확인" onclick="getLayerIndex()" />
+		<input type="button" value="맨위로" onclick="setLayerIndex('top')" />
+		<input type="button" value="맨아래로" onclick="setLayerIndex('bottom')" />
+		<input type="button" value="클릭이벤트등록" onclick="registerClickEvent()" />
+		<input type="button" value="클릭이벤트해제" onclick="unregisterClickEvent()" />
+		<input type="button" value="숨기기" onclick="hideLayer()" />
+		<input type="button" value="나타내기" onclick="showLayer()" />
+		<input type="button" value="전체숨기기" onclick="hideAllLayer()" />
+		<br>
+		<input type="button" value="전체나타내기" onclick="showAllLayer()" />
+		샘플파일 다운로드 : 
+		<a href="http://10.1.2.127/data/text/4326.txt">4326.txt</a>
+		<a href="http://10.1.2.127/data/text/900913.txt">900913.txt</a>
+		(다른이름으로 대상저장시 htm으로 저장되면 확장자를 txt으로 변경)
+	</div>
+	
+	<div style="display:inline;float:left;width:100%;height:600px;left:0px;top:0px">
+		<div id="PrintArea" style="width:100%;height:100%;left:0px;top:0px;position:relative;"></div>	
+	</div>
+</body> 
+
+</html>

@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<kml xmlns='http://www.opengis.net/kml/2.2'>
+<Document>
+<Placemark><name>국립세종도서관</name><LookAt><longitude>127.26839929706915</longitude><latitude>36.49894054150852</latitude><altitude>30.77</altitude><heading>-0.1803634979126057</heading><tilt>87.80000305175785</tilt><range>1225.26</range></LookAt><visibility>1</visibility><styleUrl>#PT</styleUrl><Point><coordinates>127.26839929706915,36.49894054150852,30.77</coordinates></Point></Placemark>
+<Placemark><name>연기도서관(세종시평생교육연구원)</name><LookAt><longitude>127.30002907718044</longitude><latitude>36.60727256004328</latitude><altitude>28.4</altitude><heading>-0.16281353228673428</heading><tilt>87.80000305175785</tilt><range>216.56</range></LookAt><visibility>1</visibility><styleUrl>#PT</styleUrl><Point><coordinates>127.30002907718044,36.60727256004328,28.4</coordinates></Point></Placemark>
+<Placemark><name>백화점 세이</name><LookAt><longitude>127.40854372190819</longitude><latitude>36.32062540936879</latitude><altitude>58.91</altitude><heading>-15.967526084590575</heading><tilt>87.80000308156009</tilt><range>799.44</range></LookAt><visibility>1</visibility><styleUrl>#PT</styleUrl><Point><coordinates>127.40854372190819,36.32062540936879,58.91</coordinates></Point></Placemark>
+<Placemark><name>오예</name><LookAt><longitude>126.81843265646029</longitude><latitude>37.56808480554724</latitude><altitude>6.35</altitude><heading>-11.347079271921185</heading><tilt>36.80000227689745</tilt><range>647.18</range></LookAt><visibility>1</visibility><styleUrl>#PT</styleUrl><Point><coordinates>126.81843265646029,37.56808480554724,6.35</coordinates></Point></Placemark>
+<Placemark><name>안양대교보신탕</name><LookAt><longitude>126.91224851336996</longitude><latitude>37.40913709033624</latitude><altitude>24.66,24.24,24.45,25.11</altitude><heading>0.9165345563733177</heading><tilt>87.80000305175785</tilt><range>514.91</range></LookAt><visibility>1</visibility><styleUrl>#PL</styleUrl><Polygon><outerBoundaryIs><LinearRing><coordinates>126.91509237497394,37.40895518323985,24.66
+126.9152512104891,37.408800406968304,24.24
+126.91542896011008,37.40888607315016,24.45
+126.91531509779845,37.4090356771428,25.11
+</coordinates></LinearRing></outerBoundaryIs></Polygon></Placemark>
+<Placemark><name>안양1번가 맛집</name><LookAt><longitude>126.919746758491</longitude><latitude>37.39907868078876</latitude><altitude>29.24,29.2,31.03,31.64,34.41,38.33</altitude><heading>1.6160372933174798</heading><tilt>87.80000305175785</tilt><range>792.97</range></LookAt><visibility>1</visibility><styleUrl>#LN</styleUrl><LineString><extrude>1</extrude><tessellate>1</tessellate><altitudeMode>29.24,29.2,31.03,31.64,34.41,38.33</altitudeMode><coordinates>126.92248747418809,37.40137104842709,29.24
+126.92270408622646,37.40112159294173,29.2
+126.9205763218942,37.400179036618695,31.03
+126.920228365992,37.39987959103847,31.64
+126.9184754057381,37.398619387406406,34.41
+126.91656286203056,37.39697365422061,38.33
+</coordinates></LineString></Placemark>
+<Placemark><name>청주농수산물도매시장</name><LookAt><longitude>127.46460448870518</longitude><latitude>36.64851492950915</latitude><altitude>74.21</altitude><heading>6.425032412497993</heading><tilt>87.40000291168685</tilt><range>469.73</range></LookAt><visibility>1</visibility><styleUrl>#PT</styleUrl><Point><coordinates>127.46460448870518,36.64851492950915,74.21</coordinates></Point></Placemark>
+<Placemark><name>에디야커피숍</name><LookAt><longitude>126.9521160533414</longitude><latitude>37.39015982521013</latitude><altitude>32.56</altitude><heading>0.39567920053278277</heading><tilt>87.80000305175785</tilt><range>328.91</range></LookAt><visibility>1</visibility><styleUrl>#PT</styleUrl><Point><coordinates>126.9521160533414,37.39015982521013,32.56</coordinates></Point></Placemark>
+<Placemark><name>안면도백사장 대하축제</name><LookAt><longitude>126.31655732168454</longitude><latitude>36.585827255229226</latitude><altitude>3.85</altitude><heading>0.4171424618879036</heading><tilt>87.80000305175785</tilt><range>309.87</range></LookAt><visibility>1</visibility><styleUrl>#PT</styleUrl><Point><coordinates>126.31655732168454,36.585827255229226,3.85</coordinates></Point></Placemark>
+<Placemark><name>산장가든</name><LookAt><longitude>127.26193203425231</longitude><latitude>36.59997224179898</latitude><altitude>45.94</altitude><heading>0.42962895532819534</heading><tilt>87.80000305175785</tilt><range>243.94</range></LookAt><visibility>1</visibility><styleUrl>#PT</styleUrl><Point><coordinates>127.26193203425231,36.59997224179898,45.94</coordinates></Point></Placemark>
+</Document>
+</kml>

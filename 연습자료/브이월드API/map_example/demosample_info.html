@@ -1,0 +1,348 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<meta http-equiv="Content-Script-Type" content="text/javascript" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta http-equiv="X-UA-Compatible" content="IE=9" />
+<title>국가공간정보확대(12월)</title> 
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=D2F96ADF-C7F4-3FE6-9021-7949E462F8C6&version=1.4"></script>
+<SCRIPT language="JavaScript" type="text/javascript" src="/jquery/jquery-1.7.1.min.js"></SCRIPT>
+<style type="text/css">
+.hidden {display:none;}
+div.content{ display:block; position:absolute; min-width:700px; right:0px; bottom:0px; top:0px; left:0px; }
+div.asidemenu{ display:inline-block; float:left; min-width:140px; width:20%; height:100%; background:#ebebeb; }
+div.mapcontent { display:inline-block; position:relative; float:left; min-width:400px; width:80%; height:100%;
+min-height:500px; left:0px; right:0px; top:0px; bottom:0px; }
+#nav { /* 메뉴 전체 영역에 대한 스타일 */ position:relative;top:5px;left:0px;right:0px; list-style-type: none; /* 불릿 기호 없앰 */
+height: 30px; /* 내비게이션 높이 */ padding: 0px 0px; margin: 0; background:#7d7d7d; border-radius:1.0em; /* 모서리 둥글게 */ }
+
+#nav li { /* 메뉴 각 항목에 대한 스타일 */ text-align:center; width:100%; position: relative; margin:1px 0px; padding: 0; } 
+#nav li.maincate { border-top:1px solid white; }
+#nav li a { /* 메뉴 항목에서도 링크에 대한 스타일 */ display: block; /*영역을 만듦 */ width:auto; font-family:"굴림"; /* 글꼴 */
+font-weight:600; /* 진하게 */ font-size:1em; /* 글자크기 */ padding:8px 0px; color: #333; /* #e7e5e5 링크 글자색 */ text-decoration:none; /* 밑줄 없앰 */ margin:0; /* 바깥 여백 없음 */ border-radius:1.4em; }
+#nav li:hover > a{ /* 메뉴 항목 위로 마우스 올렸을 때 스타일 */ background:#487CEA; /*ebebeb 배경색 */ color:#fff; /*#444 글자색 */
+border-radius:1.0em; /*1.4em 모서리 둥글게 */ -webkit-box-shadow:0 1px 1px rgba(0,0,0,0.2); /* 메뉴 항목에 그림자 */ -moz-box-shadow:0 1px 1px rgba(0,0,0,0.2); /* 메뉴 항목에 그림자 */ }
+#nav ul li a { height: 15px; padding:5px 0px; }
+#nav #cate a { color: #e7e5e5; text-shadow:0 1px 1px rgba(0,0,0,.3); font-family:Tahoma;font-weight:600; font-size:14px;}
+#nav ul { /* 서브 메뉴 영역에 대한 스타일 */ margin:0; /* 서브 메뉴 바깥 여백 없음 */ padding:0; /* 서브 메뉴 안여백 없음 */ list-style:none; /* 목록의 불릿  없앰 */ position: relative; /* 고정 위치에 표시 */ left:0; /* 부모 요소와 left 좌표 값은 같게 */ top:0px; /* 부모 요소로부터 아래로 45px 밑에 표시 */ 
+width: 98%; /* 서브 메뉴 너비 */ background:#ddd; /* 서브 메뉴 배경색 */ border:1px solid #b4b4b4; /* 서브 메뉴 테두리를 그림 */  border-radius:8px; /* 모서리를 둥글게 처리 */ -webkit-box-shadow:0 1px 3px rgba(0,0,0,.3); /* 서브 메뉴 전체에 그림자 효과 추가 */
+  -moz-box-shadow:0 1px 3px rgba(0,0,0,.3); box-shadow:0 1px 3px rgba(0,0,0,.3); display:none; visibility:hidden; opacity:0; }
+#nav li.liston ul { /* 서브 메뉴 영역에 대한 스타일 */ display:block; visibility:visible; opacity: 1; }
+#nav ul li { /* 서브 메뉴 각 항목의 스타일 */ float: none; /* 세로로 표시 */ margin:0; /* 바깥 여백 없음 */ padding:0; }
+#nav ul a { /* 서브 메뉴 항목의 링크 스타일 */ font-weight:normal; color:#333; /* 글자색 */ }
+#nav ul li:hover a { /* 서브 메뉴 항목 위로 마우스 오버했을 때의 스타일 */ background:#96B5F3; /* 0078ff 배경색 */ color:#fff; border-radius:0;/* 모서리 둥글게 처리 안함 */ }
+#nav ul li:first-child > a{ /* 서브 메뉴 첫번째 항목의 스타일 */ -webkit-border-top-left-radius:9px; /* 왼쪽 윗부분 둥글게 */
+-moz-border-radius-topleft:9x; /* 오른쪽 윗부분 둥글게 */ -webkit-border-top-right-radius:9px; -moz-border-radius-topright:9x; }
+#nav ul li:last-child > a { /* 서브 메뉴 마지막 항목의 스타일 */ -webkit-border-bottom-left-radius:9px; /* 왼쪽 아랫부분 둥글게 */
+-moz-border-radius-bottomleft:9x; /* 오른쪽 아랫부분 둥글게 */ -webkit-border-bottom-right-radius:9px;-moz-border-radius-bottomright:9x; }
+#nav ul li a.on { font-weight:800; color:#487CEA; text-shadow:none; }
+</style>
+</head> 
+<script type="text/javascript">  
+	 
+		var map = null;  
+		vworld.showMode = true; 
+		vworld.useOSM = true;
+		//레이어별 표출속성 정의
+	    vworld.setLayerShowField ([
+	    	{layer:'LT_C_UQ111',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ112',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ113',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ114',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ121',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ122',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ123',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ124',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ125',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ126',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ127',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ128',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ129',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ130',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ141',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] },
+	    	{layer:'LT_C_UQ162',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] }
+	    	,{layer:'LT_C_AGRIXUE101',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] }
+	    	,{layer:'LT_C_AGRIXUE102',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] }
+	    	,{layer:'LT_C_ASITSOILDRA',fields:['CODE_DC','LABEL'],titles:['\배수등급코드','배수등급'] }
+	    	,{layer:'LT_C_ASITSURSTON',fields:['CODE_SG','LABEL'],titles:['\자갈함량코드','자갈함량(%)'] }
+	    	,{layer:'LT_C_ASITSOILDEP',fields:['CODE_AD','LABEL'],titles:['\유효토심코드','유효토심'] }
+	    	,{layer:'LT_C_ASITDEEPSOIL',fields:['CODE_ST','LABEL'],titles:['\심토토성코드','심토토성'] }	    	
+	    	,{layer:'LT_C_UD801',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] }
+	    	,{layer:'LT_C_LHZONE',fields:['ZONENAME'],titles:['\사업지구경계도'] }
+	    	,{layer:'LT_C_LHBLPN',fields:['ZONENAME','BLOCKTYPE'],titles:['\사업지구경계도','\계획구역명'] }
+	    	,{layer:'LT_C_USFSFFB',fields:['WARD_ID','WARD_NM'],titles:['\소방서코드','\소방서명'] }
+	    	,{layer:'LT_L_FRSTCLIMB',fields:['SEC_LEN','UP_MIN','DOWN_MIN','START_Z','END_Z','CAT_NAM'],titles:['\구간거리(m)','\상행속도(분)','\하행속도(분)','\시점표고(m)','\종점표고(m)','\난이도'] }
+	    	,{layer:'LT_P_UTISCCTV',fields:['LOCATE','CCTVNAME'],titles:['\소재지','\CCTV명'] }
+	    	,{layer:'LT_C_ADSIDO_INFO',fields:['CTPRVN_CD','CTP_KOR_NM','CTP_ENG_NM'],titles:['\행정구역코드','\광역시도명','\광역시도 영문명'] }
+	    	,{layer:'LT_C_ADSIGG_INFO',fields:['SIG_CD','FULL_NM','SIG_KOR_NM','SIG_ENG_NM'],titles:['\행정구역코드','\행정구역명','\시군구명','\시군구 영문명'] }
+	    	,{layer:'LT_C_ADEMD_INFO',fields:['EMD_CD','FULL_NM','EMD_KOR_NM','EMD_ENG_NM'],titles:['\행정구역코드','\행정구역명','\읍면동명','\읍면동 영문명'] }
+	    	,{layer:'LT_C_ADRI_INFO',fields:['LI_CD','FULL_NM','LI_KOR_NM','LI_ENG_NM'],titles:['\행정구역코드','\행정구역명','\리명','\리 영문명'] }
+	    	,{layer:'LT_C_TDWAREA',fields:['SAUP_NAME','SAUP_GUBUN','YEAR_SAUP','YEAR_DSGN','SAUP_AREA'],titles:['\사업명','\연차별구분','\사업년도','\설계년도','\사업면적'] }
+	    	,{layer:'LT_C_DAMDAN',fields:['CAT_NAM','DAN_NAME'],titles:['\단지분류','\단지명'] }
+	    	,{layer:'LT_C_DAMYOD',fields:['CAT_NAM','DAN_NAME'],titles:['\용도분류','\단지명'] }
+	    	,{layer:'LT_C_DAMYOJ',fields:['CAT_NAM','DAN_NAME'],titles:['\용지분류','\단지명'] }
+	    	,{layer:'LT_C_DAMYUCH',fields:['CAT_NAM','UPJ_NAME','DAN_NAME'],titles:['\업종분류','\유치업종명','\단지명'] }
+	    	,{layer:'LT_C_RIRSV',fields:['CAT_NAM','FAC_NAME'],titles:['\시설분류','\시설명'] }
+	    	,{layer:'LT_P_RIFCT',fields:['CAT_NAM','FAC_F_NAME'],titles:['\시설분류','\시설명'] }
+	    	,{layer:'LT_P_MGPRTFA',fields:['FAC_CAT','FAC_NAM','FAC_TEL','FAC_O_ADD','FAC_N_ADD'],titles:['\시설분류','\시설명','\전화번호','\구주소','\새주소'] }
+	    	,{layer:'LT_P_MGPRTFB',fields:['FAC_CAT','FAC_NAM','FAC_TEL','FAC_O_ADD','FAC_N_ADD'],titles:['\시설분류','\시설명','\전화번호','\구주소','\새주소'] }
+	    	,{layer:'LT_P_MGPRTFC',fields:['FAC_CAT','FAC_NAM','FAC_TEL','FAC_O_ADD','FAC_N_ADD'],titles:['\시설분류','\시설명','\전화번호','\구주소','\새주소'] }
+	    	,{layer:'LT_P_MGPRTFD',fields:['FAC_CAT','FAC_NAM','FAC_TEL','FAC_O_ADD','FAC_N_ADD'],titles:['\시설분류','\시설명','\전화번호','\구주소','\새주소'] }
+	    	,{layer:'LT_C_WKMBBSN',fields:['CAT_NAM','BBSNNM'],titles:['\권역분류','\권역명'] }
+	    	,{layer:'LT_C_WKMMBSN',fields:['CAT_NAM','MBSNNM'],titles:['\권역분류','\권역명'] }
+	    	,{layer:'LT_C_WKMSBSN',fields:['CAT_NAM','SBSNNM'],titles:['\권역분류','\권역명'] }
+	    	,{layer:'LT_C_WKMSTRM',fields:['CAT_NAM','RIV_NM'],titles:['\하천분류','\하천명'] }
+	    	,{layer:'LT_L_TRKROAD',fields:['CAT_NAM','LNK_NAM','CON_NUM','COS_NAM','COL_LVL','LEN_TIM','LEN_LNK','COMMENT'],
+	    		titles:['\산책로구분','\명칭','\코스번호','\코스명','\코스난이도','\소요시간','\코스길이(km)','\비고'] }
+	    	,{layer:'LT_P_TRKROAD',fields:['TYP_NAM','NDE_NAM','COS_NAM','COS_DPC'],titles:['\분기점구분','\분기점명칭','\코스명','\비고'] }
+	    	,{layer:'LT_P_CLIMBALL',fields:['MOT_NAM','POI_NA1','ALT_VAR'],titles:['\산명칭','\지점명','\눂이표고(m)'] }
+	    	,{layer:'LT_P_CLIMBFAC',fields:['MOT_NAM','POI_NA1','ALT_VAR'],titles:['\산명칭','\지점명','\눂이표고(m)'] }
+	    	,{layer:'LT_P_CLIMBRLG',fields:['MOT_NAM','POI_NA1','ALT_VAR'],titles:['\산명칭','\지점명','\눂이표고(m)'] }
+	    	,{layer:'LT_P_NATUGEO',fields:['MOT_NAM','POI_NA1','ALT_VAR'],titles:['\산명칭','\지점명','\눂이표고(m)'] }
+	    	,{layer:'LT_P_NATUNAM',fields:['MOT_NAM','POI_NA1','ALT_VAR'],titles:['\산명칭','\지점명','\눂이표고(m)'] }
+	    	,{layer:'LT_P_MOCTNODE',fields:['NODE_ID','NODE_NAME','ND_TYPE_H','TURN_TYPE','REMARK'],titles:['\노드ID','\노드명','\노드유형','\회전제한유형','\비고'] }
+	    	,{layer:'LT_L_MOCTLINK',fields:['LINK_ID','ROAD_NAME','MAX_SPD','RD_RANK_H','RD_TYPE_H','REST_VEH_H','REST_W','REST_H','REMARK'],
+	    		titles:['\링크ID','\도로명','\최고제한속도','\도로등급','\도로유형','\통행제한차량','\통과제한하중','\통과제한높이','\비고'] }
+	    	,{layer:'ST_SIDO',fields:['SIG_NAM','CRI_CNT','CRI_RNK','CRI_INC','UNT_CNT','UNT_RNK','UNT_INC'],titles:['\시도명','범죄발생건수','범죄발생순위','증감건수','인구대비건수','인구대비순위','인구대비증감'] }
+	    	,{layer:'ST_SIGUNGU',fields:['SIG_NAM','CRI_CNT','CRI_RNK','CRI_INC','UNT_CNT','UNT_RNK','UNT_INC'],titles:['\시군구명','범죄발생건수','범죄발생순위','증감건수','인구대비건수','인구대비순위','인구대비증감'] }
+	    	,{layer:'LT_C_BLDGMETA',fields:['GEOIDN','UID','PNU'],titles:['\식별키1','\식별키2','\PNU'] }	    	
+	    	,{layer:'LT_C_WGISPLTALK',fields:['COAST_PART','LANDSEA','AREA','REGION','PROJECT'],titles:['\지역계획분류','구분','면적','지역명','주체'] }
+	    	,{layer:'LT_C_WGISPLROW',fields:['COAST_PART','LANDSEA','AREA','REGION','PROJECT'],titles:['\지역계획분류','구분','면적','지역명','주체'] }
+	    	,{layer:'LT_C_WGISPLUSE',fields:['COAST_PART','LANDSEA','AREA','REGION','PROJECT'],titles:['\지역계획분류','구분','면적','지역명','주체'] }
+	    	,{layer:'LT_C_WGISPLABS',fields:['COAST_PART','LANDSEA','AREA','REGION','PROJECT'],titles:['\지역계획분류','구분','면적','지역명','주체'] }
+	    	,{layer:'LT_C_WGISPLJUN',fields:['COAST_PART','LANDSEA','AREA','REGION','PROJECT'],titles:['\지역계획분류','구분','면적','지역명','주체'] }    	
+	    	,{layer:'LT_C_WGISRERESH',fields:['REC_RS_SEQ', 'NAME'],titles:['\일련번호','\명칭'] }
+	    	,{layer:'LT_C_WGISREPLAN',fields:['REC_BA_SEQ', 'NAME'],titles:['\일련번호','\명칭'] }
+	    	,{layer:'LT_C_WGISRERESH',fields:['REC_CO_SEQ', 'NAME'],titles:['\일련번호','\명칭'] }    	
+	    	,{layer:'LT_C_WGISIEGUG',fields:['E_CODE','E_NAME'],titles:['\단지번호','명칭'] }
+	    	,{layer:'LT_C_WGISIENONG',fields:['E_CODE','E_NAME'],titles:['\단지번호','명칭'] }
+	    	,{layer:'LT_C_WGISIEILBAN',fields:['E_CODE','E_NAME'],titles:['\단지번호','명칭'] }
+	    	,{layer:'LT_C_WGISIEDOSI',fields:['E_CODE','E_NAME'],titles:['\단지번호','명칭'] }    	
+	    	,{layer:'LT_C_WGISFMGUL',fields:['WFARM_CODE','LICWHAT'],titles:['\양식장번호','양식종류'] }
+	    	,{layer:'LT_C_WGISFMKIM',fields:['WFARM_CODE','LICWHAT'],titles:['\양식장번호','양식종류'] }
+	    	,{layer:'LT_C_WGISFMDSM',fields:['WFARM_CODE','LICWHAT'],titles:['\양식장번호','양식종류'] }
+	    	,{layer:'LT_C_WGISFMMYK',fields:['WFARM_CODE','LICWHAT'],titles:['\양식장번호','양식종류'] }
+	    	,{layer:'LT_C_WGISFMFISH',fields:['WFARM_CODE','LICWHAT'],titles:['\양식장번호','양식종류'] }
+	    	,{layer:'LT_C_WGISFMJBOK',fields:['WFARM_CODE','LICWHAT'],titles:['\양식장번호','양식종류'] }
+	    	,{layer:'LT_C_WGISTPSEA',fields:['PORT_CODE','PORT_NAME'],titles:['\무역항코드','무역항명칭'] }
+	    	,{layer:'LT_C_WGISTPLAND',fields:['PORT_CODE','PORT_NAME'],titles:['\무역항코드','무역항명칭'] }
+	    	,{layer:'LT_C_WGISTPNEWP',fields:['PORT_CODE','PORT_NAME'],titles:['\무역항코드','무역항명칭'] }
+	    	,{layer:'LT_C_WGISCPSEA',fields:['PORT_CODE','PORT_NAME'],titles:['\연안항코드','연안항명칭'] }
+	    	,{layer:'LT_C_WGISCPLAND',fields:['PORT_CODE','PORT_NAME'],titles:['\연안항코드','연안항명칭'] }    	
+	    	,{layer:'LT_C_WGISARECO',fields:['NAME'],titles:['\명칭'] }
+	    	,{layer:'LT_C_WGISARFISHER',fields:['FISHERY_CD','NAME'],titles:['\보호구역코드','명칭'] }
+	    	,{layer:'LT_C_WGISARWET',fields:['BCODE','NAME'],titles:['\보호구역코드','명칭'] }    	
+	    	,{layer:'LT_C_WGISNPGUG',fields:['PARK_NAME'],titles:['\명칭'] }
+	    	,{layer:'LT_C_WGISNPGUN',fields:['PARK_NAME'],titles:['\명칭'] }
+	    	,{layer:'LT_C_WGISNPDO',fields:['PARK_NAME'],titles:['\명칭'] }    	
+	    	,{layer:'LT_C_TFISTIDAF',fields:['AREA'],titles:['\갯벌면적'] }    	
+	    	,{layer:'LT_C_TFISMPA',fields:['MPA_NAM','GOS_NUM','GOS_DAT','LAW','LOC','ARA_SIZ','MNG_OGR']
+	    		,titles:['\보호구역명칭','고시번호','고시일자','적용법률','주소','규모','관리기관'] }    	
+	    	,{layer:'LT_P_EDRSE002',fields:['SHEL_NM','SHEL_TP','SHEL_AD','SHEL_AV'],titles:['\대피소명칭','연락처','주소','수용능력(명)'] }
+	    	,{layer:'LT_P_AISHCSTRIP',fields:['STT_CDE','ORG_NAM','STR_NAM','STR_USE','STR_ADR','ALT_VAL','INT_LEN','INT_GRD',
+	    		'SHT_GRD','LND_SIZ','PAD_SIZ','HOR_RAD','COM_DAT','USE_DAT','USE_TYP']
+	    		,titles:['\구분','\제공처','명칭','사용여부','주소','표고','진입구역길이','진입표면경사',
+	    		'전이표면경사','착륙대','패드','수평표면반경','설치허가일','사용개시일','운용방법'] }
+	    	//201412
+	    	,{layer:'LT_L_TOISDEPCNTAH',fields:['LABEL'],titles:['\명칭']}    	
+	    	,{layer:'LT_P_NSNMSSITENM',fields:['LAND_PKYO'],titles:['\명칭']}    	
+	    	,{layer:'LT_C_FLISFK100',fields:['UNAME','SIG_NAM'],titles:['\용도지역명','지자체명']} 
+	    	,{layer:'LT_C_FLISFK200',fields:['UNAME','SIG_NAM'],titles:['\용도지역명','지자체명']} 
+	    	,{layer:'LT_C_FLISFK300',fields:['UNAME','SIG_NAM'],titles:['\용도지역명','지자체명']} 
+	    	,{layer:'LT_C_CDFRS050FRQ',fields:['ELEVATION'],titles:['\고도'] }    	
+	    	,{layer:'LT_C_CDFRS100FRQ',fields:['ELEVATION'],titles:['\고도'] }    	
+	    	,{layer:'LT_C_CDFRS150FRQ',fields:['ELEVATION'],titles:['\고도'] }    	
+	    	,{layer:'LT_C_CDFRS200FRQ',fields:['ELEVATION'],titles:['\고도'] }    	
+	    	,{layer:'LT_C_CDFRSMAXFRQ',fields:['ELEVATION'],titles:['\고도'] }    	
+	    	,{layer:'LT_C_UPISUQ151',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM','PMI_NAM'],titles:['\지자체명','\대분류','중분류','소분류','명칭','도로구분'] } 
+	    	,{layer:'LT_C_UPISUQ152',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UPISUQ153',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UPISUQ154',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UPISUQ155',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UPISUQ156',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UPISUQ157',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UPISUQ158',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UPISUQ159',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UPISUQ161',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UPISUQ171',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UPISUQ173',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UPISUQ174',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UPISUQ175',fields:['SIG_NAM','LCL_NAM','MLS_NAM','SCL_NAM','DGM_NM'],titles:['\지자체명','\대분류','중분류','소분류','명칭'] } 
+	    	,{layer:'LT_C_UO301',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGG_NAME'],titles:['\용도지역명','고시년도','고시번호','시도명','시군구명'] }
+	    	,{layer:'LT_C_GIMSHYDRO',fields:['SIG_NAM','INFO'],titles:['\지자체명','\주요정보'] } 
+	    	,{layer:'LT_C_GIMSSTIFF',fields:['SIG_NAM','INFO'],titles:['\지자체명','\주요정보'] } 
+	    	,{layer:'LT_L_GIMSEC',fields:['SIG_NAM','INFO'],titles:['\지자체명','\주요정보'] } 
+	    	,{layer:'LT_C_GIMSLINEA',fields:['SIG_NAM','INFO'],titles:['\지자체명','\주요정보'] } 
+	    	,{layer:'LT_L_GIMSLINEA',fields:['SIG_NAM','INFO'],titles:['\지자체명','\주요정보'] } 
+	    	,{layer:'LT_L_GIMSDEPTH',fields:['SIG_NAM','INFO'],titles:['\지자체명','\주요정보'] } 
+	    	,{layer:'LT_L_GIMSPOTEN',fields:['SIG_NAM','INFO'],titles:['\지자체명','\주요정보'] } 
+	    	,{layer:'LT_L_GIMSDIREC',fields:['SIG_NAM','INFO'],titles:['\지자체명','\주요정보'] } 
+	    	]);
+	    
+		vworld.init("PrintArea", "base", 
+				function() {         
+					map = this.vmap; 
+					map.setMinLevel(1);
+					map.addVWORLDControl("zoomBar");
+					map.addVWORLDControl("layerSwitch");
+					//var testextent = new OpenLayers.Bounds(126.86737790716945,37.49527950140197,126.992776543028,37.54973832199952);
+					//var extent = testextent.clone().transform("EPSG:4326","EPSG:900913");
+					//map.setMaxExtent(extent);//visible Extent
+					map.zoomToMaxExtent();
+					
+					OpenLayers.ProxyHost = "/proxy.do?url=";
+				}
+				,function (obj){
+					SOPPlugin = obj; 
+					window.sop.earth.addEventListener(SOPPlugin, "lmouseup", function(event){
+						var cod=event.getMapCoordinate();
+						alert("좌표 x:" + cod.Longitude + ",y:" + cod.Latitude + ", 픽셀 x:" + event.x + ",y:" + event.y);
+					});
+				}//initCallback
+				,function (msg){}//failCallback
+			);
+	
+	//주제도 레이어 추가하기(보기)
+	function addThemeLayer(id, title, layer, wfslayer){
+		if ($('#' + id).hasClass('on')){
+			map.hideThemeLayer(title);	
+			$('#' + id).removeClass('on');
+		}
+		else {
+			if ((wfslayer == null) || (wfslayer === 'undefined')){wfslayer = layer;}
+			map.showThemeLayer(title, {layers:layer, typename:wfslayer});				
+			$('#' + id).addClass('on');
+		}
+					
+	}
+	
+	function setClass(id, classname){
+		if ($('#' + id).hasClass(classname)){
+			$('#' + id).removeClass(classname);
+		}else {
+			$('#' + id).addClass(classname);
+		}					
+	}
+	
+	function saveExcelTest(targetId){
+		var datas = "";//document.getElementById(targetId).outerHTML;
+		datas = "<thead><tr><th>asdfas 기준</th><th></th><th>  (단위: sdfasdf asdf)</th></tr></thead>"+ datas;
+		var f = document.excelFrm;
+		f.data.value = datas;
+		f.fileName.value = 'test';
+		f.submit();
+	}
+	
+	function chosung(str) {
+	  cho = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+	  result = "";
+	  for(i=0;i<str.length;i++) {
+	    code = str.charCodeAt(i)-44032;
+	    if(code>-1 && code<11172) result += cho[Math.floor(code/588)];
+	  }
+	  alert(result);
+	  //return result;
+	}
+
+</script> 
+
+<body >
+	<div class="content">
+		<div class="asidemenu">
+			<ul id="nav">
+				<li id="cate"><a href="#" title="12월개방">12월개방</a>
+				</li>
+				<li class="maincate" id="main1"><a class="subcate" href="#" title="연안침수예상도"  onclick="setClass('main1','liston');">연안침수예상도</a>
+					<ul>
+						<li><a id="a_LT_C_CDFRS050FRQ"  href="javascript:addThemeLayer('a_LT_C_CDFRS050FRQ', '해안침수_50년빈도','LT_C_CDFRS050FRQ');" title="해안침수_50년빈도">해안침수_50년빈도</a></li>
+						<li><a id="a_LT_C_CDFRS100FRQ"  href="javascript:addThemeLayer('a_LT_C_CDFRS100FRQ', '해안침수_100년빈도','LT_C_CDFRS100FRQ');" title="해안침수_100년빈도">해안침수_100년빈도</a></li>
+						<li><a id="a_LT_C_CDFRS150FRQ"  href="javascript:addThemeLayer('a_LT_C_CDFRS150FRQ', '해안침수_150년빈도','LT_C_CDFRS150FRQ');" title="해안침수_150년빈도">해안침수_150년빈도</a></li>
+						<li><a id="a_LT_C_CDFRS200FRQ"  href="javascript:addThemeLayer('a_LT_C_CDFRS200FRQ', '해안침수_200년빈도','LT_C_CDFRS200FRQ');" title="해안침수_200년빈도">해안침수_200년빈도</a></li>
+						<li><a id="a_LT_C_CDFRSMAXFRQ"  href="javascript:addThemeLayer('a_LT_C_CDFRSMAXFRQ', '해안침수_최대범람','LT_C_CDFRSMAXFRQ');" title="해안침수_최대범람">해안침수_최대범람</a></li>						
+					</ul>
+				</li>
+				<li class="maincate" id="main2"><a class="subcate" href="#" title="개발행위허가도"  onclick="setClass('main2','liston');">개발행위허가도</a>
+					<ul>
+						<li><a id="a_LT_C_UPISUQ171"  href="javascript:addThemeLayer('a_LT_C_UPISUQ171', '개발행위허가제한지역','LT_C_UPISUQ171');" title="개발행위허가제한지역">개발행위허가제한지역</a></li>
+						<li><a id="a_LT_C_UPISUQ173"  href="javascript:addThemeLayer('a_LT_C_UPISUQ173', '기반시설부담구역','LT_C_UPISUQ173');" title="기반시설부담구역">기반시설부담구역</a></li>
+						<li><a id="a_LT_C_UPISUQ174"  href="javascript:addThemeLayer('a_LT_C_UPISUQ174', '개발행위허가필지','LT_C_UPISUQ174');" title="개발행위허가필지">개발행위허가필지</a></li>
+						<li><a id="a_LT_C_UPISUQ175"  href="javascript:addThemeLayer('a_LT_C_UPISUQ175', '토지거래계약에관한허가구역','LT_C_UPISUQ175');" title="토지거래계약에관한허가구역">토지거래계약에관한허가구역</a></li>						
+					</ul>
+				</li>
+				<li class="maincate" id="main3"><a class="subcate" href="#" title="지구단위계획구역"  onclick="setClass('main3','liston');">지구단위계획구역</a>
+					<ul>
+						<li><a id="a_LT_C_UPISUQ161"  href="javascript:addThemeLayer('a_LT_C_UPISUQ161', '지구단위계획','LT_C_UPISUQ161');" title="지구단위계획">지구단위계획</a></li>
+					</ul>
+				</li>
+				<li class="maincate" id="main4"><a class="subcate" href="#" title="도시계획시설도"  onclick="setClass('main4','liston');">도시계획시설도</a>
+					<ul>
+						<li><a id="a_LT_C_UPISUQ151"  href="javascript:addThemeLayer('a_LT_C_UPISUQ151', '도시계획_도로','LT_C_UPISUQ151');" title="도시계획_도로">도시계획_도로</a></li>
+						<li><a id="a_LT_C_UPISUQ152"  href="javascript:addThemeLayer('a_LT_C_UPISUQ152', '도시계획_교통시설','LT_C_UPISUQ152');" title="도시계획_교통시설">도시계획_교통시설</a></li>
+						<li><a id="a_LT_C_UPISUQ153"  href="javascript:addThemeLayer('a_LT_C_UPISUQ153', '도시계획_공간시설','LT_C_UPISUQ153');" title="도시계획_공간시설">도시계획_공간시설</a></li>
+						<li><a id="a_LT_C_UPISUQ154"  href="javascript:addThemeLayer('a_LT_C_UPISUQ154', '도시계획_유통공급시설','LT_C_UPISUQ154');" title="도시계획_유통공급시설">도시계획_유통공급시설</a></li>
+						<li><a id="a_LT_C_UPISUQ155"  href="javascript:addThemeLayer('a_LT_C_UPISUQ155', '도시계획_공공문화체육시설','LT_C_UPISUQ155');" title="도시계획_공공문화체육시설">도시계획_공공문화체육시설</a></li>
+						<li><a id="a_LT_C_UPISUQ156"  href="javascript:addThemeLayer('a_LT_C_UPISUQ156', '도시계획_방재시설','LT_C_UPISUQ156');" title="도시계획_방재시설">도시계획_방재시설</a></li>
+						<li><a id="a_LT_C_UPISUQ157"  href="javascript:addThemeLayer('a_LT_C_UPISUQ157', '도시계획_보건위생시설','LT_C_UPISUQ157');" title="도시계획_보건위생시설">도시계획_보건위생시설</a></li>
+						<li><a id="a_LT_C_UPISUQ158"  href="javascript:addThemeLayer('a_LT_C_UPISUQ158', '도시계획_환경기초시설','LT_C_UPISUQ158');" title="도시계획_환경기초시설">도시계획_환경기초시설</a></li>
+						<li><a id="a_LT_C_UPISUQ159"  href="javascript:addThemeLayer('a_LT_C_UPISUQ159', '도시계획_기타기반시설','LT_C_UPISUQ159');" title="도시계획_기타기반시설">도시계획_기타기반시설</a></li>
+					</ul>
+				</li>
+				<li class="maincate" id="main5"><a class="subcate" href="#" title="산지정보도"  onclick="setClass('main5','liston');">산지정보도</a>
+					<ul>
+						<li><a id="a_LT_C_FLISFK100"  href="javascript:addThemeLayer('a_LT_C_FLISFK100', '산지_자연휴양림','LT_C_FLISFK100');" title="산지_자연휴양림">산지_자연휴양림</a></li>
+						<li><a id="a_LT_C_FLISFK200"  href="javascript:addThemeLayer('a_LT_C_FLISFK200', '산지_채종림','LT_C_FLISFK200');" title="산지_채종림">산지_채종림</a></li>
+						<li><a id="a_LT_C_FLISFK300"  href="javascript:addThemeLayer('a_LT_C_FLISFK300', '산지_보안림','LT_C_FLISFK300');" title="산지_보안림">산지_보안림</a></li>
+					</ul>
+				</li>
+				<li class="maincate" id="main6"><a class="subcate" href="#" title="농지정보도"  onclick="setClass('main6','liston');">농지정보도</a>
+					<ul>
+						<li><a id="a_LT_C_AGRIXUE101"  href="javascript:addThemeLayer('a_LT_C_AGRIXUE101', '농업진흥지역도','LT_C_AGRIXUE101');" title="농업진흥지역도">농업진흥지역도</a></li>
+						<li><a id="a_LT_C_AGRIXUE102"  href="javascript:addThemeLayer('a_LT_C_AGRIXUE102', '영농여건불리농지도','LT_C_AGRIXUE102');" title="영농여건불리농지도">영농여건불리농지도</a></li>
+					</ul>
+				</li>
+				<li class="maincate" id="main7"><a class="subcate" href="#" title="기본배경도"  onclick="setClass('main7','liston');">기본배경도</a>
+					<ul>
+						<li><a id="a_LT_P_NSNMSSITENM"  href="javascript:addThemeLayer('a_LT_P_NSNMSSITENM', '국가지명','LT_P_NSNMSSITENM');" title="국가지명">국가지명</a></li>
+						<li><a id="a_LT_L_TOISDEPCNTAH"  href="javascript:addThemeLayer('a_LT_L_TOISDEPCNTAH', '해안선','LT_L_TOISDEPCNTAH');" title="해안선">해안선</a></li>
+					</ul>
+				</li>
+				<li class="maincate" id="main8"><a class="subcate" href="#" title="지하수정보도"  onclick="setClass('main8','liston');">지하수정보도</a>
+					<ul>
+						<li><a id="a_LT_C_GIMSHYDRO"  href="javascript:addThemeLayer('a_LT_C_GIMSHYDRO', '수문지질단위','LT_C_GIMSHYDRO');" title="수문지질단위">수문지질단위</a></li>
+						<li><a id="a_LT_C_GIMSSTIFF"  href="javascript:addThemeLayer('a_LT_C_GIMSSTIFF', '수질다이어그램','LT_C_GIMSSTIFF');" title="수질다이어그램">수질다이어그램</a></li>
+						<li><a id="a_LT_L_GIMSEC"  href="javascript:addThemeLayer('a_LT_L_GIMSEC', '전기전도도','LT_L_GIMSEC');" title="전기전도도">전기전도도</a></li>
+						<li><a id="a_LT_C_GIMSLINEA"  href="javascript:addThemeLayer('a_LT_C_GIMSLINEA', '지질구조밀도','LT_C_GIMSLINEA');" title="지질구조밀도">지질구조밀도</a></li>
+						<li><a id="a_LT_L_GIMSLINEA"  href="javascript:addThemeLayer('a_LT_L_GIMSLINEA', '지질구조선','LT_L_GIMSLINEA');" title="지질구조선">지질구조선</a></li>
+						<li><a id="a_LT_L_GIMSDEPTH"  href="javascript:addThemeLayer('a_LT_L_GIMSDEPTH', '지하수등수심선','LT_L_GIMSDEPTH');" title="지하수등수심선">지하수등수심선</a></li>
+						<li><a id="a_LT_L_GIMSPOTEN"  href="javascript:addThemeLayer('a_LT_L_GIMSPOTEN', '지하수등수위선','LT_L_GIMSPOTEN');" title="지하수등수위선">지하수등수위선</a></li>
+						<li><a id="a_LT_L_GIMSDIREC"  href="javascript:addThemeLayer('a_LT_L_GIMSDIREC', '지하수유동방향','LT_L_GIMSDIREC');" title="지하수유동방향">지하수유동방향</a></li>
+						<!-- <li><a id="a_LT_C_GIMSFLOW"  href="javascript:addThemeLayer('a_LT_C_GIMSFLOW', '지하수유동체계규모','LT_C_GIMSFLOW');" title="지하수유동체계규모">지하수유동체계규모</a></li> -->
+					</ul>
+				</li>				
+				<li class="maincate" id="main9"><a class="subcate" href="#" title="기타"  onclick="setClass('main9','liston');">기타</a>
+					<ul>
+						<li><a id="a_LT_C_UO301"  href="javascript:addThemeLayer('a_LT_C_UO301', '문화재보호도','LT_C_UO301');" title="문화재보호도">문화재보호도</a></li>
+						<li><a id="a_LT_C_UMA100"  href="javascript:addThemeLayer('a_LT_C_UMA100', '국립공원용도지구','LT_C_UMA100');" title="국립공원용도지구">국립공원용도지구</a></li>
+						
+					</ul>
+				</li>
+				<li><a href="javascript:saveExcelTest(1);" title="엑셀테스트">엑셀테스트</a></li>
+				<li><a href="javascript:chosung('동해물과백두산이마르고닳도록');" title="엑셀테스트">동해물과백두산이마르고닳도록</a></li>
+			</ul>
+			<ul>
+				
+			</ul>
+			
+		</div>					
+		<div class="mapcontent">
+			<div id="PrintArea" style="width:100%;height:100%;left:0px;top:0px;position:relative;"></div>	
+		</div>	
+	</div>
+	<form action="/js/util/dynamicexcel.jsp" id="excelFrm" name="excelFrm" method="post">
+  		<input type="hidden" name="data" id="data" value=""></input>
+  		<input type="hidden" name="fileName" id="fileName" value=""></input>
+  	</form>
+</body> 
+	
+</html>

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+<title>Webgl API 레이어관리</title>
+</head>
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?version=wBeta&apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9&domain=http://localhost:8080"></script>
+<script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
+<script>
+var Map3D;
+function init(){
+	var optMapOptions =new vw.MapOptions(
+	vw.BasemapType.GRAPHIC, // 초기배경지도
+	"", // 디폴트레이어 설정됨 //레이어 목록
+	vw.DensityType.FULL, // navi, scale, coordinate 3개의 컨트롤이 나타남.
+	vw.DensityType.FULL, //인터렉션 밀도 ?
+	new vw.CameraPosition(new vw.CoordZ(127.12636278475038, 37.410307881426085, 500), new vw.Direction(0, 60, 0)),// 홈 카메라 위치
+	new vw.CameraPosition(new vw.CoordZ(127.126366626566, 37.41007333074048, 500), new vw.Direction(0, 60, 0)), // 초기 카메라 위치
+	true
+	);
+	//create 3d map object
+	Map3D = new vw.Map('globarea', optMapOptions);
+}
+
+$(window).load(function(){
+	init();
+})
+
+
+
+var map3DgetLayers = function(){
+	var option="";
+	Map3D.getLayers().getArray().forEach(function(layerNum){
+		option+= "<option value='"+layerNum.get("name")+"' >"+layerNum.get("name")+"</option>";
+	})
+	$('#selectId').html(option);
+}
+
+/**
+ * 선택한 레이어 조회
+ */
+$(document).on("change",'#selectId',function(){
+	
+	$('#selectlayer').remove();
+	var searchLayer = Map3D.searchLayer($(this).val()); //레이어선택
+	var length = searchLayer.getKeys().length;
+	var option="";
+	searchLayer.getKeys().forEach(function(i){  // 레이어 속성조회
+		option+= "<option value='"+i+"' >"+i+"</option>";
+	})
+	var selecthtml =$("<select id='selectlayer' size='"+length+"' style='float:left' data_id='"+$('#selectId').val()+"' />")
+	selecthtml.append(option);
+	$('#selectId').after(selecthtml);
+})
+
+$(document).on("click",'#selectlayer',function(){
+	var layerName= $('#selectlayer').attr("data_id");
+	var selectValue = $(this).val();
+	alert(Map3D.searchLayer(layerName).get(selectValue));
+	
+})
+
+/**
+ * 라인 객체 레이어 추가
+ */
+var map3DaddLayer = function(){
+	
+	var array = Array();
+	array.push(new vw.LineString3D(37.410307881426085,127.12636278475038,  null));
+	array.push(new vw.LineString3D(37.810307881426085,127.12636278475038,  null));
+	array.push(new vw.LineString3D(37.810307881426085,127.32636278475038,  null));
+	
+	var lineSource = new vw.source.Object3D({
+		name: "linestring",
+		mode: "3D",
+		object: array,
+		color: new Float32Array([1, 1, 0, 1])
+	});
+
+	var lineTestLayer = new vw.layer.Object3D({
+		source: lineSource,
+		name: "object3d_line",
+		visible: true
+	});
+
+	Map3D.addLayer(lineTestLayer); // 레이어 추가
+	
+	/*   //레이어  라인 추가 안됨 확인 필요 
+	
+	var lineSource = new vw.source.Object3D({
+		name: "linestring",
+		mode: "3D",
+		object: [ new vw.LineString3D(37.410307881426085,127.12636278475038,  null) ,new vw.LineString3D(37.810307881426085,127.12636278475038,  null),
+			,new vw.LineString3D(37.810307881426085,127.32636278475038,  null)
+		],
+		color: new Float32Array([1, 1, 0, 1])
+	});
+
+	var lineTestLayer = new vw.layer.Object3D({
+		source: lineSource,
+		name: "object3d_line",
+		visible: true
+	});
+
+	Map3D.addLayer(lineTestLayer); 
+	*/
+}
+
+
+</script>
+<body>
+<!-- 
+레퍼런스 없음 레이어 목록 가지고오기 
+Map3D.getLayers()
+
+레이어 삭제
+Map3D.deleteLayer(레이어명) 
+
+레이어 추가
+Map3D.addLayer(레이어명) 
+})
+ -->
+
+<div style="width: 1000px; height: 230px; background-color: gray">
+<select size="9" style="width: 200px; float:left;" id="selectId">
+</select>
+<input type="button" value="현재 레이어 목록 호출" onclick="map3DgetLayers();" style="clear:both;">
+<input type="button" value="레이어 삭제" onclick="Map3D.deleteLayer($('#selectId').val());map3DgetLayers();">
+<input type="button" value="레이어 추가(라인생성)" onclick="map3DaddLayer();map3DgetLayers();">
+</div>
+
+<div id="maparea" style="display:inline-block;position:absolute;width:1000px;height:600px;">
+	<div id="globarea" style="display:inline-block;position:relative;width:100%;height:100%;">
+	</div>
+</div>
+
+
+</body>
+
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html> 
+<head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<title>VWORLD DEMO SAMPLE(POLYLINE)</title> 
+<script type="text/javascript" src="https://map.vworld.kr/js/vworldMapInit.js.do?apiKey=D2F96ADF-C7F4-3FE6-9021-7949E462F8C6"></script>
+</head> 
+<body>
+<script type="text/javascript">
+	var map = null;  
+	vworld.showMode = false; 
+   
+   // 통합지도 초기화
+	vworld.init(
+		"cont1", "map-first"
+		,function() {         
+			map = this.vmap; 
+			map.setControlsType({"simpleMap":true});
+			//기존 클릭이벤트 해제
+			//map.events.unregister('click', map, map.onMapClicked);
+			//신규 클릭이벤트 부여
+			//map.events.register('click', map, fnMapClicked);
+			
+			//화면중심점과 레벨로 이동
+			map.setCenterAndZoom(14137792.751626197, 4092051.278263237, 8);  	
+		}
+		,function (obj){SOPPlugin = obj; }//initCallback
+		,function (msg){alert('vworld init fail');}//failCallback
+	);
+	
+    function fnMapClicked(){
+    	alert("click");
+    }
+	//========Polyline=============================
+	var polyline;
+	function createPolyline(){
+		OpenLayers.Renderer.symbol.lightning = [0, 0, 4, 2, 6, 0, 10, 5, 6, 3, 4, 5, 0, 0];		
+		OpenLayers.Renderer.symbol.rectangle = [0, 0, 4, 0, 4, 10, 0, 10, 0, 0];
+		OpenLayers.Renderer.symbol.church = [4, 0, 6, 0, 6, 4, 10, 4, 10, 6, 6, 6, 6, 14, 4, 14, 4, 6, 0, 6, 0, 4, 4, 4, 4, 0];
+		OpenLayers.Renderer.symbol.arrow = [0,2, 1,0, 2,2, 1,0, 0,2];//
+		var style_green = {rotation:0, pointRadius: 10, graphicName: "arrow", fillColor: "#00FF00", strokeColor: "#00FF00", strokeOpacity: 1, strokeWidth: 2}; 
+		
+		map.setZoomLevel(14);
+		var center = map.getCenter();
+				
+		var points = [];
+		points.push(new OpenLayers.Geometry.Point(center.lon, center.lat)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat - 1000)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat - 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat - 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat + 1000)); 
+		
+		polyline = new vworld.Polyline(points, style_green);
+		map.vectorLayer.addFeatures([polyline]); 	
+		
+		return polyline;
+		
+	}
+	
+	function setPolylineStyle(){
+		//[dot | dash | dashdot | longdash | longdashdot | solid]
+		var line;
+		if (polyline == null){
+			line = createPolyline();
+		}else {
+			line = polyline;
+		}
+		var oldw = line.getStyle();
+		line.setStyle("dash");
+	}
+	
+	function setPolylineWeight(w){
+		var line;
+		if (polyline == null){
+			line = createPolyline();
+		}else {
+			line = polyline;
+		}
+		var oldw = line.getWeight();
+		line.setWeight(w);
+		alert('기존굵기:' + oldw + ",변경굵기:" + w);
+	}
+	function setPolylineColor(color){
+		var line;
+		if (polyline == null){
+			line = createPolyline();
+		}else {
+			line = polyline;
+		}
+		var oldc = line.getColor();
+		line.setColor(color);
+		alert('기존색상:' + oldc + ",변경색상:" + color);
+	}
+	
+	function addPolylinePoint(){
+		var line;
+		if (polyline == null){
+			line = createPolyline();
+		}else {
+			line = polyline;
+		}
+		var center = map.getCenter();
+		line.addNewPoint(new OpenLayers.Geometry.Point(center.lon, center.lat));
+	}
+	
+	function getPolylineBound(){
+		var line;
+		if (polyline == null){
+			line = createPolyline();
+		}else {
+			line = polyline;
+		}
+		var oldb = line.getPolyBounds();
+		createBounds(oldb);
+		alert('Bound:' + oldb);
+	}
+	
+	function createBounds(bounds){
+		var points = [];
+		points.push(new OpenLayers.Geometry.Point(bounds.left, bounds.top)); 
+		points.push(new OpenLayers.Geometry.Point(bounds.right, bounds.top)); 
+		points.push(new OpenLayers.Geometry.Point(bounds.right, bounds.bottom)); 
+		points.push(new OpenLayers.Geometry.Point(bounds.left, bounds.bottom)); 
+		
+		var style = {strokeColor: "#00FF00", fillColor: "#00FF00", strokeOpacity: 1, fillOpacity:0.1, strokeWidth: 2}; 
+		var poly = new vworld.Polygon(points, style);
+		
+		map.vectorLayer.addFeatures([poly]);
+	}
+</script> 
+<div>
+	
+	<button type="button" onclick="javascript:createPolyline();" name="pl_1" >polyline(생성)</button>
+	<button type="button" onclick="javascript:setPolylineStyle();" name="pl_2" >스타일조회/지정</button>
+	<button type="button" onclick="javascript:setPolylineWeight(10);" name="pl_2" >굵기조회/지정</button>
+	<button type="button" onclick="javascript:setPolylineColor('#ff0000');" name="pl_3" >색상조회/지정</button>
+	<button type="button" onclick="javascript:addPolylinePoint();" name="pl_4" >포인트추가</button>
+	<button type="button" onclick="javascript:getPolylineBound();" name="pl_5" >Bound조회</button>
+	
+</div>
+<div style="display:inline;float:left;width:100%;height:500px;left:0px;top:0px">
+<div id="cont1" style="width:100%;height:650px;left:0px;top:0px"></div>	
+</div>
+
+</body> 
+</html>

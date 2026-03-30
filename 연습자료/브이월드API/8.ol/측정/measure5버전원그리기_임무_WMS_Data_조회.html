@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Measure</title>
+  <link rel="stylesheet" href="https://openlayers.org/en/v4.6.5/css/ol.css" type="text/css">
+  <!-- The line below is only needed for old environments like Internet Explorer and Android 4.x -->
+  <script
+    src="https://cdn.polyfill.io/v2/polyfill.min.js?features=requestAnimationFrame,Element.prototype.classList,URL"></script>
+  <script src="https://openlayers.org/en/v5.3.0/build/ol.js"></script>
+  <script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
+  <style>
+    .tooltip {
+      position: relative;
+      background: rgba(0, 0, 0, 0.5);
+      border-radius: 4px;
+      color: white;
+      padding: 4px 8px;
+      opacity: 0.7;
+      white-space: nowrap;
+    }
+
+    .tooltip-measure {
+      opacity: 1;
+      font-weight: bold;
+    }
+
+    .tooltip-static {
+      background-color: #ffcc33;
+      color: black;
+      border: 1px solid white;
+    }
+
+    .tooltip-measure:before,
+    .tooltip-static:before {
+      border-top: 6px solid rgba(0, 0, 0, 0.5);
+      border-right: 6px solid transparent;
+      border-left: 6px solid transparent;
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      margin-left: -7px;
+      left: 50%;
+    }
+
+    .tooltip-static:before {
+      border-top-color: #ffcc33;
+    }
+  </style>
+</head>
+
+<body>
+ <div id="map" style="width: 100%; height: 350px; left: 0px; top: 0px"></div>
+    <label>Measurement type &nbsp;</label>
+    <select id="type">
+      <option value="length">Length (LineString)</option>
+      <option value="area">Area (Polygon)</option>
+      <option value="Point">Point</option>
+      <option value="Circle">Circle</option>
+      <option value="Select">선택</option>
+    </select>
+
+    <form id="dataForm">
+      <input type="hidden" name="key" value="CEB52025-E065-364C-9DBA-44880E3B02B8">
+      <input type="hidden" name="domain" value="http://localhost:8080">
+      <input type="hidden" name="service" value="data">
+      <input type="hidden" name="version" value="2.0">
+      <input type="hidden" name="request" value="getfeature">
+      <input type="hidden" name="format" value="json">
+      <input type="hidden" name="size" value="100">
+      <input type="hidden" name="page" value="1">
+      <input type="hidden" name="data" value="">
+      <input type="hidden" name="buffer" value="">
+      <input type="hidden" name="geometry" value="true">
+      <input type="hidden" name="attribute" value="true">
+      <input type="hidden" name="crs" value="EPSG:900913">
+      <input type="hidden" name="geomfilter" value="BOX(14028876.609587036,3912653.333809428,14151175.854843318,3974414.4526638505)">
+    </form>
+
+  <div>
+    임무
+    <input type="text" id="subj"/>
+    작업내용
+    <textarea id="cont"></textarea>
+  </div>
+
+  <script>
+    var raster = new ol.layer.Tile({
+      source:  new ol.source.XYZ({
+        url: 'http://api.vworld.kr/req/wmts/1.0.0/CEB52025-E065-364C-9DBA-44880E3B02B8/Base/{z}/{y}/{x}.png'
+        ,attributions : "브이월드"
+      }) // 기본지도 타일
+    });
+
+    var source = new ol.source.Vector({
+      id: "sourceId"
+    });
+    source.set("name", "sourceName");
+
+    var vector = new ol.layer.Vector({
+      id: "vectorId",
+      source: source,
+      style: new ol.style.Style({
+        fill: new ol.style.Fill({
+          color: 'rgba(255, 255, 255, 0.2)'
+        }),
+        stroke: new ol.style.Stroke({
+          color: '#ffcc33',
+          width: 2
+        }),
+        image: new ol.style.Icon(/** @type {olx.style.IconOptions} */({
+          anchor: [0.5, 10],
+          anchorXUnits: 'fraction',
+          anchorYUnits: 'pixels',
+          src: 'http://map.vworld.kr/images/ol3/marker_blue.png'
+        }))
+
+      })
+    });
+    vector.set("name", "vectorName");
+
+
+    /**
+     * Currently drawn feature.
+     * @type {ol.Feature}
+     */
+    var sketch;
+
+
+    /**
+     * The help tooltip element.
+     * @type {Element}
+     */
+    var helpTooltipElement;
+
+
+    /**
+     * Overlay to show the help messages.
+     * @type {ol.Overlay}
+     */
+    var helpTooltip;
+
+
+    /**
+     * The measure tooltip element.
+     * @type {Element}
+     */
+    var measureTooltipElement;
+
+
+    /**
+     * Overlay to show the measurement.
+     * @type {ol.Overlay}
+     */
+    var measureTooltip;
+
+
+    /**
+     * Message to show when the user is drawing a polygon.
+     * @type {string}
+     */
+    var continuePolygonMsg = 'Click to continue drawing the polygon';
+
+
+    /**
+     * Message to show when the user is drawing a line.
+     * @type {string}
+     */
+    var continueLineMsg = 'Click to continue drawing the line';
+
+
+    /**
+     * Handle pointer move.
+     * @param {ol.MapBrowserEvent} evt The event.
+     */
+    var pointerMoveHandler = function (evt) {
+      if (evt.dragging) {
+        return;
+      }
+      /** @type {string} */
+      var helpMsg = 'Click to start drawing';
+
+      if (sketch) {
+        var geom = (sketch.getGeometry());
+        if (geom instanceof ol.geom.Polygon) {
+          helpMsg = continuePolygonMsg;
+        } else if (geom instanceof ol.geom.LineString) {
+          helpMsg = continueLineMsg;
+        }
+      }
+
+      helpTooltipElement.innerHTML = helpMsg;
+      helpTooltip.setPosition(evt.coordinate);
+
+      helpTooltipElement.classList.remove('hidden');
+    };
+
+
+    var map = new ol.Map({
+      layers: [raster, vector],
+      target: 'map',
+      view: new ol.View({
+        center: [14400000, 4600000],
+        zoom: 7
+      })
+    });
+
+    map.on('pointermove', pointerMoveHandler);
+
+    map.getViewport().addEventListener('mouseout', function () {
+      helpTooltipElement.classList.add('hidden');
+    });
+
+    var typeSelect = document.getElementById('type');
+
+    var draw; // global so we can remove it later
+
+
+    /**
+     * Format length output.
+     * @param {ol.geom.LineString} line The line.
+     * @return {string} The formatted length.
+     */
+    var formatLength = function (line) {
+      var length = ol.sphere.getLength(line);
+      var output;
+      if (length > 100) {
+        output = (Math.round(length / 1000 * 100) / 100) +
+          ' ' + 'km';
+      } else {
+        output = (Math.round(length * 100) / 100) +
+          ' ' + 'm';
+      }
+      return output;
+    };
+
+
+    /**
+     * Format area output.
+     * @param {ol.geom.Polygon} polygon The polygon.
+     * @return {string} Formatted area.
+     */
+    var formatArea = function (polygon) {
+      var area = ol.sphere.getArea(polygon);
+      var output;
+      if (area > 10000) {
+        output = (Math.round(area / 1000000 * 100) / 100) +
+          ' ' + 'km<sup>2</sup>';
+      } else {
+        output = (Math.round(area * 100) / 100) +
+          ' ' + 'm<sup>2</sup>';
+      }
+      return output;
+    };
+
+    function addInteraction() {
+      var type = '';
+      if (typeSelect.value == 'area') {
+        type = 'Polygon';
+      } else if (typeSelect.value == 'length') {
+        type = 'LineString';
+      } else if (typeSelect.value == 'Circle') {
+        type = 'Circle';
+      } else if (typeSelect.value == 'Point') {
+        type = 'Point';
+      } else if (typeSelect.value == 'Select') {
+        var select; // ref to currently selected interaction
+    
+        select = new ol.interaction.Select({
+          //condition: ol.events.condition.pointerMove
+          condition: ol.events.condition.click
+        })
+        select.set("이벤트","선택");
+        select.on("select", function (evt) {
+          var length = evt.target.getFeatures().getLength();
+          if(length>0){
+            console.log(length);
+            subj = evt.target.getFeatures().getArray()[0].get("subj");
+            cont = evt.target.getFeatures().getArray()[0].get("cont");
+            document.getElementById('subj').value=subj;
+            document.getElementById('cont').value=cont;
+          }
+        })
+
+        map.addInteraction(select);
+        return;
+      }
+
+      draw = new ol.interaction.Draw({
+        source: source,
+        type: type,
+        style: new ol.style.Style({
+          fill: new ol.style.Fill({
+            color: 'rgba(255, 255, 255, 0.2)'
+          }),
+          stroke: new ol.style.Stroke({
+            color: 'rgba(0, 0, 0, 0.5)',
+            lineDash: [10, 10],
+            width: 2
+          }),
+          image: new ol.style.Circle({
+            radius: 5,
+            stroke: new ol.style.Stroke({
+              color: 'rgba(0, 0, 0, 0.7)'
+            }),
+            fill: new ol.style.Fill({
+              color: 'rgba(255, 255, 255, 0.2)'
+            })
+          })
+        })
+      });
+      map.addInteraction(draw);
+
+      createMeasureTooltip();
+      createHelpTooltip();
+
+      var listener;
+      draw.on('drawstart',
+        function (evt) {
+          // set sketch
+          sketch = evt.feature;
+
+          /** @type {ol.Coordinate|undefined} */
+          var tooltipCoord = evt.coordinate;
+
+          listener = sketch.getGeometry().on('change', function (evt) {
+            var geom = evt.target;
+            var output;
+            if (geom instanceof ol.geom.Polygon) {
+              output = formatArea(geom);
+              tooltipCoord = geom.getInteriorPoint().getCoordinates();
+            } else if (geom instanceof ol.geom.LineString) {
+              output = formatLength(geom);
+              tooltipCoord = geom.getLastCoordinate();
+            } else if (geom instanceof ol.geom.Circle) {//거리계산 구현
+              var length = ol.sphere.getDistance(ol.proj.transform(geom.getCenter(),'EPSG:900913','EPSG:4326'),ol.proj.transform(geom.getLastCoordinate(),'EPSG:900913', 'EPSG:4326'),6378137)
+              if (length > 100) {
+                output = (Math.round(length / 1000 * 100) / 100) +
+                  ' ' + 'km';
+              } else {
+                output = (Math.round(length * 100) / 100) +
+                  ' ' + 'm';
+              }
+              tooltipCoord = geom.getLastCoordinate();
+            }
+            measureTooltipElement.innerHTML = output;
+            measureTooltip.setPosition(tooltipCoord);
+          });
+        }, this);
+     
+      draw.on('drawend',
+        function (evt) {
+          feature = evt.feature;
+          feature.set("subj",document.getElementById('subj').value);
+          feature.set("cont",document.getElementById('cont').value);
+          var features ="";
+
+          if(evt.feature.getGeometry() instanceof ol.geom.LineString){
+            //Data API 구현
+            //POLYGON((128.648582279208 35.1051285819365,128.751351648921 35.1051285819365,128.751351648921 35.2073184651552,128.648582279208 35.2073184651552,128.648582279208 35.1051285819365))
+            
+            var s="";
+            evt.feature.getGeometry().getFlatCoordinates().forEach(function(coord,i){
+              if(i%2!=1){
+                s+=String(coord)+" ";
+              }
+              else{
+                s+=String(coord)+",";
+              }
+            });
+            s = s.substr(0, s.length -1)
+            console.log(s);
+            $('[name=geomfilter]').val('LINESTRING('+s+')');
+            $('[name=data]').val("LT_C_AISPRHC");
+
+            $.ajax({
+                type: "get",
+                url: "http://api.vworld.kr/req/data?"+$('#dataForm').serialize().replace('&buffer=',''),
+                dataType: 'jsonp',
+                async: false,
+                success: function(data) {
+                    features = (new ol.format.GeoJSON()).readFeatures(data.response.result.featureCollection)
+                    
+                },complete: function(){
+
+                vectorSource = new ol.source.Vector({
+                    features:features
+                })
+                var VectorLayer = new ol.layer.Vector({
+                    source: vectorSource,
+                    id:"vectorLayer",
+                    style: vectorStyle
+                });
+                map.getLayers().forEach(function(layer){
+                    if(layer.get("id")=="vectorLayer"){
+                        map.removeLayer(layer);//기존결과 삭제
+                    }
+                })
+                map.addLayer(VectorLayer);
+                }, error: function(xhr, stat, err) {}
+            });
+             
+          }else if(evt.feature.getGeometry() instanceof ol.geom.Circle){
+            var center = evt.feature.getGeometry().getCenter();
+            $('[name=geomfilter]').val('POINT('+center[0]+' '+center[1]+')');
+            length = ol.sphere.getDistance(ol.proj.transform(center,'EPSG:900913','EPSG:4326'),ol.proj.transform(evt.feature.getGeometry().getLastCoordinate(),'EPSG:900913', 'EPSG:4326'),6378137)
+            $('[name=buffer]').val(length);
+            $('[name=data]').val("LT_C_AISPRHC");
+            // 'lt_c_aisresc' , lt_c_aisprhc
+
+            $.ajax({
+                type: "get",
+                url: "http://api.vworld.kr/req/data",
+                data : $('#dataForm').serialize(),
+                dataType: 'jsonp',
+                async: false,
+                success: function(data) {
+                    features = (new ol.format.GeoJSON()).readFeatures(data.response.result.featureCollection)
+                    
+                },complete: function(){
+                /* 원 그리는 부분
+                var radius = drawMeter(map,length,center);
+                 
+                var feature1 = new ol.Feature({
+                    geometry: new ol.geom.Circle(center,radius)
+                    ,id:"circle"
+                });
+                features.push(feature1);
+                */
+                vectorSource = new ol.source.Vector({
+                    features:features
+                })
+                var VectorLayer = new ol.layer.Vector({
+                    source: vectorSource,
+                    id:"vectorLayer",
+                    style: vectorStyle
+                });
+                map.getLayers().forEach(function(layer){
+                    if(layer.get("id")=="vectorLayer"){
+                        map.removeLayer(layer);//기존결과 삭제
+                    }
+                })
+                map.addLayer(VectorLayer);
+            },
+             
+            error: function(xhr, stat, err) {}
+            });
+          } //else 종료
+          
+
+
+          measureTooltipElement.className = 'tooltip tooltip-static';
+          measureTooltip.setOffset([0, -7]);
+          // unset sketch
+          sketch = null;
+          // unset tooltip so that a new one can be created
+          measureTooltipElement = null;
+          createMeasureTooltip();
+          ol.Observable.unByKey(listener);
+        }, this);
+    }
+    /* 폴리곤의 스타일 설정 */
+    var vectorStyle = function(feature) {
+        var style = new ol.style.Style({
+            stroke: new ol.style.Stroke({
+                color: [0, 0, 255, 1],
+                width: 5
+            }),
+            fill: new ol.style.Fill({
+                color: [255, 0, 0, .7]
+            })
+        });
+        return [style];
+    }
+     
+    /**
+     * Creates a new help tooltip
+     */
+    function createHelpTooltip() {
+      if (helpTooltipElement) {
+        helpTooltipElement.parentNode.removeChild(helpTooltipElement);
+      }
+      helpTooltipElement = document.createElement('div');
+      helpTooltipElement.className = 'tooltip hidden';
+      helpTooltip = new ol.Overlay({
+        element: helpTooltipElement,
+        offset: [15, 0],
+        positioning: 'center-left'
+      });
+      map.addOverlay(helpTooltip);
+    }
+
+
+    /**
+     * Creates a new measure tooltip
+     */
+    function createMeasureTooltip() {
+      if (measureTooltipElement) {
+        measureTooltipElement.parentNode.removeChild(measureTooltipElement);
+      }
+      measureTooltipElement = document.createElement('div');
+      measureTooltipElement.className = 'tooltip tooltip-measure';
+      measureTooltip = new ol.Overlay({
+        element: measureTooltipElement,
+        offset: [0, -15],
+        positioning: 'bottom-center'
+      });
+      map.addOverlay(measureTooltip);
+    }
+
+   
+    /**
+     * Let user change the geometry type.
+     */
+    typeSelect.onchange = function () {
+      map.removeInteraction(draw);
+      map.getInteractions().getArray().forEach(function(i){
+        if(i.get("이벤트")=="선택"){
+          map.removeInteraction(i);
+        }
+      })
+      addInteraction();
+    };
+    addInteraction();
+
+    function setWMSLayer(wms_val){
+      var wms_tile = new ol.layer.Tile({
+        name : "WMS_LAYER",
+        source : new ol.source.TileWMS({
+          url : "http://api.vworld.kr/req/wms?",
+          params : {
+            LAYERS : wms_val,
+            STYLES : wms_val,
+            CRS : "EPSG:3857",
+            apikey : "CEB52025-E065-364C-9DBA-44880E3B02B8",
+            DOMAIN : "http://loacalhost:8080",
+            FORMAT : "image/png",
+            domain : "http://localhost",
+            server : "dev"
+          }
+        })
+      });
+      wms_tile.set("WMS_LAYER",wms_val);
+      map.addLayer(wms_tile);
+    }
+
+    setWMSLayer('lt_c_aisprhc'); //비행금지
+    setWMSLayer('lt_c_aisresc'); //비행제한
+
+    //원주율 실제거리 계산
+    var drawMeter = function(map, radius, cood) {
+        var view = map.getView(); // 맴객체의 뷰
+        var projection = view.getProjection(); // 프로젝션 정보를 가지고옴 EPGS:3857
+        var resolutionAtEquator = view.getResolution(); //해상도 
+        //var pointResolution = projection.getPointResolution(resolutionAtEquator, cood); //점포인트의 해상도 Openlayers 3버전??
+        var pointResolution = ol.proj.getPointResolution(projection,resolutionAtEquator, cood); //점포인트의 해상도 Openlayers 4버전??
+         
+         
+        var resolutionFactor = resolutionAtEquator/pointResolution; //
+        var radius = (radius / ol.proj.Units.METERS_PER_UNIT.m) * resolutionFactor;
+        return radius;
+    }
+  </script>
+</body>
+
+</html>

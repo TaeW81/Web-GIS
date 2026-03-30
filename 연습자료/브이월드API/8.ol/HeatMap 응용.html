@@ -1,0 +1,164 @@
+<!doctype html>
+<!--
+Created using JS Bin
+http://jsbin.com
+
+Copyright (c) 2018 by anonymous (http://jsbin.com/fusipetasa/1/edit)
+
+Released under the MIT license: http://jsbin.mit-license.org
+-->
+<meta name="robots" content="noindex">
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width">
+    <link rel="stylesheet" href="http://openlayers.org/en/master/css/ol.css" type="text/css">
+    <style type="text/css">
+    body {
+      width: 960px;
+      height: 500px;
+      position: relative;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+    </style>
+    <title>브이월드 검색 API 2.0 ,  히트 맵</title>
+  </head>
+  <body>
+    <div id="map" style="height: 400px;"></div>
+	<form id="searchForm" action="#" class="form_data" onsubmit="return false;search();">
+	<input type="hidden" name="page" value="1" />
+	<input type="hidden" name="type" value="PLACE" />
+	<input type="hidden" name="request" value="search" />
+	<input type="hidden" name="apiKey" value="CEB52025-E065-364C-9DBA-44880E3B02B8" />
+	
+	<div>
+		<input type="text"  id="searchValue" name="query" value="야탑역" style="width: 100px;" /> <a href="javascript:search();" >검색</a> 
+		</div>
+	</form>
+	
+	<form>
+	  <label>radius size</label>
+	  <input id="radius" type="range" min="1" max="50" step="1" value="5">
+	  <label>blur size</label>
+	  <input id="blur" type="range" min="1" max="50" step="1" value="15">
+	</form>
+    <script src="https://cdn.rawgit.com/openlayers/openlayers.github.io/master/en/v5.3.0/build/ol.js" type="text/javascript"></script>
+    <script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
+    <script type="text/javascript">
+    	//HeatMap 범위설정
+	    var blur = document.getElementById('blur');
+	    var radius = document.getElementById('radius');
+	    var vectorHeat ; //Heat 맵 객체
+    	/*
+    		범위 설정
+    	*/
+        var maxExtent = ol.proj.transformExtent([112.5, 29.53522956294847, 135, 45.089], 'EPSG:4326', 'EPSG:3857')
+	    var newProj = ol.proj.get('EPSG:3857');
+	    var newProjExtent = newProj.getExtent();
+	    
+	    // 맵 생성 OSM 배경지도 
+        var map = new ol.Map({
+          target: 'map',
+          layers: [
+            new ol.layer.Tile({
+              source: new ol.source.OSM()
+            })
+          ],
+          view: new ol.View({
+            center: ol.proj.transform([126.9380517322744,37.16792263658907], 'EPSG:4326', 'EPSG:900913'),
+            zoom: 5,
+            extent :maxExtent
+          })
+        });
+        var features = new Array();
+        
+
+        
+		var search = function(){
+			$.ajax({
+				type: "get",
+				url: "http://api.vworld.kr/req/search",
+				data : $('#searchForm').serialize(),
+				dataType: 'jsonp',
+				async: false,
+				success: function(data) {
+					//json 데이터를 openlayers 에 맞게 파싱 
+					for(var o in data.response.result.items){ 
+						if(o==0){
+							move(data.response.result.items[o].point.x*1,data.response.result.items[o].point.y*1);
+						}
+						
+						console.log(data.response.result.items[o].title);
+						
+						//Feature 객체 생성 및 배열저장
+						features[o] = new ol.Feature({
+					        geometry: new ol.geom.Point(ol.proj.transform([ data.response.result.items[o].point.x*1,data.response.result.items[o].point.y*1],'EPSG:4326', "EPSG:900913")),
+					        title: data.response.result.items[o].title,
+					        parcel: data.response.result.items[o].address.parcel,
+					        road: data.response.result.items[o].address.road,
+					        category: data.response.result.items[o].category,
+					        point: data.response.result.items[o].point
+					    });
+						features[o].set("id",data.response.result.items[o].id);
+					}
+					
+					//ol.source.Vector 객체 생성 
+					var vectorSource = new ol.source.Vector({
+			        	  features: features
+			       	});
+					
+					//HeatMap 객체 생성
+			        vectorHeat = new ol.layer.Heatmap({
+			            source: vectorSource,
+			            blur: parseInt(blur.value, 10),
+			            radius: parseInt(radius.value, 10)
+			        });
+			          
+			        vectorHeat.getSource().on('addfeature', function(event) {
+			            // 2012_Earthquakes_Mag5.kml stores the magnitude of each earthquake in a
+			            // standards-violating <magnitude> tag in each Placemark.  We extract it from
+			            // the Placemark's name instead.
+			            var name = event.feature.get('name');
+			            var magnitude = parseFloat(name.substr(2));
+			            event.feature.set('weight', magnitude - 5);
+			        });
+			       	
+			        /*
+			        	기존검색결과를 제거하기 위해 키 값 생성
+			   		*/
+			   		vectorHeat.set("cluster","search_cluster")
+			        
+			        map.getLayers().forEach(function(layer){
+						if(layer.get("cluster")=="search_cluster"){
+							map.removeLayer(layer);
+						}
+		    	    });
+			        
+					map.addLayer(vectorHeat);
+				},
+				error: function(xhr, stat, err) {}
+			});
+			
+
+		}
+		
+		var move = function(x,y){//127.10153, 37.402566
+			map.getView().setCenter(ol.proj.transform([ x, y ],'EPSG:4326', "EPSG:900913")); // 지도 이동
+			map.getView().setZoom(12);
+		}
+		
+        blur.addEventListener('input', function() {
+        	vectorHeat.setBlur(parseInt(blur.value, 10));
+        });
+
+        radius.addEventListener('input', function() {
+       		vectorHeat.setRadius(parseInt(radius.value, 10));
+        });
+		
+    </script>
+  </body>
+</html>

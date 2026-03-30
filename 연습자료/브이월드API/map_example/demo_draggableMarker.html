@@ -1,0 +1,75 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html> 
+<head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<title>VWORLD DEMO SAMPLE</title> 
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=D2F96ADF-C7F4-3FE6-9021-7949E462F8C6"></script>
+</head> 
+<body>
+<script type="text/javascript">
+	var map = null;  
+	vworld.showMode = false; 
+	// 통합지도 초기화
+	vworld.init(
+		"cont1"	// rootDiv
+		, "map-first" // mapType
+		,function() {         
+			map = this.vmap; 
+			map.setControlsType({"simpleMap":true});	//간단한 화면	
+			map.addVWORLDControl("zoomBar");
+			//화면중심점과 레벨로 이동
+			map.setCenterAndZoom(14137792.751626197, 4092051.278263237, 8);  	
+		}
+		,function (obj){SOPPlugin = obj; }//initCallback
+		,function (msg){alert('vworld init fail');}//failCallback
+	);
+   
+	function init(){
+		map.init();
+	}
+		
+	//========DraggableMarker================
+	var dMarkers;
+	//화면클릭 이벤트 등록 및 마커찍기
+	var pointControl;
+	function addPointEvent(){	
+		var pointOptions = {persist:true}
+		if (pointControl == null) {
+			pointControl = new OpenLayers.Control.Measure(OpenLayers.Handler.Point,{handlerOptions:pointOptions});
+			pointControl.events.on({"measure": mapclick});
+        	map.addControl(pointControl);
+		}
+		map.init();
+		pointControl.activate();
+	}	
+	function mapclick(event){
+		var temp = event.geometry;	
+		var pos = new OpenLayers.LonLat(temp.x, temp.y);	
+		//DraggableMarker 생성
+		if (dMarkers == null){
+			dMarkers = new vworld.DraggableMarker('dMarker', '01', '02');
+			dMarkers.dCtl.overFlag = false;
+			dMarkers.dCtl.onComplete = function(feature, px){
+				var lonlat = map.getLonLatFromPixel(px).transform(feature.data.proj, map.originalProj);
+                feature.data.lonlat = lonlat;
+                if (feature.data.popup != null) {
+                    feature.data.popup.lonlat = lonlat;
+                }
+                //이동된 좌표정보
+                alert(lonlat.lon + "," + lonlat.lat);
+			}
+		} 
+		dMarkers.addMarker(pos);
+	}
+		
+</script> 
+<div>
+	<button type="button" onclick="javascript:init();" name="init" >초기화</button>
+	<button type="button" onclick="javascript:addPointEvent();" name="addpin" >Marker찍기</button>
+</div>
+<div style="display:inline;float:left;width:100%;height:500px;left:0px;top:0px">
+<div id="cont1" style="width:100%;height:650px;left:0px;top:0px"></div>	
+</div>
+
+</body> 
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html> 
+<head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<title>VWORLD DEMO SAMPLE</title> 
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=D2F96ADF-C7F4-3FE6-9021-7949E462F8C6"></script>
+</head> 
+<body>
+<script type="text/javascript">
+	var map = null; 
+	vworld.showMode = false; 
+   
+   // 통합지도 초기화
+	vworld.init(
+		"cont1"	// rootDiv
+		, "map-first" // mapType
+		,function() {         
+			map = this.vmap; 
+			map.setBaseLayer(map.vworldBaseMap); 
+			map.setControlsType({"simpleMap":true});	//간단한 화면	 
+			//화면중심점과 레벨로 이동
+			map.setCenterAndZoom(14137792.751626197, 4092051.278263237, 14);  
+			
+		}
+		,function (obj){}//initCallback
+		,function (msg){}//failCallback
+	);
+   var polygonLayer;
+   function createVector(){
+	   //layer style
+	   var style = new OpenLayers.StyleMap({
+		    'default': OpenLayers.Util.applyDefaults(
+		        {strokeColor : "#0000FF",fillColor : "#0000FF" ,strokeOpacity : 0.7 ,fillOpacity : 0.3 ,strokeWidth : 10},
+		        OpenLayers.Feature.Vector.style["default"]
+		    ),
+		    'select': OpenLayers.Util.applyDefaults(
+		    		{strokeColor : "#FF0000",fillColor : "#FF0000" ,strokeOpacity : 0.7 ,fillOpacity : 0.3 ,strokeWidth : 10},
+		    		OpenLayers.Feature.Vector.style['select']
+		    )
+		});
+	   
+	   //events listener
+	   var layerListeners = {
+			   featureover: function(e) {
+				    e.feature.renderIntent = "select";
+				    e.feature.layer.drawFeature(e.feature);
+		        },
+		        featureout: function(e) {
+		            e.feature.renderIntent = "default";
+		            e.feature.layer.drawFeature(e.feature);
+		        },
+			    featureclick: function(e) {
+			        alert(e.object.name + " says: " + e.feature.id + " clicked.")
+			        return false;
+			    },
+			    nofeatureclick: function(e) {
+			        alert(e.object.name + " says: No feature clicked.");
+			    }
+			};
+	   
+	   polygonLayer = new OpenLayers.Layer.Vector("Test Polygon Layer", {
+		   projection: "EPSG:4326",
+		   styleMap: style,
+		   eventListeners: layerListeners
+		});
+		map.addLayers([polygonLayer]);
+   }
+   
+   function createPolygon(){
+	    
+	   if (polygonLayer == null) {
+		   createVector();
+	   }
+	    var center = map.getCenter();
+	    var points=[];
+		points.push(new OpenLayers.Geometry.Point(center.lon, center.lat)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat - 1000)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat - 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat - 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat + 1000)); 
+		
+		//layer style 적용
+	    var polygon1234 = new vworld.Polygon(
+	    		points/*,{
+	    		strokeColor : "#0000FF" ,
+	    		fillColor : "#0000FF" ,
+	    		strokeOpacity : 0.7 ,
+	    		fillOpacity : 0.3 ,
+	    		strokeWidth : 10
+	    		}*/);
+	   polygonLayer.addFeatures([ polygon1234 ]);
+   }
+	
+</script> 
+<div>
+	<button type="button" onclick="javascript:createPolygon();" name="pg_1" >Polygon(생성)</button>
+</div>
+<div style="display:inline;float:left;width:100%;height:500px;left:0px;top:0px">
+<div id="cont1" style="width:100%;height:650px;left:0px;top:0px"></div>	
+</div>
+
+</body> 
+</html>

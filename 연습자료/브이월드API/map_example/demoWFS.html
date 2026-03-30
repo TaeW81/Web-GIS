@@ -1,0 +1,448 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html> <head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<title>VWORLD DEMO MARKER</title> 
+<SCRIPT language="JavaScript" type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=D2F96ADF-C7F4-3FE6-9021-7949E462F8C6"></SCRIPT>
+<SCRIPT language="JavaScript" type="text/javascript" src="http://map.vworld.kr/jquery/jquery-1.7.1.min.js"></SCRIPT>
+</head> 
+
+<script type="text/javascript">  
+	 
+		var map = null;  
+		var mapBounds = null;
+		//showMode : false 화면전환 버튼 감춘다.
+		//단, map-only, earth-only, raster-only 인 경우 자동으로 버튼이 안보임.
+		vworld.showMode = false;	
+		vworld.init("PrintArea", "map-only", 
+				function() {         
+					map = this.vmap;					
+					map.events.register('moveend', this, customMoveEnded);				
+				}
+			);
+			
+	
+	//화면클릭 이벤트 등록 및 마커찍기
+	var markerControl;
+	var infoPixel;	
+	
+	function addClickEvent(){	
+		var pointOptions = {persist:true}
+		if (markerControl == null) {
+			markerControl = new OpenLayers.Control.Measure(OpenLayers.Handler.Point,{handlerOptions:pointOptions});
+        	markerControl.events.on({"measure": mapclick});
+        	map.addControl(markerControl);
+		}
+		map.init();
+        markerControl.activate();
+	}
+	//화면클릭 이벤트 해제
+	function removeClickEvent(){
+		map.events.unregister('click', this, mapclick);
+	}
+	
+	function mapclick(event){
+		//map.init();	//맵기능 초기화
+		var temp = event.geometry;	
+		var pos = new OpenLayers.LonLat(temp.x, temp.y);
+		
+		document.getElementById('mousex').value = pos.lon;
+		document.getElementById('mousey').value = pos.lat;
+		
+        //프록시설정
+        OpenLayers.ProxyHost = "http://map.vworld.kr/proxy.do?url=";	
+        
+        infoPixel = map.getPixelFromLonLat(pos);
+        fnRequestWFS(pos.lon, pos.lat, 
+			infoPixel.x,infoPixel.y,'EPSG:900913','LT_C_UQ111',jsRSTreatResponse);			
+	}	
+		
+		
+	function fnRequestWFS(lon,lat,pixelX,pixelY,projection,searchlist,success,failure,extbuffer){
+			var msg = '검색좌표(lon):' + lon;
+				msg += '\n검색좌표(lat):' + lat;
+				msg += '\n검색픽셀(pixelX):' + pixelX;
+				msg += '\n검색좌표(pixelY):' + pixelY;
+				msg += '\n좌표계(projection):' + projection;
+				msg += '\n검색대상(searchlist):' + searchlist;
+				
+			try {
+				var buffer = 1;
+				if (typeof extbuffer == 'number') buffer = extbuffer;
+				
+				var typeName = (searchlist != null)? searchlist:'';	
+				var types = typeName.split(',');
+				
+				if (typeof lon != 'number' || typeof lat != 'number' 
+					|| typeof pixelX != 'number' || typeof pixelY != 'number' 
+					|| typeof searchlist != 'string' || types.length == 0 ) {
+									
+					alert('검색조건(인자)이 올바르지 않습니다. 확인 후 다시 시도하여 주십시오.\n\n' + msg);
+					return;
+				}				
+									
+				var x = lon; var y=lat;	
+				if (projection == 'EPSG:4326' || projection == 'EPSG:4019') {
+					var min = OpenLayers.Util.destinationVincenty(new OpenLayers.LonLat(lon,lat), 225, buffer);
+					var max = OpenLayers.Util.destinationVincenty(new OpenLayers.LonLat(lon,lat), 45, buffer);					
+					var MinX = Math.abs(min.lat);
+					var MinY = Math.abs(min.lon);
+					var MaxX = Math.abs(max.lat);
+					var MaxY = Math.abs(max.lon);
+				} else {
+					var pixel = new OpenLayers.Pixel(pixelX-2,pixelY+2);
+					var min = thisMap.getLonLatFromPixel(pixel);
+					var pixel = new OpenLayers.Pixel(pixelX+2,pixelY-2);
+					var max = thisMap.getLonLatFromPixel(pixel);				
+					var MinX = Math.abs(min.lon);
+					var MinY = Math.abs(min.lat);
+					var MaxX = Math.abs(max.lon);
+					var MaxY = Math.abs(max.lat);
+				}
+							
+				var SearchPoint = MinX + "," + MinY + "," + MaxX + "," + MaxY;			
+				var filterText = "BBOX=" + SearchPoint ;
+				//쿼리 필드 리스트 생성하기
+				var fieldinfo = null;
+				var properties = "";
+				
+				var successCall = null;
+				var failureCall = null;
+				
+				if (typeof success == 'function'){successCall = success; }
+				if (typeof failure == 'function'){failureCall = failure; }
+			
+				//특정필드 검색-&propertyname=(mnum,uname,ag_geom)	
+	        	var params = "TYPENAME=" + typeName;
+				params += "&"+filterText;
+										
+				params += "&SERVICE=WFS";
+				params += "&REQUEST=GetFeature";
+				params += "&SRSNAME=" + projection;
+	    		params += "&OUTPUT=text/xml;subType=gml/3.1.1/profiles/gmlsf/1.0.0/0";
+	    		params += "&VERSION=1.1.0";
+	    		params += "&EXCEPTIONS=text/xml";
+	    		params += "&apiKey=" + vworldApiKey;
+	    		var reqConfig = OpenLayers.Util.extend({
+	            		//url: vworldUrls.wfs + params,
+	            		url : "http://map.vworld.kr/proxy.do?url=" + encodeURIComponent(vworldUrls.wfs + params), 
+	            		headers: {"Content-Type": "text/plain"},
+	            		success: successCall,
+	            		failure: failureCall,
+	            		scope: this
+	        		}, {method: "GET"});
+			    OpenLayers.Request.issue(reqConfig);
+			} catch(e){
+				alert("공간정보조회를 실패하였습니다.\n\n" + e.message);
+			}				
+		}
+		
+		
+		function jsRSTreatResponse(response){							
+		var xmlObj = response.responseXML;		
+		var g =  new OpenLayers.Format.GML();
+		var responStr = response.responseText;
+		var features = g.read(responStr);
+		if(features.length < 1) return;		
+							    						    	
+    	var bounds;
+		var hideinfo= true;
+		
+		features.sort(function(a,b){
+			var aval = a.fid.split('.')[0];
+			var bval = b.fid.split('.')[0];
+			return aval < bval ? -1: aval==bval? 0:1;								
+		});
+		
+		vworldInfo.group = [];
+		
+		var initGroup = false;
+		var curAlias = "";
+		var curFeats = [];
+		var curGroup = "";					    	
+		var tabCount =0;
+		for(var i=0;i< features.length;i++) {
+			
+			initGroup = false;								
+    		var tmpgroup = features[i].fid.split('.')[0];								
+			if (curGroup == "" || curGroup != tmpgroup) {
+				if (curGroup != "") {
+					//피쳐그룹 추가
+					vworldInfo.group.push({"alias":curAlias,"layer":curGroup,"features":curFeats});
+					tabCount ++;
+				} 
+				initGroup = true;
+				curFeats = [];
+				curAlias = "";
+				curGroup = tmpgroup;
+			}  
+			//모든 건수를 목록으로..
+			if (initGroup){				
+				if (curAlias == '') {curAlias = curGroup;}							
+			} 
+			curFeats.push(features[i]);
+			if (i == features.length -1) {
+				//피쳐그룹 추가
+				vworldInfo.group.push({"alias":curAlias,"layer":curGroup,"features":curFeats});
+				tabCount ++;									
+			}								            								
+		}		
+		
+		jsRSTreatShowResponse(0,0);																											
+		features= null;							
+	}
+	
+	function jsRSTreatShowResponse(groupid, idx){														
+		if (groupid >= vworldInfo.group.length || groupid == null) {groupid = 0; }
+		if (idx >= vworldInfo.group[groupid].length || idx == null) {idx = 0;}
+		
+		var feature = vworldInfo.group[groupid].features[idx];	
+		
+		map.vectorLayer.removeAllFeatures();
+		
+		var canShow = true;
+		var layername = feature.fid.split('.')[0];
+							
+		//popup
+		//1. 레이어의 첫번째 객체정보 보여주기
+		var content = subcontent= "";								
+		var Titles = null;							
+		var lcnt = 0;
+		var alias = '';
+				
+		if (alias == '' || alias == 'undefined') {alias = layername;}
+		
+		var sizeW = 120;
+		var sizeH = 0;
+		if (canShow || vworldInfo.group[groupid].features.length > 1 || vworldInfo.group.length > 1 ) {
+			content = "<div class='title'>" + alias;				
+			content += "<img class='navi' src='http://map.vworld.kr/images/maps/zoomto.png' title=\"영역확대\" onclick='javascript:vworldUtil._zoomToFeature(" + groupid+ "," + idx +");'></img>";
+			content += "<img class='navi' src='http://map.vworld.kr/images/maps/zoomprev.png' title=\"이전영역\" onclick='javascript:vworldUtil._prevMap();'></img>";
+			content += "<img class='close' src='http://map.vworld.kr/images/maps/del-gray.gif' title=\"닫기\" onclick='javascript:vworldUtil._initInfos();'></img>";
+			content += "</div>";
+			sizeH += 36;
+			var tmpW = (alias.length * 18)+45;
+			if (sizeW < tmpW) {sizeW = tmpW;}
+		}
+		var height = 0;
+		if (canShow) {
+			
+			var FieldAlias =null;
+			if (FieldAlias != null) {
+				for (var k in FieldAlias) {				
+					var title = k;
+					var tmp = FieldAlias[k];
+					if (tmp === null || typeof tmp === 'undefined') continue;
+					if (tmp != null && typeof tmp != 'undefined') title = tmp;
+					
+					var isnumber = false;
+					var innerimage = "";
+					var value = feature.attributes[k]; 
+					if (value ==null || value == 'undefined' || value == '0000') {value = "-";}	
+					var tmp1 = "" + k + "";
+					var tmp2 = "" + value + "";
+					var tmpW = 90 + (tmp2.length*13) + 50;										
+					if (sizeW < tmpW) {sizeW = tmpW;}		
+					if ((k.indexOf('_CNT') > 0 || k.indexOf('_RNK') > 0) && (value != "-") ) {
+						isnumber = true;
+						try{
+							value = Math.round(value);
+							value = vworldFunc._commify(value);
+						}catch(e){}						
+						
+					} else if (k.indexOf('_INC') > 0 && value != "-") {
+						isnumber = true;
+						value = Math.round(value);
+						if (value > 0) {
+							innerimage = '<img src="http://map.vworld.kr/images/statistics/arrow_up.gif" alt="증가" />&nbsp';		
+						} else if (value == 0) {
+							innerimage = '';					
+						} else {
+							innerimage = '<img src="http://map.vworld.kr/images/statistics/arrow_down.gif" alt="감소" />&nbsp';
+							value *= -1;
+						}
+						try{
+							value = vworldFunc._commify(value);
+						}catch(e){}							
+					}
+					
+					if (isnumber) {
+						subcontent += "<div class='nam'>" + title + "</div><div class='val_num'>" + innerimage + value + "</div>" ;
+					} else {
+						subcontent += "<div class='nam'>" + title + "</div><div class='val_str'>" + value + "</div>" ;
+					}
+					
+					lcnt ++;			
+				}
+			} else {
+				for (var k in feature.attributes) {   
+					if ((k.toUpperCase() == 'BOUNDEDBY') || (k.toUpperCase() == 'OBJECTID') 
+						|| (k.toUpperCase() == 'GID')  || (k.toUpperCase() == 'SHAPE_AREA') 
+						|| (k.toUpperCase() == 'SHAPE_LEN')) continue;
+					var title = k;
+					var value = feature.attributes[k]; 
+					if (value ==null || value == 'undefined' || value == '0000') {value = "-";}	
+					var tmp1 = "" + k + "";
+					var tmp2 = "" + value + "";
+					var tmpW = 90 + (tmp2.length*13) + 50;										
+					if (sizeW < tmpW) {sizeW = tmpW;}								
+					subcontent += "<div class='nam'>" + title + "</div><div class='val'>" + value + "</div>" ;
+					lcnt ++;							
+				}	
+			}		
+												
+			height = lcnt*20 + 2;		
+			sizeH += height + 7;							
+		}	
+		//2. 레이어의 나머지 객체정보 인덱스 생성
+		if (vworldInfo.group[groupid].features.length > 1 ) {
+			subcontent += "<div class='navi'>";
+			for (var ei=0; ei < vworldInfo.group[groupid].features.length; ei ++){
+				var ci = ei + 1;
+				if (ei == idx){										
+					subcontent += "<a class='navi_focus' href='javascript:jsRSTreatShowResponse(" + groupid + "," + ei +  ");'>" + ci + "</a>";
+				} else {
+					subcontent += "<a class='navi' href='javascript:jsRSTreatShowResponse(" + groupid + "," + ei +  ");'>" + ci + "</a>";
+				}
+			}
+			var tmpW = vworldInfo.group[groupid].features.length*21;
+			if (sizeW < tmpW) {sizeW = tmpW;}	
+			sizeH += 26;
+			height += 22;								
+			subcontent += "</div>";						
+		} 					
+		if (height > 0) {content += "<div class='list' style=\'height:"+ height + "px;\'>" + subcontent + "</div>";}									
+		//3. 다른 레이어 리스트 생성				
+		var nidx = idx + 1;
+		if (nidx >= vworldInfo.group.length) {nidx = 0;} 
+		
+		if (vworldInfo.group.length > 1 ) {
+			var hgt =27;
+			var str = "";
+			str = "주제도 선택";
+			if (vworldInfo.group.length == 1) {str = ""; hgt = 2;}
+			content += "<div class='etc'><div class='name'> "+ str + "</div>";							
+			sizeH += hgt;
+		} else {sizeH += 8;}	
+		var tmpW= 0;							
+		for (var ni=0; ni < vworldInfo.group.length; ni ++){
+			if (ni != groupid){										
+				var alias = vworldInfo.group[ni].alias;
+				content += "<a class='etc' href='javascript:jsRSTreatShowResponse(" + ni + ",0);'>" + alias + "</a>";
+				tmpW += alias.length * 12 + 10;
+				if (tmpW > 250) {tmpW = 250; sizeH += 30;}
+				if (sizeW < tmpW) {sizeW = tmpW;}
+				if (tmpW >= 250) {tmpW =0;}
+			}								
+		}	
+		if (vworldInfo.group.length > 1 ) {
+			sizeH += 30;
+			content += "</div>";
+		}
+		var finalX = finalY=0;	
+		var curCenter = feature.geometry.getBounds().getCenterLonLat();	//infoLonLat.clone();//
+		var maxw =  vworldFunc._GetElement(vworldIDs.idpanel).offsetWidth;
+		var maxh =  vworldFunc._GetElement(vworldIDs.idpanel).offsetHeight;
+				
+		if (content != "") {
+			var width = sizeW;
+			var height = sizeH;		
+			var tmpw = infoPixel.x + sizeW + 16;
+			var tmph = infoPixel.y + sizeH + 16;
+			
+			if (tmpw > maxw){ infoPixel.x -= (tmpw - maxw);}
+			if (tmph > maxh){ infoPixel.y -= (tmph - maxh);}
+										
+			var left = infoPixel.x;
+			var top = infoPixel.y;		
+			//for 2D
+						
+			var divpop = vworldFunc._GetElement(vworld.enums.POP_CONTENT_ID);
+			if (divpop == null) {divpop = vworldFunc._CreateElement('div');}
+			divpop.style.display = 'none';
+			divpop.setAttribute('id', vworld.enums.POP_CONTENT_ID);
+			divpop.frameBorder = '0';
+			divpop.scrolling = 'no';
+			divpop.style.position = 'absolute';
+			divpop.style.overflow = 'hidden';
+			divpop.style.width = width  + 'px';
+			divpop.style.height = height + 'px';	
+			divpop.style.left = left + 8 + 'px';
+			divpop.style.top = top + 8 + 'px';
+			divpop.className = 'olFramedCloudPopupContent';				
+			divpop.style.zIndex = 10001;
+			
+			var infopop = vworldFunc._GetElement(vworld.enums.POP_FRAME_ID);
+			if (infopop == null) {infopop = vworldFunc._CreateElement('iframe');}
+			infopop.style.display = 'none';
+			infopop.setAttribute('id', vworld.enums.POP_FRAME_ID);
+			infopop.frameBorder = '0';
+			infopop.scrolling = 'no';
+			infopop.style.position = 'absolute';
+			infopop.style.overflow = 'hidden';
+			infopop.style.width = width + 16 + 'px';
+			infopop.style.height =height + 16 + 'px';	
+			infopop.style.left = left + 'px';
+			infopop.style.top = top + 'px';
+							
+			infopop.style.zIndex = 10000;
+								        					
+			vworldFunc._GetElement(vworldIDs.idpanel).appendChild(infopop);					
+			vworldFunc._GetElement(vworldIDs.idpanel).appendChild(divpop);					
+			divpop.innerHTML=content;			
+			divpop.style.display = 'inline-block';							
+			infopop.style.display = 'inline-block';		
+			
+			vworldUtil._addFeature(feature);		
+		}																						
+	}
+	function customMoveEnded(e) {		
+		var curBounds = map.getExtent().clone();
+		var maxBounds = map.getTransformBounds(new OpenLayers.Bounds( 120.9375, 31.95216223802497, 132.1875, 43.068));
+		if (!maxBounds.intersectsBounds( curBounds )){
+			map.panTo(map.getTransformBounds(new OpenLayers.LonLat(127,37)));
+		}        			        
+	}
+	
+	function testajax(){
+		
+			$.ajax({ 
+		            type: 'GET'
+		            ,url : "http://apis.vworld.kr/data?service=cadastral&request=GetData&apiKey=F53C84A7-5159-33D8-A1B1-2EA3B23FFFD7&domain=http://www.17sido.com/index.html&geometry=point(127.15395553718642 35.8307748173478)&format=json&buffer=10&pageIndex=1&pageUnit=10"
+				    ,dataType : "jsonp"
+		            ,success: function(data) {
+		            	alert(data);
+		            }
+		            ,error: function(xhr, status, error) 
+		            {
+		                if(xhr.status === 200)
+		                {
+		                	alert("status:요청성공");
+		                    alert("["+xhr.responseText+"]");                   
+		                    alert("["+error+"]");
+		                }
+		            }
+		   });
+	}
+	
+	function testresponse(data){
+		alert('testsetsetse');
+        alert(data);
+	}
+			
+</script> 
+
+<body >	
+	<div>
+		<button type="button" onclick="javascript:map.init();" name="init" >초기화</button>
+		<button type="button" onclick="javascript:addClickEvent();" name="reqWFS" >도시지역정보검색</button>
+		
+		<button type="button" onclick="javascript:testajax();" name="reqWFS" >테스트</button>
+		마우스클릭(구글좌표):
+		<input type="text" name='q' id='mousex' value="0" maxlength="20" style="ime-mode:active"/>
+		<input type="text" name='q' id='mousey' value="0" maxlength="20" style="ime-mode:active"/>		
+	</div>	
+	<div style="display:inline;float:left;width:100%;height:800px;left:0px;top:0px">
+		<div id="PrintArea" style="width:80%;height:100%;top:0px;position:relative;"></div>	
+	</div>	
+</body> 
+</html>

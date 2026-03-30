@@ -1,0 +1,125 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+    <title>배경지도API-좌표변환테스트</title>
+    <script src="http://www.openlayers.org/api/2.13/OpenLayers.js" type="text/javascript"></script>
+    <script type="text/javascript" src="http://map.vworld.kr/js/apis.do?type=Base&apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9&domain=vworld.kr"></script>
+    <script type="text/javascript" src="http://map.vworld.kr/js/map/proj4js.js"></script>
+    <script type="text/javascript" src="http://map.vworld.kr/jquery/jquery-1.7.1.min.js"></script>  
+    <script type="text/javascript">
+      var map;
+	    var mapBounds = new OpenLayers.Bounds(123 , 32, 134 , 43);
+	    var mapMinZoom = 7;
+	    var mapMaxZoom = 19;
+        // avoid pink tiles
+        OpenLayers.IMAGE_RELOAD_ATTEMPTS = 3;
+        OpenLayers.Util.onImageLoadErrorColor = "transparent";
+        
+        function init(){
+        var options = {
+            controls: [],
+            projection: new OpenLayers.Projection("EPSG:900913"),
+            displayProjection: new OpenLayers.Projection("EPSG:4326"),
+            units: "m",
+            controls : [],
+            numZoomLevels:21,
+            maxResolution: 156543.0339,
+            maxExtent: new OpenLayers.Bounds(-20037508.34, -20037508.34, 20037508.34, 20037508.34)
+            };
+        map = new OpenLayers.Map('map', options);
+		
+		var options = {serviceVersion : "",
+			layername: "",
+			isBaseLayer: false,
+			opacity : 1,
+			type: 'png',
+			transitionEffect: 'resize',
+			tileSize: new OpenLayers.Size(256,256),
+			min_level : 7,
+			max_level : 18,
+			buffer:0};
+		//======================================
+		//1. 배경지도 추가하기
+        vBase = new vworld.Layers.Base('VBASE');
+		if (vBase != null){map.addLayer(vBase);}
+		//2. 영상지도 추가하기
+		vSAT = new vworld.Layers.Satellite('VSAT');
+		if (vSAT != null) {map.addLayer(vSAT);};
+		//3. 하이브리드지도 추가하기
+		vHybrid = new vworld.Layers.Hybrid('VHYBRID');
+		if (vHybrid != null) {map.addLayer(vHybrid);} 
+		//4. Gray지도 추가하기
+		vGray = new vworld.Layers.Gray('VGRAY');
+		if (vGray != null){map.addLayer(vGray);}
+		//5. Midnight지도 추가하기
+		vMidnight = new vworld.Layers.Midnight('VMIDNIGHT');
+		if (vMidnight != null){map.addLayer(vMidnight);}
+		//===========================================
+		
+        var switcherControl = new OpenLayers.Control.LayerSwitcher();
+        map.addControl(switcherControl);
+        switcherControl.maximizeControl();
+
+        map.zoomToExtent( mapBounds.transform(map.displayProjection, map.projection ) );
+	    map.zoomTo(11);
+	    
+	    map.addControl(new OpenLayers.Control.Navigation());   
+	    map.addControl(new OpenLayers.Control.PanZoomBar());
+        map.addControl(new OpenLayers.Control.MousePosition());
+        map.addControl(new OpenLayers.Control.Attribution({separator:" "}))
+    }
+   //국토지리원 표준 (세계측지계-중부원점)
+   Proj4js.defs["EPSG:5186"] = "+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +units=m +no_defs";
+   //UTM-K(Bessel) 도로명주소 사용중
+   Proj4js.defs["EPSG:5178"] = "+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=bessel +units=m +no_defs +towgs84=-115.80,474.99,674.11,1.16,-2.31,-1.63,6.43";
+   //네이버지도 좌표계
+   Proj4js.defs["EPSG:5179"] = "+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +units=m +no_defs";
+   function trans(){
+	    
+	   var epsgNum = $.trim($("#epsg").val()).toUpperCase();
+	   var ll=new OpenLayers.LonLat(map.getCenter().lon,map.getCenter().lat).transform(
+				new OpenLayers.Projection("EPSG:900913"), 
+				new OpenLayers.Projection(epsgNum));
+	   
+	   var ll2=new OpenLayers.LonLat(map.getCenter().lon,map.getCenter().lat).transform(
+				new OpenLayers.Projection("EPSG:900913"), 
+				new OpenLayers.Projection("EPSG:4326"));
+	   
+	   $("#centergx").val(map.getCenter().lon);
+	   $("#centergy").val(map.getCenter().lat);	   
+	   $("#centerx").val(ll.lon);
+	   $("#centery").val(ll.lat);
+	   $("#centerlx").val(ll2.lon);
+	   $("#centerly").val(ll2.lat);
+   }
+   
+   function changeValue(id, value){
+		var targetid = id.split("_")[0];	
+		$("#" + targetid).val(value);
+	}
+    
+    </script>
+  </head>
+  <body onload="init()">
+    <div id="map" style="height:600px;"></div>
+    <div >
+    	화면중심점(EPSG:900913):
+    	<input type="text" name='q' id='centergx' value="0" style="ime-mode:active;width:150px;"/>
+		<input type="text" name='q' id='centergy' value="0" style="ime-mode:active;width:150px;"/>
+		<input type="text" id="epsg" value="5186" readonly/>
+		<select id="epsg_list" onchange="changeValue(this.id, this.value);">
+					<option value="EPSG:5186">세계측지계 중부원점(EPSG:5186)</option>
+					<option value="EPSG:5178">UTM-K(Bessel)(EPSG:5178)</option>
+					<option value="EPSG:5179">UTM-K(GRS80)(EPSG:5179)</option>
+					</select>
+		<input type="text" name='q' id='centerx' value="0" style="ime-mode:active;width:150px;"/>
+		<input type="text" name='q' id='centery' value="0" style="ime-mode:active;width:150px;"/>
+		<button type="button" onclick="javascript:trans();" >변환>></button>
+		
+		<input type="text" name='q' id='centerlx' value="0" style="ime-mode:active;width:150px;"/>
+		<input type="text" name='q' id='centerly' value="0" style="ime-mode:active;width:150px;"/>
+		
+		
+	</div>		   
+  </body>
+</html>

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=CEB52025-E065-364C-9DBA-44880E3B02B8"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4.js"></script>
+<meta charset="UTF-8">
+<title>WMS API / DATA API</title>
+</head>
+<!-- 
+
+클릭한 영역에 buffer를 주어 Data API 조회
+
+ -->
+<body>
+<div id="map" style="float: left; width: 800px;"></div>
+<div style="border: 1px solid black; float: left; width: 224px; " >
+	
+	<form action="" id="wms_check_box">
+		<ul>
+			<li>
+				<select id="select_wms">
+					<option>선택</option>
+					<option value='LT_C_SPBD'>도로명주소건물</option>
+					<option value='LP_PA_CBND_BUBUN,LP_PA_CBND_BONBUN'>지적도</option>
+				</select>
+
+			</li>
+		</ul>
+	</form>
+</div>
+<div style="border: 1px solid RED; float: left; width: 224px; " >
+	<form id="dataForm">
+		<input type="hidden" name="key" value="CEB52025-E065-364C-9DBA-44880E3B02B8">
+		<input type="hidden" name="domain" value="http://localhost:8080">
+		<input type="hidden" name="service" value="data">
+		<input type="hidden" name="version" value="2.0">
+		<input type="hidden" name="request" value="getfeature">
+		<input type="hidden" name="format" value="json">
+		<input type="hidden" name="size" value="100">
+		<input type="hidden" name="page" value="1">
+		<input type="hidden" name="data" value="">
+		<input type="hidden" name="geometry" value="true">
+		<input type="hidden" name="attribute" value="true">
+		<input type="hidden" name="crs" value="EPSG:900913">
+		<input type="hidden" name="geomfilter" value="BOX(14028876.609587036,3912653.333809428,14151175.854843318,3974414.4526638505)">
+	</form>
+	
+	<ul>
+		<li><DIV><span>data</span><div id="data_result"></div></DIV></li>
+	</ul>
+</div>
+
+<div style="border: 1px solid RED; float: left; width: 224px; " >
+	<DIV><span>범례</span><div id="wms_image"></div></DIV>
+</div>
+
+<script type="text/javascript">
+var epsg2097 ="+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=500000 +ellps=bessel +units=m +no_defs";
+proj4.defs("EPSG:2097", epsg2097); //epsg2097 좌표계 등록
+
+vw.ol3.MapOptions = {
+   basemapType: vw.ol3.BasemapType.GRAPHIC
+ , controlDensity: vw.ol3.DensityType.EMPTY
+ , interactionDensity: vw.ol3.DensityType.BASIC
+ , controlsAutoArrange: true
+ , homePosition: vw.ol3.CameraPosition
+ , initPosition: vw.ol3.CameraPosition
+}; 
+  
+var vmap = new vw.ol3.Map("map",  vw.ol3.MapOptions);
+var view = vmap.getView();
+
+/* 폴리곤의 스타일 설정 */
+var vectorStyle = function(feature) {
+    var style = new ol.style.Style({
+	    stroke: new ol.style.Stroke({
+	        color: [0, 256, 0, 1],
+	        width: 5
+	    }),
+	    fill: new ol.style.Fill({
+	        color: [256, 0, 0, .7]
+	    })
+    });
+    return [style];
+}
+
+
+vmap.on('singleclick', function(evt) {
+	var pixel = evt.pixel;
+	
+	if(typeof vmap.getLayerByName("wms_theme") == "object"){
+		var layer = vmap.getLayerByName("wms_theme").get("id")
+		if(layer.indexOf(",") >-1){
+			layer = layer.split(",")[0]; //data API는 레이어 1개씩 조회가 가능해서 2개이상이 입력될경우 변경되도록 설정(지적도)
+		}
+		var min = vmap.getCoordinateFromPixel([evt.pixel[0] -4,evt.pixel[1]+4])
+	    var max = vmap.getCoordinateFromPixel([evt.pixel[0] +4,evt.pixel[1]-4])
+	    var box = min[0]+","+min[1]+","+max[0]+","+max[1]
+
+		$('[name=geomfilter]').val('BOX('+box+')');		
+		$('[name=data]').val(layer);		
+		
+	    $.ajax({
+	    	type: "get",
+	    	url: "http://api.vworld.kr/req/data",
+	    	data : $('#dataForm').serialize(),
+	    	dataType: 'jsonp',
+	    	async: false,
+	    	success: function(data) {
+	    	    
+	    	    var vectorSource = new ol.source.Vector({features: (new ol.format.GeoJSON()).readFeatures(data.response.result.featureCollection)})
+	    	    
+	    	    vmap.removeLayer(vmap.getLayerByName("search_result")) // 기존 선택된 폴리곤 삭제
+	    	    
+		        
+	    	    var vector_layer = new ol.layer.Vector({
+	    	  	  source: vectorSource,
+	    	  	  style: vectorStyle
+	    	  	})
+	    	    
+	    	    vector_layer.set("name","search_result");
+	    	 	vmap.addLayer(vector_layer);
+	    	 	
+	    	 	var resultFeature = vectorSource.getFeatures()[0]
+	    	 	if(typeof resultFeature == "object"){
+		        	var featurehtml="";
+		        	for(var i in resultFeature.getKeys()){ 
+		        		featurehtml += resultFeature.getKeys()[i] + " = "+resultFeature.get(resultFeature.getKeys()[i])+"\n";
+		        	}
+		        	$('#data_result').html(featurehtml);
+	    	 	}
+	    	},
+	    	
+	    	error: function(xhr, stat, err) {}
+	    });
+	    
+	    // ■■■■■ BOX 영역 표시 테스트 시작
+	    //min, min
+   		var box_coordinates =[[min[0]*1,min[1]*1],[min[0]*1,max[1]*1],[max[0]*1,max[1]*1],[max[0]*1,min[1]*1],[min[0]*1,min[1]*1] ];
+		
+		//폴리곤생성
+	    var polygon_feature = new ol.Feature({
+	        geometry: new ol.geom.Polygon([box_coordinates]     
+	        )
+	    });
+	    
+	    var style = new ol.style.Style({
+	    	    stroke: new ol.style.Stroke({
+	    	        color: [0, 255, 0, .7],
+	    	        width: 3
+	    	    }),
+	    	    fill: new ol.style.Fill({
+	    	        color: [0, 0, 255, .4]
+	    	    })
+		  });	
+	      
+	    polygon_feature.setStyle(style);
+
+	    var vector_layer = new ol.layer.Vector({
+	    	  source: new ol.source.Vector({
+	    	    features: [polygon_feature]
+	    	  })
+	      		
+	    })
+   	    
+	    vector_layer.set("vector","box_layer")
+        
+        vmap.getLayers().forEach(function(layer){
+			if(layer.get("vector")=="box_layer"){
+				vmap.removeLayer(layer);
+			}
+	    })
+	    
+	 	vmap.addLayer(vector_layer);
+	    
+	}
+ });
+
+
+/**
+	오버레이 삭제
+*/
+var deleteOverlay = function(id){
+	vmap.removeOverlay(map.getOverlayById(id));
+}
+
+$(function(){
+	
+	$(document).on('change','#select_wms',function(){
+		
+		var this_val = $(this).val();
+		var this_title = $(this).prev().text();
+		
+		vmap.removeLayer(vmap.getLayerByName("wms_theme")) //기존결과 삭제
+		
+		var layer_tile = new ol.layer.Tile({
+	        title: this_title,
+	        id: this_val,
+	        name: "wms_theme", //vmap 올린 레이어를 삭제하거나 수정,변경할때 접근할 name 속성
+	        projection: "EPSG:900913",
+	        extent: vmap.getView().getProjection().getExtent(), //[-20037508.34, -20037508.34, 20037508.34, 20037508.34]
+	        maxZoom: 18,
+	        minZoom: 10,
+	        tilePixelRatio: 1,
+	        tileSize: [512, 512],
+	        source: new ol.source.TileWMS({
+	            url: "http://api.vworld.kr/req/wms?",
+	            params: {
+	                LAYERS: this_val.toLowerCase(),
+	                STYLES: this_val.toLowerCase(),
+	                CRS: "EPSG:900913",
+	                apikey: "CEB52025-E065-364C-9DBA-44880E3B02B8",
+	                DOMAIN:"http://loacalhost:8080",
+	                title: this_title,
+	                FORMAT: "image/png",
+	                domain: "http://localhost",
+	                WIDTH:512,
+	                HEIGHT:512
+	            }
+		    })
+	    	});
+		layer_tile.setZIndex(5);
+		vmap.addLayer(layer_tile);
+		var imgSrc = "http://api.vworld.kr/req/image?key=CEB52025-E065-364C-9DBA-44880E3B02B8&service=image&request=GetLegendGraphic&format=png&type=ALL&layer="+this_val+"&style="+this_val
+		$('#wms_image').html("<img src='"+imgSrc+"' alt ='"+this_title+"의 범례이미지' >");
+		
+	});//'click'
+})
+
+
+/**
+ * 선택한 좌표의 건물정보 조회
+ */
+
+var bulid_result = function(bbox){
+//http://openapi.nsdi.go.kr/nsdi/map/BldgisSpceService/wfs/getBldgisSpceWFS?request=GetFeature&service=WFS&maxfeatures=10&typename=F8&bbox=451385,215098,451575,215353,EPSG:2097&authkey=6c541f38767bef5a9f011d
+	getFile("http://openapi.nsdi.go.kr/nsdi/map/BldgisSpceService/wfs/getBldgisSpceWFS?request=GetFeature&service=WFS&maxfeatures=10&typename=F8&bbox="+bbox+",EPSG:2097&authkey=6c541f38767bef5a9f011d", "xml",
+	function(response){
+		result =  jQuery.parseXML(response.responseText);
+		console.log(result);
+	})		
+}
+ 
+
+
+/**
+ * 웹 프록시 사용 
+ * @param theURL
+ * @param type
+ * @param callback
+ * @returns 
+ * https://gist.github.com/rickdog/d66a03d1e1e5959aa9b68869807791d5
+ */
+function getFile(theURL, type, callback)
+{
+	jQuery.ajax = (function(_ajax)
+	{
+		var protocol = location.protocol,
+			hostname = location.hostname,
+			exRegex = RegExp(protocol + '//' + hostname),
+			YQL = 'http' + (/^https/.test(protocol)?'s':'') + '://query.yahooapis.com/v1/public/yql?callback=?',
+			query = 'select * from html where url="{URL}" and xpath="*"';
+
+		function isExternal(url)
+		{
+			return !exRegex.test(url) && /:\/\//.test(url);
+		}
+
+		return function(o)
+		{
+			var url = o.url;
+			if (o.dataType == 'xml')  
+				query = 'select * from xml where url="{URL}"';	// XML
+			if ( /get/i.test(o.type) && !/json/i.test(o.dataType) && isExternal(url) )
+			{
+				o.url = YQL;
+				o.dataType = 'json';
+				o.data = {
+					q: query.replace('{URL}', url + (o.data ? (/\?/.test(url) ? '&' : '?') + jQuery.param(o.data) : '')),
+					format: 'xml'
+				};
+
+				if (!o.success && o.complete) {
+					o.success = o.complete;
+					delete o.complete;
+				}
+
+				o.success = (function(_success)
+				{
+					return function(data)
+					{
+						if (_success) {
+							_success.call(this, {
+								responseText: (data.results[0] || '').replace(/<script[^>]+?\/>|<script(.|\s)*?\/script>/gi, '')
+							}, 'success');
+						}
+					};
+				})(o.success);
+			}
+			return _ajax.apply(this, arguments); 
+		};
+	})(jQuery.ajax);
+
+
+	return $.ajax({
+		url: theURL,
+		type: 'GET',
+		dataType: type,
+		success: function(res) {
+			callback ? callback(res) : undefined;
+		}
+	})
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<meta http-equiv="Content-Script-Type" content="text/javascript" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta http-equiv="X-UA-Compatible" content="IE=9" />
+<title>항공지도서비스(예시)</title> 
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=D2F96ADF-C7F4-3FE6-9021-7949E462F8C6&version=1.4"></script>
+<SCRIPT language="JavaScript" type="text/javascript" src="http://map.vworld.kr/jquery/jquery-1.7.1.min.js"></SCRIPT>
+<style type="text/css">
+.hidden {display:none;}
+div.content{ display:block; position:absolute; min-width:700px; right:0px; bottom:0px; top:0px; left:0px; }
+div.asidemenu{ display:inline-block; float:left; min-width:140px; width:20%; height:100%; background:#ebebeb; }
+div.mapcontent { display:inline-block; position:relative; float:left; min-width:400px; width:80%; height:100%;
+min-height:500px; left:0px; right:0px; top:0px; bottom:0px; }
+#nav { /* 메뉴 전체 영역에 대한 스타일 */ position:relative;top:5px;left:0px;right:0px; list-style-type: none; /* 불릿 기호 없앰 */
+height: 30px; /* 내비게이션 높이 */ padding: 0px 0px; margin: 0; background:#7d7d7d; border-radius:1.0em; /* 모서리 둥글게 */ }
+
+#nav li { /* 메뉴 각 항목에 대한 스타일 */ text-align:center; width:100%; position: relative; margin:1px 0px; padding: 0; } 
+#nav li.maincate { border-top:1px solid white; }
+#nav li a { /* 메뉴 항목에서도 링크에 대한 스타일 */ display: block; /*영역을 만듦 */ width:auto; font-family:"굴림"; /* 글꼴 */
+font-weight:600; /* 진하게 */ font-size:1em; /* 글자크기 */ padding:8px 0px; color: #333; /* #e7e5e5 링크 글자색 */ text-decoration:none; /* 밑줄 없앰 */ margin:0; /* 바깥 여백 없음 */ border-radius:1.4em; }
+#nav li:hover > a{ /* 메뉴 항목 위로 마우스 올렸을 때 스타일 */ background:#487CEA; /*ebebeb 배경색 */ color:#fff; /*#444 글자색 */
+border-radius:1.0em; /*1.4em 모서리 둥글게 */ -webkit-box-shadow:0 1px 1px rgba(0,0,0,0.2); /* 메뉴 항목에 그림자 */ -moz-box-shadow:0 1px 1px rgba(0,0,0,0.2); /* 메뉴 항목에 그림자 */ }
+#nav ul li a { height: 15px; padding:5px 0px; }
+#nav #cate a { color: #e7e5e5; text-shadow:0 1px 1px rgba(0,0,0,.3); font-family:Tahoma;font-weight:600; font-size:14px;}
+#nav ul { /* 서브 메뉴 영역에 대한 스타일 */ margin:0; /* 서브 메뉴 바깥 여백 없음 */ padding:0; /* 서브 메뉴 안여백 없음 */ list-style:none; /* 목록의 불릿  없앰 */ position: relative; /* 고정 위치에 표시 */ left:0; /* 부모 요소와 left 좌표 값은 같게 */ top:0px; /* 부모 요소로부터 아래로 45px 밑에 표시 */ 
+width: 98%; /* 서브 메뉴 너비 */ background:#ddd; /* 서브 메뉴 배경색 */ border:1px solid #b4b4b4; /* 서브 메뉴 테두리를 그림 */  border-radius:8px; /* 모서리를 둥글게 처리 */ -webkit-box-shadow:0 1px 3px rgba(0,0,0,.3); /* 서브 메뉴 전체에 그림자 효과 추가 */
+  -moz-box-shadow:0 1px 3px rgba(0,0,0,.3); box-shadow:0 1px 3px rgba(0,0,0,.3); display:none; visibility:hidden; opacity:0; }
+#nav li.liston ul { /* 서브 메뉴 영역에 대한 스타일 */ display:block; visibility:visible; opacity: 1; }
+#nav ul li { /* 서브 메뉴 각 항목의 스타일 */ float: none; /* 세로로 표시 */ margin:0; /* 바깥 여백 없음 */ padding:0; }
+#nav ul a { /* 서브 메뉴 항목의 링크 스타일 */ font-weight:normal; color:#333; /* 글자색 */ }
+#nav ul li:hover a { /* 서브 메뉴 항목 위로 마우스 오버했을 때의 스타일 */ background:#96B5F3; /* 0078ff 배경색 */ color:#fff; border-radius:0;/* 모서리 둥글게 처리 안함 */ }
+#nav ul li:first-child > a{ /* 서브 메뉴 첫번째 항목의 스타일 */ -webkit-border-top-left-radius:9px; /* 왼쪽 윗부분 둥글게 */
+-moz-border-radius-topleft:9x; /* 오른쪽 윗부분 둥글게 */ -webkit-border-top-right-radius:9px; -moz-border-radius-topright:9x; }
+#nav ul li:last-child > a { /* 서브 메뉴 마지막 항목의 스타일 */ -webkit-border-bottom-left-radius:9px; /* 왼쪽 아랫부분 둥글게 */
+-moz-border-radius-bottomleft:9x; /* 오른쪽 아랫부분 둥글게 */ -webkit-border-bottom-right-radius:9px;-moz-border-radius-bottomright:9x; }
+#nav ul li a.on { font-weight:800; color:#487CEA; text-shadow:none; }
+</style>
+</head> 
+<script type="text/javascript">  
+	 
+		var map = null;  
+		vworld.showMode = true; 
+		vworld.init("PrintArea", "base", 
+				function() {         
+					map = this.vmap; 
+					map.addVWORLDControl("zoomBar");
+					map.addVWORLDControl("layerSwitch");				
+				}
+				,function (obj){
+					SOPPlugin = obj; 
+					window.sop.earth.addEventListener(SOPPlugin, "lmouseup", function(event){
+						var cod=event.getMapCoordinate();
+						alert("좌표 x:" + cod.Longitude + ",y:" + cod.Latitude + ", 픽셀 x:" + event.x + ",y:" + event.y);
+					});
+				}//initCallback
+				,function (msg){}//failCallback
+			);
+	
+	//주제도 레이어 추가하기(보기)
+	function addThemeLayer(id, title, layer, wfslayer){
+		if ($('#' + id).hasClass('on')){
+			map.hideThemeLayer(title);	
+			$('#' + id).removeClass('on');
+		}
+		else {
+			if ((wfslayer == null) || (wfslayer === 'undefined')){wfslayer = layer;}
+			map.showThemeLayer(title, {layers:layer, typename:wfslayer});				
+			$('#' + id).addClass('on');
+		}		
+	}
+	
+	function setClass(id, classname){
+		if ($('#' + id).hasClass(classname)){
+			$('#' + id).removeClass(classname);
+		}else {
+			$('#' + id).addClass(classname);
+		}					
+	}
+			
+</script> 
+
+<body >
+	<div class="content">
+		<div class="asidemenu">
+			<ul id="nav">
+				<li id="cate"><a href="#" title="항공지도">항공지도</a>
+				</li>
+				<li class="maincate" id="main1"><a class="subcate" href="#" title="항공로"  onclick="setClass('main1','liston');">항공로</a>
+					<ul>
+						<li><a id="a_LT_L_AISPATH"  href="javascript:addThemeLayer('a_LT_L_AISPATH', '항공로','LT_L_AISPATH');" title="항공로">항공로</a></li>
+						<li><a id="a_LT_L_AISROUTEU"  href="javascript:addThemeLayer('a_LT_L_AISROUTEU', '제한고도','LT_L_AISROUTEU');" title="제한고도">제한고도</a></li>
+					</ul>
+				</li>
+				<li class="maincate" id="main2"><a class="subcate" href="#" title="공역" onclick="setClass('main2','liston');">공역</a>
+					<ul>
+						<li><a id="a_LT_C_AISADZC"  href="javascript:addThemeLayer('a_LT_C_AISADZC', '방공식별구역','LT_C_AISADZC');" title="방공식별구역">방공식별구역</a></li>
+						<li><a id="a_LT_C_AISFIRC"  href="javascript:addThemeLayer('a_LT_C_AISFIRC', '비행정보구역','LT_C_AISFIRC');" title="비행정보구역">비행정보구역</a></li>	
+						<li><a id="a_LT_C_AISPRHC"  href="javascript:addThemeLayer('a_LT_C_AISPRHC', '비행금지구역','LT_C_AISPRHC');" title="비행금지구역">비행금지구역</a></li>
+						<li><a id="a_LT_C_AISRESC"  href="javascript:addThemeLayer('a_LT_C_AISRESC', '비행제한구역','LT_C_AISRESC');" title="비행제한구역">비행제한구역</a></li>
+						<li><a id="a_LT_C_AISCTRC"  href="javascript:addThemeLayer('a_LT_C_AISCTRC', '관제권','LT_C_AISCTRC');" title="관제권">관제권</a></li>
+						<li><a id="a_LT_C_AISTMAC"  href="javascript:addThemeLayer('a_LT_C_AISTMAC', '접근관제구역','LT_C_AISTMAC');" title="접근관제구역">접근관제구역</a></li>
+						
+						<li><a id="a_LT_C_AISCATC"  href="javascript:addThemeLayer('a_LT_C_AISCATC', '훈련구역','LT_C_AISCATC');" title="훈련구역">훈련구역</a></li>
+						<li><a id="a_LT_C_AISDNGC"  href="javascript:addThemeLayer('a_LT_C_AISDNGC', '위험구역','LT_C_AISDNGC');" title="위험구역">위험구역</a></li>
+						<li><a id="a_LT_C_AISALTC"  href="javascript:addThemeLayer('a_LT_C_AISALTC', '경계구역','LT_C_AISALTC');" title="경계구역">경계구역</a></li>
+						<li><a id="a_LT_C_AISMOAC"  href="javascript:addThemeLayer('a_LT_C_AISMOAC', '군작전구역','LT_C_AISMOAC');" title="군작전구역">군작전구역</a></li>
+						<li><a id="a_LT_C_AISACMC"  href="javascript:addThemeLayer('a_LT_C_AISACMC', '공중전투기동훈련장','LT_C_AISACMC');" title="공중전투기동훈련장">공중전투기동훈련장</a></li>
+						<li><a id="a_LT_C_AISRFLC"  href="javascript:addThemeLayer('a_LT_C_AISRFLC', '공중급유구역','LT_C_AISRFLC');" title="공중급여구역">공중급유구역</a></li>
+					</ul>
+				</li>
+				<li class="maincate" id="main3"><a class="subcate" href="#" title="시계비행" onclick="setClass('main3','liston');">시계비행</a>
+					<ul>
+						<li><a id="a_LT_L_AISVFRPATH"  href="javascript:addThemeLayer('a_LT_L_AISVFRPATH', '시계비행로','LT_L_AISVFRPATH,LT_P_AISVFRPATH');" title="시계비행로">시계비행로</a></li>
+						<li><a id="a_LT_P_AISVFRPT"  href="javascript:addThemeLayer('a_LT_P_AISVFRPT', '시계비행보고지점','LT_P_AISVFRPT,LT_P_AISVFRPT_SW,LT_P_AISVFRPT_SN');" title="시계비행보고지점">시계비행보고지점</a></li>
+						<li><a id="a_LT_L_AISCORRID_YS"  href="javascript:addThemeLayer('a_LT_L_AISCORRID_YS', '한강회랑','LT_L_AISCORRID_YS,LT_L_AISCORRID_GJ,LT_P_AISCORRID_YS,LT_P_AISCORRID_GJ');" title="한강회랑">한강회랑</a></li>
+												
+						<li><a id="a_LT_L_AISSEARCHL"  href="javascript:addThemeLayer('a_LT_L_AISSEARCHL', '수색비행장비행구역','LT_L_AISSEARCHL,LT_P_AISSEARCHP','LT_L_AISSEARCHL,LT_P_AISSEARCHP');" title="수색비행장비행구역">수색비행장비행구역</a></li>
+						<li><a id="a_LT_P_AISHCSTRIP"  href="javascript:addThemeLayer('a_LT_P_AISHCSTRIP', '헬기장','LT_P_AISHCSTRIP');" title="헬기장">헬기장</a></li>
+						<li><a id="a_LT_P_AISBLDG40F"  href="javascript:addThemeLayer('a_LT_P_AISBLDG40F', '건물군(40층이상)','LT_P_AISBLDG40F');" title="건물군(40층이상)">건물군(40층이상)</a></li>
+						
+					</ul>
+				</li>				
+			</ul>
+		</div>					
+		<div class="mapcontent">
+			<div id="PrintArea" style="width:100%;height:100%;left:0px;top:0px;position:relative;"></div>	
+		</div>	
+	</div>
+</body> 
+</html>

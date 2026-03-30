@@ -1,0 +1,251 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html> <head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<title>VWORLD DEMO SAMPLE</title> 
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=D2F96ADF-C7F4-3FE6-9021-7949E462F8C6"></script>
+<script language="JavaScript" type="text/javascript" src="http://map.vworld.kr/jquery/jquery-1.7.1.min.js"></script>
+</head> 
+
+<script type="text/javascript">  
+	 
+		var map = null;
+		var output = "xml";
+		var stat_style = null;
+		
+		vworld.showMode = false; 
+		vworld.init("MapArea", "map-first", 
+				function() {         
+					map = this.vmap; 
+					map.setMinLevel(1);
+					map.useOSM = true;
+					map.setMapToolPosition("left-top");
+					//기능버튼 추가
+					map.addVWORLDControl("zoomBar");
+					map.addVWORLDControl("layerSwitch");
+					map.addVWORLDControl("indexMap");
+										
+					//map.setIndexMapPosition("right-bottom");				
+					map.addMapToolButton("init");		//초기화       
+					//map.addMapToolButton("zoomin"); 	//확대     
+					map.addMapToolButton("zoomout"); 	//축소     
+					map.addMapToolButton("pan");   		//이동      
+					map.addMapToolButton("prev");     	//이전화면    
+					map.addMapToolButton("next");   	//다음화면
+					map.addMapToolButton("info");   	//정보조회      
+					map.addMapToolButton("fullext");	//전체보기
+					map.addMapToolButton("caldist");	//거리측정
+					map.addMapToolButton("calarea");	//면적측정
+					
+					//단일 심볼 레이어인 경우
+					//fnMakeBoundaryLayer(true);
+					//룰심볼 레이어인 경우
+					fnMakeBoundaryLayer(false);
+				}
+				,function (obj){
+				}//initCallback
+				,function (msg){alert('oh my god');}//failCallback
+			);
+	function fnMakeBoundaryLayer(isSingleStyle){
+		if (map.wfsBoundaryLayer != null) return true;
+		if (isSingleStyle){
+			if (stat_style == null){
+				var stat_style = new OpenLayers.Style(
+					      {
+					    	strokeColor: "#e96016",
+							fillColor: "#FAFAFA",
+							strokeWidth: 4, 
+							fillOpacity: 0.5,
+							strokeOpacity: 0.7,
+							fontColor: "#0649FB",
+							fontFamily: "Dotum",
+							fontWeight: "bold",
+							fontSize: "14px",
+							labelBorderSize: 0.7,
+							labelBorderColor: "#E8ED7A",
+					        label: "\${emd_kor_nm}"
+					      }
+					  );
+			}
+			map.wfsBoundaryLayer = new OpenLayers.Layer.Vector("wfsBoundaryLayer",{styleMap: new OpenLayers.StyleMap(stat_style), extractAttributes: true , displayInLayerSwitcher:true});	
+		} else {
+			if (stat_style == null){
+				var stat_style = new OpenLayers.Style(
+					      {
+					    	strokeColor: "#e96016",
+							//fillColor: "#FAFAFA",
+							strokeWidth: 4, 
+							fillOpacity: 0.5,
+							strokeOpacity: 0.7,
+							fontColor: "#0649FB",
+							fontFamily: "Dotum",
+							fontWeight: "bold",
+							fontSize: "14px",
+							labelBorderSize: 0.7,
+							labelBorderColor: "#E8ED7A",
+					        label: "\${emd_kor_nm}"
+					      },
+					      {
+					          rules: [
+					              new OpenLayers.Rule({
+					                  filter: new OpenLayers.Filter.Comparison({
+					                      type: OpenLayers.Filter.Comparison.EQUAL_TO,
+					                      property: "emd_cd",
+					                      value: "11710102"
+					                  }),
+					                  symbolizer: {
+					                	  fillColor: "#FA883C"
+					                  }
+					              }),
+					              new OpenLayers.Rule({
+					                  filter: new OpenLayers.Filter.Comparison({
+					                      type: OpenLayers.Filter.Comparison.EQUAL_TO,
+					                      property: "emd_cd",
+					                      value: "11710103"
+					                  }),
+					                  symbolizer: {
+					                	  fillColor: "#FAFA00"
+					                  }
+					              }),
+					              new OpenLayers.Rule({
+					                  filter: new OpenLayers.Filter.Comparison({
+					                      type: OpenLayers.Filter.Comparison.EQUAL_TO,
+					                      property: "emd_cd",
+					                      value: "11710104"
+					                  }),
+					                  symbolizer: {
+					                	  fillColor: "#8FBD46"
+					                  }
+					              }),
+					              new OpenLayers.Rule({
+					                  elseFilter: true,
+					                  symbolizer: {
+					                	  fillColor: "#FAFAFA"
+					                  }
+					              })
+					          ]
+					      }
+					  );
+			}
+			map.wfsBoundaryLayer = new OpenLayers.Layer.Vector("wfsBoundaryLayer",{styleMap: new OpenLayers.StyleMap(stat_style), extractAttributes: true , displayInLayerSwitcher:true});	
+		}
+		map.addLayer(map.wfsBoundaryLayer);
+		return true;
+	}
+		
+	// API 데이터 조회
+	function fnRequestData(){
+		
+		geometry = encodeURIComponent("LINESTRING(14147828.770315 4509739.5407776,14147905.207343 4511000.7517442,14149300.183109 4511841.5590552,14150427.629276 4513427.6273919,14151421.310644 4511478.4831709,14152453.210525 4509777.7592918,14153829.077034 4509185.3723226,14154880.086173 4509280.918608,14154708.102859 4507905.052099,14153790.85852 4506796.7151891,14153198.471551 4505401.739423,14151822.605042 4505994.1263922,14150790.70516 4507465.5391865,14149605.931222 4508650.3131247,14149013.544253 4509491.1204357,14150140.99042 4510121.725919)");
+		
+		try {
+			OpenLayers.ProxyHost = "/proxy.do?url=";
+			
+			var params = "";
+			params += "apiKey=D2F96ADF-C7F4-3FE6-9021-7949E462F8C6";
+			params += "&domain=http://localhost";
+			params += "&geometry=" + geometry;
+			params += "&filter=emd_cd:like:11710";
+			params += "&output="+output;
+			params += "&srsName=EPSG:900913";
+			params += "&pageIndex=1"; //페이지번호
+			params += "&pageUnit=20"; //한페이지당 레코드 수
+			
+			serviceId = $("#service").val();
+			
+			var reqConfig = OpenLayers.Util.extend({
+	        		url: "http://apis.vworld.kr/2ddata/ademd/data?" + params,
+	        		headers: {"Content-Type": "text/plain"},
+	        		success: jsRSTreatResponse,
+	        		failure: null,
+	        		scope: this
+	    		}, {method: "GET"}); 
+		    OpenLayers.Request.issue(reqConfig);
+		} catch(e){
+			alert("공간정보조회를 실패하였습니다.\n\n" + e.message);
+		}
+	}
+	
+	function jsRSTreatResponse(response){
+		
+		var features;
+		var xmlDoc;
+		if(output == "xml"){
+			if (window.DOMParser)
+			{
+				var parser = new DOMParser();
+				xmlDoc = parser.parseFromString(response.responseText, "application/xml");
+			}
+			else // Internet Explorer
+			{
+				xmlDoc = new ActiveXObject("Microsoft.XMLDOM");
+				xmlDoc.async=false;
+				xmlDoc.loadXML(response.responseText); 
+			}
+			var code = xmlDoc.getElementsByTagName("resultCode")[0].childNodes[0].nodeValue;
+			if(code != '200'){
+				alert(xmlDoc.getElementsByTagName("resultMsg")[0].childNodes[0].nodeValue);
+				return;
+			}
+			var g =  new OpenLayers.Format.GML();
+			var responStr = response.responseText;
+			features = g.read(responStr);
+			
+			if(features.length < 1){
+				alert("검색된 데이터가 없습니다.");
+				return;	
+			}
+				
+		}else if(output == "json"){
+			var json_str = response.responseText;
+			var geojson = eval("(" + json_str + ")");
+			
+			var code = geojson.header['resultCode'];
+			if(code != '200'){
+				alert(geojson.header['resultMsg']);
+				return;
+			}
+			var geojson_format = new OpenLayers.Format.GeoJSON();
+			features = geojson_format.read(geojson.featureCollection);
+			
+			if(features.length < 1){
+				alert("검색된 데이터가 없습니다.");
+				return;	
+			}
+			
+		}
+		map.wfsBoundaryLayer.removeAllFeatures();
+		features.sort(function(a,b){
+			var aval = a.fid.split('.')[0];
+			var bval = b.fid.split('.')[0];
+			return aval < bval ? -1: aval==bval? 0:1;								
+		});
+		
+		var bounds = null;				
+		for(var idx=0; idx<features.length; idx++){
+			var geom = features[idx].geometry.clone();
+			if (bounds == null) {bounds = geom.getBounds();}
+			else {bounds.extend(geom.getBounds());}
+		}
+		//영역범위로 이동
+		map.zoomToExtent(bounds,false);
+		//동객체 추가
+		map.wfsBoundaryLayer.addFeatures(features);
+	}
+	function rndColor() {
+		var val = '#' + ('00000' + (Math.random() * 16777216 << 0).toString(16)).substr(-6);
+		alert(val);
+	    return val;
+	}
+</script> 
+
+<body >
+	<div>			
+		<button type="button" onclick="javascript:fnRequestData();" name="addcache" >송파구동지도</button>	
+	</div>
+	
+	<div style="display:inline;float:left;width:100%;height:800px;left:0px;top:0px">
+		<div id="MapArea" style="width:100%;height:100%;left:0px;top:0px;position:relative;"></div>	
+	</div>	
+	
+</body> 
+</html>

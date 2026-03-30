@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+<title>Webgl API 지도생성</title>
+</head>
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?version=wBeta&apiKey=CEB52025-E065-364C-9DBA-44880E3B02B8&domain=http://localhost:8080"></script>
+<script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
+<script>
+var Map3D;
+function init(){
+	var optMapOptions =new vw.MapOptions(
+	vw.BasemapType.GRAPHIC, // 초기배경지도
+	"", // 디폴트레이어 설정됨 //레이어 목록
+	vw.DensityType.FULL, // navi, scale, coordinate 3개의 컨트롤이 나타남.
+	vw.DensityType.FULL, //인터렉션 밀도 ?
+	new vw.CameraPosition(new vw.CoordZ(127.12636278475038,37.410307881426085,  500), new vw.Direction(0, 60, 0)),// 홈 카메라 위치
+	new vw.CameraPosition(new vw.CoordZ( 127.126366626566,37.41007333074048, 500), new vw.Direction(0, 60, 0)), // 초기 카메라 위치
+	true
+	);
+	//create 3d map object
+	Map3D = new vw.Map('globarea', optMapOptions);
+}
+
+$(window).load(function(){
+	init();
+})
+	
+</script>
+<body>
+
+<!-- 
+지도 생성 
+ -->
+<div id="maparea" style="display:inline-block;position:absolute;width:1000px;height:600px;">
+	<div id="globarea" style="display:inline-block;position:relative;width:100%;height:100%;">
+	</div>
+</div>
+
+
+</body>
+
+</html>

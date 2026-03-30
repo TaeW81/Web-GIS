@@ -1,0 +1,110 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<kml xmlns='http://www.opengis.net/kml/2.2'>
+	<Document>
+		<name>테스트</name>
+		<Placemark>
+			<styleUrl>#icon-503-DB4436</styleUrl>
+			<name>점 1</name>
+			<description>
+			<![CDATA[
+				<b>년:</b>2007년<br>
+				<b>지역:</b>경기도<br>
+				<b>동(호)수:</b>206동 1101호<br>
+				<b>면적:</b>12,000
+			]]>
+			</description>
+			<ExtendedData>
+			</ExtendedData>
+			<Point>
+				<coordinates>126.99646000000001,37.6403349,0.0</coordinates>
+			</Point>
+		</Placemark>
+		<Placemark>
+			<styleUrl>#icon-503-62AF44</styleUrl>
+			<name>점 2</name>
+			<description>
+			<![CDATA[
+			<b>년:</b>2007년<br>
+				<b>지역:</b>경기도<br>
+				<b>동(호)수:</b>206동 1102호<br>
+				<b>면적:</b>12,000
+			]]>
+			</description>
+			<ExtendedData>
+			</ExtendedData>
+			<Point>
+				<coordinates>127.1200562,37.4770378,0.0</coordinates>
+			</Point>
+		</Placemark>
+		<Placemark>
+			<styleUrl>#icon-503-C6A4CF</styleUrl>
+			<name>점 3</name>
+			<description>
+			<![CDATA[
+				<b>년:</b>2007년<br>
+				<b>지역:</b>경기도<br>
+				<b>동(호)수:</b>206동 1103호<br>
+				<b>면적:</b>12,000
+			]]>
+			</description>
+			<ExtendedData>
+			</ExtendedData>
+			<Point>
+				<coordinates>126.8536377,37.4792174,0.0</coordinates>
+			</Point>
+		</Placemark>
+		<Placemark>
+			<styleUrl>#icon-503-3F5BA9</styleUrl>
+			<name>점 4</name>
+			<description>
+			<![CDATA[
+				<b>년:</b>2007년<br>
+				<b>지역:</b>경기도<br>
+				<b>동(호)수:</b>206동 1104호<br>
+				<b>면적:</b>12,000
+			]]>
+			</description>
+			<ExtendedData>
+			</ExtendedData>
+			<Point>
+				<coordinates>127.2409058,37.3155675,0.0</coordinates>
+			</Point>
+		</Placemark>
+		<Style id='icon-503-3F5BA9'>
+			<IconStyle>
+				<color>ffA95B3F</color>
+				<scale>1.1</scale>
+				<Icon>
+					<href>http://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+				</Icon>
+			</IconStyle>
+		</Style>
+		<Style id='icon-503-62AF44'>
+			<IconStyle>
+				<color>ff44AF62</color>
+				<scale>1.1</scale>
+				<Icon>
+					<href>http://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+				</Icon>
+			</IconStyle>
+		</Style>
+		<Style id='icon-503-C6A4CF'>
+			<IconStyle>
+				<color>ffCFA4C6</color>
+				<scale>1.1</scale>
+				<Icon>
+					<href>http://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+				</Icon>
+			</IconStyle>
+		</Style>
+		<Style id='icon-503-DB4436'>
+			<IconStyle>
+				<color>ff3644DB</color>
+				<scale>1.1</scale>
+				<Icon>
+					<href>http://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+				</Icon>
+			</IconStyle>
+		</Style>
+	</Document>
+</kml>

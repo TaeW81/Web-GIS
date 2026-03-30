@@ -1,0 +1,71 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns:atom="http://www.w3.org/2005/Atom" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:vx="http://www.vworld.kr/kml/ext/2.2" xmlns:xal="http://openxal.org/ui" xmlns="http://earth.google.com/kml/2.2">
+  <Document xmlns="">
+    <name>제목없는 다각형.kmz</name>
+    <visibility>1</visibility>
+    <open>0</open>
+    <Style id="s_VworldBaseStyle">
+      <LineStyle>
+        <color>FF80FFFF</color>
+        <colorMode>normal</colorMode>
+        <width>4</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>99BEBEBE</color>
+        <colorMode>normal</colorMode>
+        <fill>1</fill>
+        <outline>1</outline>
+      </PolyStyle>
+    </Style>
+    <Style id="s_VworldBaseStyle_h">
+      <LineStyle>
+        <color>ff80ffff</color>
+        <colorMode>normal</colorMode>
+        <width>4</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>99bebebe</color>
+        <colorMode>normal</colorMode>
+        <fill>1</fill>
+        <outline>1</outline>
+      </PolyStyle>
+    </Style>
+    <StyleMap id="m_VworldBaseStyle">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#s_VworldBaseStyle</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#s_VworldBaseStyle_h</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Placemark>
+      <name>제목없는 다각형</name>
+      <visibility>1</visibility>
+      <open>0</open>
+      <styleUrl>#m_VworldBaseStyle</styleUrl>
+      <vx:AccessDate>2014-01-02 오후 12:41:41</vx:AccessDate>
+      <Polygon>
+        <extrude>0</extrude>
+        <tessellate>1</tessellate>
+        <altitudeMode>clampToGround</altitudeMode>
+        <outerBoundaryIs>
+          <LinearRing>
+            <extrude>0</extrude>
+            <tessellate>1</tessellate>
+            <altitudeMode>clampToGround</altitudeMode>
+            <coordinates>127.064757588995,34.8616019728637,0 127.067034945083,34.8605743235094,0 127.06882773139,34.8608330508838,0 127.069100384982,34.8623232172653,0 127.068846345881,34.8630906866778,0 127.067502652056,34.8633048710197,0 127.066147427865,34.8630250964228,0 127.065302452601,34.8625179158501,0 127.065302452601,34.8625179158501,0 127.064757588995,34.8616019728637,309.1 </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+        <innerBoundaryIs>
+          <LinearRing>
+            <extrude>0</extrude>
+            <tessellate>1</tessellate>
+            <altitudeMode>clampToGround</altitudeMode>
+          </LinearRing>
+        </innerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>

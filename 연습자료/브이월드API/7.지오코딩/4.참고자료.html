@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<!-- 지오코더2.0, 역지오코더 2.0 데이터 API 2.0 샘플 -->
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Insert title here</title>
+</head>
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=CEB52025-E065-364C-9DBA-44880E3B02B8&domain=http://localhost:8080"></script>
+<script  src="http://code.jquery.com/jquery-latest.min.js"></script>
+<body>
+<div id="vMap" style="width: 600px; height: 400px; left: 0px; top: 0px"></div>
+<div>
+    <form id="searchForm" action="#" class="form_data" onsubmit="return false;search();">
+<!-- nsdi apikey 시작 -->   
+        <input type="hidden" id="sido_key" value="12685d425f1af0872d756c" />
+        <input type="hidden" id="sigoon_key" value="b0888bae39fbd0463a9252" /> 
+        <input type="hidden" id="dong_key" value="91afccaa8d7f499151ee3b" /> <!--  아직 key 인증을 받지 못함... -->
+<!-- nsdi apikey 종료 -->       
+        <input type="hidden" name="apiKey" value="CEB52025-E065-364C-9DBA-44880E3B02B8" />
+         
+        <div>
+            <select id="sido_code">
+                <option>선택</option>
+            </select>
+            <select id="sigoon_code">
+                <option>선택</option>
+            </select>
+            <select id="dong_code">
+                <option>선택</option>
+            </select>
+            <p><span>역지오코더 위치 : </span><span id="geoAddress"></span> </p>
+            <p><span>좌표(4326) : </span><span id="geo4326"></span> </p>
+            <p><span>좌표(3857) : </span><span id="geo3857"></span> </p>
+        </div>
+         
+    <ul id="result_ajax">
+        <li></li>
+    </ul>
+    <p id="result_count"></p>
+    <p id="result_pos"></p>
+    <p id="loading"></p>
+     
+    </form>
+     
+    <form id="dataForm">
+        <input type="hidden" name="key" value="CEB52025-E065-364C-9DBA-44880E3B02B8">
+        <input type="hidden" name="domain" value="http://localhost:8080">
+        <input type="hidden" name="service" value="data">
+        <input type="hidden" name="version" value="2.0">
+        <input type="hidden" name="request" value="getfeature">
+        <input type="hidden" name="format" value="json">
+        <input type="hidden" name="size" value="10">
+        <input type="hidden" name="page" value="1">
+        <!-- <input type="hidden" name="data" value="LT_C_ADSIDO_INFO"> -->
+        <input type="hidden" name="data" value="LT_C_ADEMD_INFO">
+        <input type="hidden" name="geometry" value="true">
+        <input type="hidden" name="attribute" value="true">
+        <input type="hidden" name="crs" value="EPSG:900913">
+    </form>
+     
+</div>
+<script type="text/javascript">
+
+$.support.cors = true;
+
+vw.ol3.MapOptions = {
+        basemapType : vw.ol3.BasemapType.GRAPHIC,
+        controlDensity : vw.ol3.DensityType.BASIC,
+        interactionDensity : vw.ol3.DensityType.FULL,
+        controlsAutoArrange : true,
+        homePosition : vw.ol3.CameraPosition,
+        initPosition : vw.ol3.CameraPosition,
+};
+vmap = new vw.ol3.Map("vMap", vw.ol3.MapOptions);
+ 
+     
+$(function(){
+     
+    $.ajax({
+        type: "get",
+        url: "http://openapi.nsdi.go.kr/nsdi/eios/service/rest/AdmService/admCodeList.json",
+        data : {authkey : $('#sido_key').val()},
+        async: false,
+        dataType: 'json',
+        success: function(data) {
+            var html = "<option>선택</option>";
+             
+            for(var i=0;i<data.admVOList.admVOList.length;i++){ 
+                html +="<option value='"+data.admVOList.admVOList[i].admCode+"'>"+data.admVOList.admVOList[i].lowestAdmCodeNm+"</option>"
+            }
+             
+            $('#sido_code').html(html);
+             
+        },
+        error: function(xhr, stat, err) {}
+    });
+     
+     
+    $(document).on("change","#sido_code",function(){
+        var thisVal = $(this).val();        
+         
+        $.ajax({
+            type: "get",
+            url: "http://openapi.nsdi.go.kr/nsdi/eios/service/rest/AdmService/admSiList.json",
+            data : {admCode : thisVal, authkey : $('#sigoon_key').val()},
+            async: false,
+            dataType: 'json',
+            success: function(data) {
+                var html = "<option>선택</option>";
+                 
+                for(var i=0;i<data.admVOList.admVOList.length;i++){ 
+                    html +="<option value='"+data.admVOList.admVOList[i].admCode+"'>"+data.admVOList.admVOList[i].lowestAdmCodeNm+"</option>"
+                }
+                 
+                $('#sigoon_code').html(html);
+                 
+            },
+            error: function(xhr, stat, err) {}
+        });
+    });
+     
+    $(document).on("change","#sigoon_code",function(){ 
+        var thisVal = $(this).val();        
+         
+        $.ajax({
+            type: "get",
+            url: "http://openapi.nsdi.go.kr/nsdi/eios/service/rest/AdmService/admDongList.json",
+            data : {admCode : thisVal, authkey : $('#dong_key').val()},
+            async: false,
+            dataType: 'json',
+            success: function(data) {
+                var html = "<option>선택</option>";
+                 
+                for(var i=0;i<data.admVOList.admVOList.length;i++){ 
+                    html +="<option value='"+data.admVOList.admVOList[i].admCode+"'>"+data.admVOList.admVOList[i].lowestAdmCodeNm+"</option>"
+                }
+                 
+                $('#dong_code').html(html);
+                 
+            },
+            error: function(xhr, stat, err) {}
+        });
+    });
+    $(document).on("change","#dong_code",function(){ 
+        var thisVal = $(this).val();        
+        var addressText= $("#sido_code option:selected").text()+" "+$("#sigoon_code option:selected").text()+" "+$("#dong_code option:selected").text()
+        //address
+         
+        geocoder(addressText);
+         
+    });
+     
+})
+var dataAjax = function(x,y){
+    $.ajax({
+        type: "get",
+        url: "http://api.vworld.kr/req/data?geomFilter=POINT("+x+" "+y+")",
+        data : $('#dataForm').serialize(),
+        dataType: 'jsonp',
+        async: false,
+        success: function(data) {
+            var vectorSource = new ol.source.Vector({features: (new ol.format.GeoJSON()).readFeatures(data.response.result.featureCollection)})
+             
+            var vector_layer = new ol.layer.Vector({
+              source: vectorSource
+            })
+             
+            vector_layer.set("vectorLayer","search_vector")
+             
+            vmap.getLayers().forEach(function(layer){ //기존검색결과 제거 
+                if(layer.get("vectorLayer")=="search_vector"){
+                    vmap.removeLayer(layer);
+                }
+            });
+             
+            vmap.addLayer(vector_layer);
+             
+             
+        },
+        complete: function(){
+            $('#loading').text("");
+        },
+         
+        error: function(xhr, stat, err) {}
+    });
+}
+ 
+/**
+ *  지오코더 호출 
+ */
+var geocoder = function(name){
+    $.ajax({
+        type: "get",
+        url: "http://api.vworld.kr/req/address?service=address&version=2.0&request=getcoord&format=json&type=parcel",
+        data : {apiKey : $('[name=apiKey]').val(), address : name},
+        dataType: 'jsonp',
+        success: function(data) {
+            result= data;
+            move(data.response.result.point.x*1,data.response.result.point.y*1,11);
+            var point = ol.proj.transform([ data.response.result.point.x*1, data.response.result.point.y*1],'EPSG:4326', "EPSG:900913");
+            dataAjax(point[0],point[1]);
+        },
+        beforeSend: function(){
+            $('#loading').text("로딩중....");
+        },
+ 
+        error: function(xhr, stat, err) {}
+    });
+}
+ 
+/**
+ *  역 지오코더 호출 
+ */
+var geocoder_reverse = function(x,y){
+    $.ajax({
+        type: "get",
+        url: "http://api.vworld.kr/req/address?service=address&version=2.0&request=getaddress&format=json&type=both&crs=epsg:900913",
+        data : {apiKey : $('[name=apiKey]').val(), point : x+","+y},
+        dataType: 'jsonp',
+        success: function(data) {
+            var geoResult =""; 
+            for( i in data.response.result)
+            { 
+                if(i!=0){
+                	geoResult += ", ";
+                }
+            	geoResult +=data.response.result[i].text;
+            }
+            $('#geoAddress').text(geoResult);
+        },
+        beforeSend: function(){
+        	var g4326 = ol.proj.transform([x*1,y*1],'EPSG:900913', "EPSG:4326");
+        	$('#geo4326').text(g4326[0]+","+g4326[1]);
+        	$('#geo3857').text(x+","+y);
+        	
+        },
+ 
+        error: function(xhr, stat, err) {}
+    });
+}
+/**
+ * 화면 이동
+ */
+var move = function(x,y,zoom){//127.10153, 37.402566
+    vmap.getView().setCenter(ol.proj.transform([ x, y ],'EPSG:4326', "EPSG:900913")); // 지도 이동
+    vmap.getView().setZoom(zoom);
+}
+ 
+ 
+/**
+    오버레이 삭제
+*/
+var deleteOverlay = function(id){
+    vmap.removeOverlay(vmap.getOverlayById(id));
+}
+ 
+ 
+/* 클릭 이벤트 제어 */
+vmap.on("click", function(evt) {
+    var coordinate = evt.coordinate //좌표정보
+    var pixel = evt.pixel
+     
+    //선택한 픽셀정보로  feature 체크 
+    vmap.forEachFeatureAtPixel(pixel, function(feature, layer) {
+        var emd_cd = feature.get("emd_cd");
+            if(emd_cd.length>0){
+             
+            var overlayElement= document.createElement("div"); // 오버레이 팝업설정 
+            overlayElement.setAttribute("class", "overlayElement");
+            overlayElement.setAttribute("style", "background-color: #3399CC; border: 2px solid white; color:white");
+            overlayElement.setAttribute("onclick", "deleteOverlay('"+feature.get("emd_cd")+"')");
+            overlayElement.innerHTML="<p>"+feature.get("full_nm")+"("+feature.get("emd_cd")+")"+"</p>";
+             
+            var overlayInfo = new ol.Overlay({
+                id:feature.get("emd_cd"),
+                element:overlayElement,
+                position: coordinate
+            });
+             
+            if(feature.get("emd_cd") != null){
+                vmap.removeOverlay(vmap.getOverlayById(feature.get("emd_cd")));
+            }
+             
+            vmap.addOverlay(overlayInfo);
+        }
+    });
+});
+ 
+/** 선택시 스타일 설정*/
+var stylep = new ol.style.Style({
+    stroke: new ol.style.Stroke({
+        color: [51, 51, 51, .0],
+        width: 3
+    }),
+    fill: new ol.style.Fill({
+        color: [51, 51, 51, .7]
+    })
+});
+var selectInteraction = new ol.interaction.Select({
+    features: function (feature) {
+        return true;
+    },
+    style: [stylep]
+});
+vmap.getInteractions().extend([selectInteraction]);
+ 
+ 
+/* 지도이동 후 지오코더 호출  */
+vmap.on("moveend", function(evt) {
+    var center = vmap.getView().getCenter();
+     
+    geocoder_reverse(center[0],center[1]);
+});
+ 
+vmap.addLayer(vmap.addNamedLayer("도로명주소 건물","lt_c_spbd"))
+
+vmap.getView().setCenter([14135639.747106832, 4481442.704339056])
+vmap.getView().setZoom(19)
+
+</script>     
+ 
+</body>
+</html>

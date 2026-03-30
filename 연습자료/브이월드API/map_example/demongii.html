@@ -1,0 +1,569 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"> 
+<html xmlns="http://www.w3.org/1999/xhtml"> 
+<head> 
+<title>국가기준점 모니터링 시스템</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<meta http-equiv="Content-Script-Type" content="text/javascript" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta http-equiv="X-UA-Compatible" content="IE=9" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script type="text/javascript" src="http://map.vworld.kr/jquery/jquery-1.7.1.min.js"></script>
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9"></script>
+<!--[if lt IE 9]>
+	<script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script> 
+<![endif]-->
+<style type="text/css">
+<!--
+*,body {padding:0px 0px;margin:0px 0px;-webkit-box-sizing: border-box;-moz-box-sizing: border-box;box-sizing: border-box;}
+.map {width:100%;height:100%;margin:auto;border:solid 1px #ccc; position:absolute;z-index:9999;background:none;overflow:hidden;}
+.map .control .box {height:40px;min-height:40px;}
+div #mapcontent { display:inline-block; position:relative; float:left; min-width:100px; width:100%; height:70%;margin:0px;min-height:100px; left:0px; right:0px; top:0px; bottom:0px; }
+.hidden {display:none;height:0px;}
+.map .control h2 {margin:0;}
+#mapcontent #list ul {max-height:200px;overflow-y:auto;overflow-x:hidden;}
+#loccount {padding-left: 10px;display:inline-block;font-size:11px;font-family:Dotum;}
+.close  {position:absolute;padding:0px;right:10px;top:8px;}
+.close img {border:none;vertical-align:middle;}
+.list-menu  {padding:5px 5px;clear:both;width:100%;text-align:right;border-bottom: solid 1px #ebebeb;}
+.list-menu img {border:none;vertical-align:middle;}
+
+div.asidemenu{ display:inline-block; float:left; min-width:140px; width:300px; height:100%; 
+background:none;border-right:1px #848484 solid;overflow:hidden;}
+div.maincontent { display:inline-block; position:relative; float:left; min-width:400px; height:100%;
+min-height:500px; left:0px; right:0px; top:0px; bottom:0px; }
+.spot-location {   
+	position:relative;  
+	top: 0px;height:35px;
+	padding:2px 0 6px 0;
+	width:100%; color:#202020;
+	border-bottom:1px #848484 solid;
+	font-family:Dotum;
+	font-weight:bold;  
+	background: rgb(255,255,255); /* Old browsers */
+	background: url(data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiA/Pgo8c3ZnIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgdmlld0JveD0iMCAwIDEgMSIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+CiAgPGxpbmVhckdyYWRpZW50IGlkPSJncmFkLXVjZ2ctZ2VuZXJhdGVkIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjAlIiB5MT0iMCUiIHgyPSIwJSIgeTI9IjEwMCUiPgogICAgPHN0b3Agb2Zmc2V0PSI0MyUiIHN0b3AtY29sb3I9IiNmZmZmZmYiIHN0b3Atb3BhY2l0eT0iMSIvPgogICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjZjdmN2Y3IiBzdG9wLW9wYWNpdHk9IjEiLz4KICA8L2xpbmVhckdyYWRpZW50PgogIDxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9InVybCgjZ3JhZC11Y2dnLWdlbmVyYXRlZCkiIC8+Cjwvc3ZnPg==);
+	background: -moz-linear-gradient(top,  rgba(255,255,255,1) 43%, rgba(247,247,247,1) 100%); /* FF3.6+ */
+	background: -webkit-gradient(linear, left top, left bottom, color-stop(43%,rgba(255,255,255,1)), color-stop(100%,rgba(247,247,247,1))); /* Chrome,Safari4+ */
+	background: -webkit-linear-gradient(top,  rgba(255,255,255,1) 43%,rgba(247,247,247,1) 100%); /* Chrome10+,Safari5.1+ */
+	background: -o-linear-gradient(top,  rgba(255,255,255,1) 43%,rgba(247,247,247,1) 100%); /* Opera 11.10+ */
+	background: -ms-linear-gradient(top,  rgba(255,255,255,1) 43%,rgba(247,247,247,1) 100%); /* IE10+ */
+	background: linear-gradient(to bottom,  rgba(255,255,255,1) 43%,rgba(247,247,247,1) 100%); /* W3C */
+	filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffffff', endColorstr='#f7f7f7',GradientType=0 ); /* IE6-8 */   
+	}
+.spot-location ul { overflow:hidden;  margin:0 5px 0 12px;padding-top:0px }
+.spot-location ul li { float:left; }
+.spot-location li a { color:#000; display:inline-block;  margin:0 3px; }
+.spot-location .control ul{margin-left:3px;}
+.asidemenu .spot-location h3 {padding:6px 10px;vertical-align:middle;text-align:center;}
+.map-style {position:absolute; right:4px;  top:6px; z-index:500;}
+.map-style ul {overflow:hidden;	height:21px; zoom:1;}
+.map-style ul li  {float:left;display:inline;margin:0;}
+.map-style ul li a {overflow:hidden;height:21px;width:auto;margin:0;padding:0;}
+.map-style ul li.tab-on a img,
+.map-style ul li a:focus img,
+.map-style ul li a:hover img,
+.map-style ul li a:active img {margin-top:-21px;}
+.wide-list {position:relative;overflow-y:auto;margin:0px 0px;width:100%;}
+#tmsslist {clear:both;overflow:hidden;}
+#tmsslist li .text {margin-left:5px;min-height: 35px;clear:both;}
+#tmsslist li .text img {float:left; margin-right:5px;}
+#tmsslist li .text dl {padding:4px 4px 4px 0px;vertical-align:middle;line-height:30px;}
+#tmsslist li .text dl dt {font-size:12px;font-weight:bold; float:left;}
+#tmsslist li .text dl dd {float:left;margin-left: 10px;}
+#tmsslist li, #tmsslist li:hover, #tmsslist li.list-over { 
+width:100%; cursor:pointer; background:#e3e3e3;border-bottom: solid 1px #ebebeb;  margin: 0 0;padding:5px 0px 2px 5px;}
+#tmsslist li {background:none;}
+
+ul.tab-style01 {overflow:hidden;position:relative;height:20px;zoom:1;float:left;} 
+ul.tab-style01 li {color:#848484;font-size:11px;font-family:Dotum;height:20px;line-height:20px; float:left; cursor:pointer;margin-right:5px;}
+ul.tab-style01 li.tab-on,
+ul.tab-style01 li:focus,
+ul.tab-style01 li:hover,
+ul.tab-style01 li:active {
+	color:blue;font-weight:bold;
+}
+.spot-location ul li input[type=text]{color:red;font-weight:bold;padding:2px 10px;line-height:24px;height:30px;border:solid 1px #e3e3e3;}
+-->
+</style>
+<script language="javascript" type="text/javascript">
+//<![CDATA[
+var isPluginLoadState = false;
+var vworldMap = null;
+var umCount = 0;
+var umValues = [];
+var umTitles = [];
+var umPopuHtml = [];
+var TITLE_FIELD;//string
+var LIST_FIELDS;//array
+var DEFAULT_MARKER = 'http://map.vworld.kr/images/v2map/umap/pointer/ico-type4-01.png';
+var MARKER_URL = DEFAULT_MARKER;
+var MARKER_SET = [];
+var CATEGORY_STATE = {
+		state:["통신상태_정상","통신상태_비정상","기울기_정상","기울기_비정상","항온/항습_정상","항온/항습_비정상"],
+		marker:["http://map.vworld.kr/images/v2map/umap/pointer/ico-type1-01.png"
+				,"http://map.vworld.kr/images/v2map/umap/pointer/ico-type1-08.png"
+				,"http://map.vworld.kr/images/v2map/umap/pointer/ico-type2-01.png"
+				,"http://map.vworld.kr/images/v2map/umap/pointer/ico-type2-08.png"
+				,"http://map.vworld.kr/images/v2map/umap/pointer/ico-type3-01.png"
+				,"http://map.vworld.kr/images/v2map/umap/pointer/ico-type3-08.png"]
+};
+var CATEGORY = "통신상태";
+$(document).ready(function(){
+	
+	$(".tab-style01 li").unbind('click');
+	$(".tab-style01 li").on("click", function(e){
+		$(".tab-style01 li").removeClass("tab-on");
+		if(!$(this).hasClass("tab-on")) {
+			$(this).addClass("tab-on");
+			CATEGORY = $(this).text();
+			jsInitList();
+		}
+	});
+	
+	//기본값 셋팅	
+	MARKER_SET = [];
+	for (var i=1;i<5;i++){
+		for (var j=1;j<9;j++){
+			MARKER_SET.push("http://map.vworld.kr/images/v2map/umap/pointer/ico-type" + i + "-0" + j +".png");
+		}
+	}
+	vworld.setModeCallback(function(){
+		$(".map-style > ul > li").each(function(){  
+	        if($(this).hasClass("on"))  
+	            $(this).removeClass("on");
+	    });
+		$("li", ".map-style").each(function(){  
+	        if($(this).hasClass("tab-on"))  
+	            $(this).removeClass("tab-on");   
+	    });
+		var mode = vworld.getMode();
+		$("#ms"+mode).addClass("tab-on");
+	});
+	vworld.showMode = false;
+	vworld.hideNotice = true;
+	var type='base';
+	vworld.init("mapArea", 'map-first',
+		function() {         
+			vworldMap = this.vmap; 
+			vworldMap.setControlsType({"simpleMap":true});
+			vworldMap.addVWORLDControl("zoomBar");
+			var testextent = new OpenLayers.Bounds(126.40347581687793,37.206366909584986,127.30903450488795,37.57599782845997); //경위도의 최대,최소값을 넣어주면 됩니다.
+			var extent = testextent.clone().transform("EPSG:4326","EPSG:900913");
+			vworldMap.setOptions({restrictedExtent : extent});//visible Extent
+			//vworldMap.setMaxExtent(extent);
+			vworldMap.zoomToMaxExtent();
+			
+			vworld.FramedBox.prototype.imageSrc ="http://map.vworld.kr/images/maps/box-popup-lightgray.png";
+			vworld.MarkerA.prototype.fixedRelativePosition = true;
+			vworld.MarkerA.prototype.initDisplay = true;
+			if (type != 'earth'){
+				jsInitList();
+			}
+			$("#ms0").addClass("tab-on");
+			
+			vworldMap.events.register('mousemove', this, jsMouseMove);
+		}
+		,function (obj){
+			SOPPlugin = obj;			
+			window.setTimeout(function(){
+			    try{
+			    	if(isPluginLoad()){
+			    		if (type == 'earth'){
+			    			jsInitList();
+			    		}
+			    	}		   	
+			    }catch(e){}
+		    }, 10);			
+		}
+		,function (msg){}
+	);
+	setWindowResize = function(){
+		var tmp_size_height = $(".map").height();
+		var tmp_size_width = $(".map").width();
+		var tmp_side_width = $(".asidemenu").outerWidth();
+		if ($(".asidemenu").hasClass("hidden")){
+			tmp_side_width = 0;
+		}		
+		var tmp_box_height = $(".spot-location").outerHeight();
+		var tmp_height = tmp_size_height - tmp_box_height;
+		var tmp_width = tmp_size_width - tmp_side_width;
+		if(tmp_height < 200) tmp_height = 200;
+		$(".maincontent").width(tmp_width);
+		$("#mapcontent").width(tmp_width);
+		$("#mapcontent").height(tmp_height);
+		$(".wide-list").height(tmp_height);
+		return true;
+	};
+	
+	setWindowResize();
+	$(window).bind("resize", setWindowResize); 	
+	$("._close-list").click(function(){
+		$(".asidemenu, ._open-list").removeClass("hidden");
+		$(".asidemenu").addClass("hidden");
+		$(".asidemenu").hide();
+		$("._open-list").show();
+		setWindowResize();
+		vworldMap.updateSize();
+	});
+	$("._open-list").click(function(){
+		$(".asidemenu, ._open-list").removeClass("hidden");
+		$(".asidemenu").show();	
+		$("._open-list").addClass("hidden");
+		$("._open-list").hide();
+		setWindowResize();
+		vworldMap.updateSize();	
+	});
+});
+
+function isPluginLoad(){
+	try{
+		if(arguments[0] == undefined){
+			closeDiv();	
+		}
+	}catch(e){}
+	if(!isPluginLoadState){
+		try{
+			SOPPlugin = XDcom;
+			SOPCamera = SOPPlugin.getViewCamera();
+	    	SOPLayerList = SOPPlugin.getLayerList();	    	
+	    	SOPMap = SOPPlugin.getView();	    	
+	    	SOPUtil = SOPPlugin.getUtil();	    	
+	    		    			   
+		}catch(e){
+			isPluginLoadState = false;
+			return isPluginLoadState;
+		}
+		isPluginLoadState = true;
+	}
+	return isPluginLoadState;
+}
+
+function jsMapClear(){
+	if(vworld.isLoaded3D()) {
+		try {
+			SOPMap.mapReset();
+			SOPMap.clearInputPoint();
+			SOPPlugin.getAnalysis().clear();
+			SOPPlugin.getAnalysis().clearArea();
+			if(SOPEditObject != null){
+				if(SOPEditObject.getTarget().isEdit()){
+					SOPEditObject.getTarget().cancelEdit();
+					SOPEditObject = null;
+				}
+			}		
+			SOPPlugin.getUserLayer().removeAll();
+			if(SOPMap.getSelectObject() != null){
+				if(SOPEventLast == null){
+					SOPMap.clearSelectObj();
+				}
+			}
+		}catch(e){}
+	}
+	vworldMap.initAll();
+}
+
+function jsInitList(){
+	var vals = "";
+	var jsonobj = {
+			titles:["기준점명","점의종류","도엽명","통신상태","기울기", "항온/항습"],
+			fields : ["기준점명","점의종류","도엽명","통신상태","기울기", "항온/항습"],
+	        values:[["U성남 102","통합기준점","성남","정상","정상","비정상",{"XPOS":126.962361681225,"YPOS":37.3822660330151}],
+	                ["U성남 101","통합기준점","성남","비정상","정상","정상",{"XPOS":126.6825,"YPOS":36.9822660330151}],
+	                ["U성남 111","통합기준점","성남","정상","비정상","비정상",{"XPOS":127.54,"YPOS":37.66}],
+	                ["U성남 103","통합기준점","성남","정상","비정상","정상",{"XPOS":127.062361681225,"YPOS":37.5822660330151}]]
+	};
+	if (typeof jsonobj.titles != 'object' || typeof jsonobj.values != 'object') return;
+	//전역변수 설정
+	var curtype = 'base';
+	umTitles = jsonobj.titles;//array
+	umValues = jsonobj.values;//array
+	umCount = umValues.length;
+	
+	umPopuHtml = "<div class=\"vworld-info-window\"><h2>{기준점명}</h2><p><b>점의종류</b>{점의종류}<br></p><p><b>도엽명</b>{도엽명}<br></p><p><b>통신상태</b>{통신상태}<br></p><p><b>기울기</b>{기울기}<br></p><p><b>항온/항습</b>{항온\/항습}<br></p></div>";
+    
+	$("#loccount").text("장소 " + umCount + "개");
+	
+	TITLE_FIELD = (typeof jsonobj.titlefield != 'undefined')? jsonobj.titlefield : jsonobj.fields[0] ;//string
+	LIST_FIELDS = jsonobj.fields;//array
+	MARKER_URL = (typeof jsonobj.markerurl != 'undefined')? markerurl: DEFAULT_MARKER;
+	for (var i=0;i<MARKER_SET.length;i++){
+		var markerarry = MARKER_SET[i].split("/");
+		var cururl = markerarry[markerarry.length-1];
+		if (MARKER_URL.indexOf(cururl)> -1){
+			MARKER_URL = MARKER_SET[i];
+			break;
+		}
+	}
+	
+	jsListAll(-1);
+}
+
+function jsListAll(page){
+	var curFirstRecordIndex = 0;
+	var totalRecordCount = umValues.length;
+	var curLastRecordIndex = totalRecordCount-1;
+	var getColumnValueByName = function(index, name){
+		var returnStr = "";
+		if (index < 0 || index > umValues.length) return "";			
+		for (var i = 0; i < umTitles.length; i++) {
+			var title = umTitles[i];
+			if (title == name){
+				returnStr = umValues[index][i];
+				break;
+			}
+		}
+		return returnStr;
+	}
+	
+	var getPopupHtml = function(row) {	
+		var previewSource = umPopuHtml;
+		//title
+		var columnval = getColumnValueByName(row, TITLE_FIELD);
+		previewSource = previewSource.replace(new RegExp("{" + TITLE_FIELD + "}", 'gi'), columnval);
+		
+		for (var i=0; i < LIST_FIELDS.length; i++){
+			var columnval = getColumnValueByName(row, LIST_FIELDS[i]);
+			previewSource = previewSource.replace(new RegExp("{" + LIST_FIELDS[i] + "}", 'gi'), columnval);
+		}
+		return previewSource;
+	}
+	
+	$("#tmsslist").empty();	
+	var info_width = 300;
+	var info_height = 27 + (24*LIST_FIELDS.length);
+	var bounds = null; 
+	
+	jsMapClear();	
+	for (var index = curFirstRecordIndex; index < curLastRecordIndex+1; index++) {
+		var imgpath = MARKER_URL;
+		listval = getColumnValueByName(index, CATEGORY );
+		for (var k=0;k < CATEGORY_STATE.state.length;k++){
+			var compare = CATEGORY +"_"+ listval;
+			if (compare == CATEGORY_STATE.state[k]){
+				imgpath = CATEGORY_STATE.marker[k];
+				break;
+			}
+		} 
+		
+		var field = umValues[index];
+		var id = OpenLayers.Util.createUniqueID('marker_');
+		var divli = $('<li>').attr("id", 'li_' + id);
+		//마커지정
+		var div_img = $('<img>').attr("src", imgpath);
+		
+		if (typeof field[field.length -1] == 'object') {
+			//위치이동 및 마커기능 기능 연동
+			var pos = field[field.length -1];
+			if (bounds == null) bounds = new OpenLayers.Bounds();			
+			bounds.extend(new OpenLayers.LonLat(pos.XPOS,pos.YPOS));
+			bounds.extend(new OpenLayers.LonLat(pos.XPOS,pos.YPOS));
+			//popup 소스 만들기
+			var popup = getPopupHtml(index);	
+			fnAddMarker(id, pos.XPOS,pos.YPOS, popup, info_width, info_height, imgpath);			
+			divli.attr("onclick","jsMoveMapLocation('" + id + "'," + pos.XPOS + "," + pos.YPOS + ");");
+		}
+		var title = getColumnValueByName(index, TITLE_FIELD);
+		var div_dt = $('<dt></dt>').append(title);
+		var div_text = $('<div>').addClass('text');
+		var div_dl = $('<dl>');
+		div_dl.append(div_dt);
+		LIST_FIELDS.forEach(function(list) {
+			var listval = getColumnValueByName(index, list);
+			if (list == "통신상태" || list =="기울기" || list == "항온/항습") {
+				var divtxt_list = $('<dd></dd>').append(listval);	
+				div_dl.append(divtxt_list);
+			}
+		});		
+		div_text.append(div_img);
+		div_text.append(div_dl);
+		divli.append(div_text);
+		$('#tmsslist').append(divli);
+	}
+	//위치이동
+	if (bounds != null)	jsMoveMapExtentByBound(bounds);
+}
+
+function fnAddMarker(id, lon, lat, message, iWidth, iHeight, imgpath){
+	
+	var point = vworldMap.getTransformXY(lon,lat,"EPSG:4326","EPSG:900913");
+	
+	if(vworld.isLoaded3D()){		
+		var poi,symbolizdPoi;
+    	var vec3=SOPPlugin.createVec3();
+    	poi = SOPPlugin.createPoint('999');	
+    		
+    	vec3.Longitude = parseFloat(lon);
+    	vec3.Latitude = parseFloat(lat);
+    	var height = SOPPlugin.getView().getTerrHeight(lon,lat);
+		vec3.Altitude = height;
+    	
+    	poi.set(vec3);
+		var sym=poi.getSymbol();
+		var icon=sym.getIcon();
+		icon.setNormalIcon(imgpath);
+		sym.setIcon(icon);
+		poi.setSymbol(sym);				
+		try {SOPPlugin.getView().addChild(poi,8);}catch(e){}
+		window.sop.earth.addEventListener(poi, "lmouseup", function(){show3DPopup(poi, message, iWidth, iHeight)});		
+	} 
+	var marker = new vworld.MarkerA(lon, lat, message, imgpath, "EPSG:4326",{w:23,h:29});  
+	marker.popupContentHTML = message;
+	marker.fixedRelativePosition = true;
+	marker.initDisplay = true;
+	marker.id = id;
+	//marker.events.unregister('click', null, marker.clickEventHandler);
+	//marker.events.register('click', marker, jsMarkerClicked);
+	vworldMap.addMarker(marker);
+	
+}
+
+function show3DPopup(target, htmlstring, width, height){
+	if(SOPPlugin != null){
+		SOPPlugin.closeBalloon();
+		var balloon = SOPPlugin.createHtmlBalloon();
+		balloon.setTarget(target);
+		balloon.setCloseButton(true);
+		balloon.setHtmlString(htmlstring);
+		balloon.setWidth_(width);//300);
+		balloon.setHeight_(height);//150);
+		balloon.show_(true);
+		SOPPlugin.setBalloon(balloon, true);
+	}
+}
+
+function jsMoveMapExtentByBound(bounds){
+	try {
+		var mode = vworld.getMode();
+		if(mode == 2){
+			var center = bounds.getCenterLonLat();	
+			bounds = bounds.transform(new OpenLayers.Projection("EPSG:4326"),new OpenLayers.Projection("EPSG:900913"));
+			var w = bounds.getWidth();
+			var h = bounds.getHeight();
+			if (w > h) {var dist = w*1.2;}else {var dist = h*1.2;}	
+			if (dist < 200) {dist = 200;}
+			
+			var vec3= vearth.createVec3();
+			vec3.Longitude = center.lon;
+			vec3.Latitude = center.lat;
+			var tilt = vearth.getViewCamera().getTilt();
+			var direct = vearth.getViewCamera().getDirect();		
+			//이전화면 기록
+			var camcenter = vearth.getViewCamera().getCenterPoint();
+			var camdistance = vearth.getViewCamera().getDistance();	
+			vearth.getViewCamera().moveDist(vec3,tilt,direct,dist,0);
+		}else{
+			bounds = vworldMap.getTransformBounds(bounds);
+			vworldMap.setZoomLevel(19);
+			vworldMap.zoomToAuto(bounds, 10,false);
+		}
+	}catch(e){}
+}
+/**
+ * 경위도좌표값으로 화면중심 이동(현재축척기준)
+ * @param lon
+ * @param lat
+ */
+function jsMoveMapLocation(id, lon, lat){
+	try {
+		var point = vworldMap.getTransformXY(lon,lat,"EPSG:4326","EPSG:900913");
+		if(vworld.isLoaded3D()  && vworld.getMode() == 2 ){
+			SOPCamera.moveLonLatAltOval(parseFloat(lon), parseFloat(lat),1000, 10);
+		}
+		else {
+			vworldMap.setCenterXY(point.x,point.y);
+			var len = vworldMap.userMarkers.markers.length;
+			for (var i=0; i < len; i++) {
+				var marker = vworldMap.userMarkers.markers[i];
+				if (marker.id == id) {
+					marker.events.triggerEvent("click");
+					break;
+				}
+			}
+		}
+	}catch(e){}
+}
+/**
+ * 마커제외하고 화면 클리어하기
+ */
+function jsInitWithoutMarker(){
+	//case1. 마커포함 화면 클리어 할때 --> 추가적으로 마커를 재생성하는 함수를 호출하면 됨.
+	//vworldMap.initAll();
+	
+	//case2. 마커제외 화면 클리어 할때
+	vworldMap.init();	//마우스기능 초기화
+	vworldMap.initMeasurement();	//측정결과 삭제 및 기능 초기화
+	vworldMap.clearDisplayLayer(false);	//화면 다시 그리기 	
+}
+/**
+ * 마우스지점 경위도 좌표 표출하기
+ */
+function jsMouseMove(event){
+	var position = vworldMap.events.getMousePosition(event); 
+    var lonlat = vworldMap.getLonLatFromPixel(position); 
+    var point = vworldMap.getTransformXY(
+    		lonlat.lon,lonlat.lat,"EPSG:900913","EPSG:4326");    
+    //구글좌표표출
+    //$("#mousex").val(lonlat.lon);
+	//$("#mousey").val(lonlat.lat);
+	//경위도 표출
+	$("#mousex").val(point.x);
+	$("#mousey").val(point.y);
+}
+//]]>
+</script>
+</head> 
+<body>
+<!-- layer -->
+	<div class="map">
+		<div class="box asidemenu">								
+			<div class="spot-location">
+				<h3>국가기준점 모니터링 시스템</h3>
+				<div class="close">
+					<a href="#" class="_close-list"><img src="http://map.vworld.kr/images/demo/btn/btn_downup.png" alt="목록" title="목록"/></a> 
+				</div>
+			</div>
+			<div id="list" class="wide-list">
+				<div class="list-menu">
+					<ul class="tab-style01">
+						<li id="typeA" class="tabMenu tab-on">통신상태</li>
+						<li id="typeB" class="tabMenu">기울기</li>
+						<li id="typeC" class="tabMenu">항온/항습</li>
+					</ul>
+					<p id="loccount"></p>
+					<a href="javascript:jsListAll(-1);"><img class="refresh" src="http://map.vworld.kr/images/demo/icon/icon_refresh_s.png" alt="다시그리기" title="다시그리기"></a>
+				</div>
+				<ul id="tmsslist" class="spot-list"></ul>
+			</div>
+		</div>
+		<div class="maincontent">
+			<div class="spot-location">
+				<div class="control">
+					<ul>
+						<li class="_open-list hidden"><a href="#" title="목록보기"><img src="http://map.vworld.kr/images/demo/btn_downup_open.png" alt=""/></a></li>
+						<li><a href="#" onclick="vworldMap.zoomBoxIn();" title="확대"><img src="http://map.vworld.kr/images/demo/pan_zoomin.png" alt=""/></a></li>
+						<li><a href="#" onclick="vworldMap.zoomBoxOut();" title="축소"><img src="http://map.vworld.kr/images/demo/pan_zoomout.png" alt=""/></a></li>
+						<li><a href="#" onclick="vworldMap.calcDistance(); " title="거리측정"><img src="http://map.vworld.kr/images/demo/pan_dist.png" alt=""/></a></li>
+						<li><a href="#" onclick="vworldMap.calcArea();" title="면적측정"><img src="http://map.vworld.kr/images/demo/pan_area.png" alt=""/></a></li>
+						<li><a href="#" onclick="javascript:jsInitWithoutMarker();" title="초기화"><img src="http://map.vworld.kr/images/demo/pan_init.png" alt=""/></a></li>
+						<li>
+						<input type="text" name='q' id='mousex' value="0" maxlength="20"/>
+						<input type="text" name='q' id='mousey' value="0" maxlength="20"/>
+						</li>
+					</ul>
+				</div>
+				<!-- 지도 스타일 -->
+				<div class="map-style">
+					<ul>
+						<li id="ms0"><a href="#" onclick="vworld.setMode(0);" title="2D 지도로 전환"><img src="http://map.vworld.kr/images/demo/btn/btn-map-style02.gif" alt=""/></a></li>
+						<li id="ms3"><a href="#" onclick="vworld.setMode(3);" title="회색 2D 지도로 전환"><img src="http://map.vworld.kr/images/demo/btn/btn-map-style03.gif" alt=""/></a></li>
+						<li id="ms4"><a href="#" onclick="vworld.setMode(4);" title="야간 2D 지도로 전환"><img src="http://map.vworld.kr/images/demo/btn/btn-map-style04.gif" alt=""/></a></li>
+						<li id="ms1"><a href="#" onclick="vworld.setMode(1);" title="항공영상 2D 지도로 전환"><img src="http://map.vworld.kr/images/demo/btn/btn-map-style05.gif" alt=""/></a></li>
+					</ul>
+				</div>
+				<!--///지도 스타일 --> 
+			</div>
+			<div id="mapcontent" class="control mapcontent"><div id="mapArea" style="width:100%;height:100%;left:0px;top:0px;position:relative;"></div>	
+		</div>
+			
+	</div> 				
+</body> 
+</html>

@@ -1,0 +1,68 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns:atom="http://www.w3.org/2005/Atom" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:vx="http://www.vworld.kr/kml/ext/2.2" xmlns:xal="http://openxal.org/ui" xmlns="http://earth.google.com/kml/2.2">
+  <Folder>
+    <name>내 장소</name>
+    <visibility>0</visibility>
+    <open>0</open>
+    <Style id="s_bul_poi_b_1">
+      <IconStyle>
+        <colorMode>normal</colorMode>
+        <scale>1.1</scale>
+        <heading>0</heading>
+        <Icon>
+          <href>http://xdworld.vworld.kr:8080/dll_home/icons/bul_poi_b_1.png</href>
+        </Icon>
+        <hotSpot x="0" y="0" xunits="" yunits="" />
+      </IconStyle>
+      <LabelStyle>
+        <color>FFFFFFFF</color>
+        <colorMode>normal</colorMode>
+        <scale>1</scale>
+        <vx:OutLineColor>
+          <color>FFA0A0A0</color>
+        </vx:OutLineColor>
+      </LabelStyle>
+    </Style>
+    <Style id="s_bul_poi_b_1_hl">
+      <IconStyle>
+        <colorMode>normal</colorMode>
+        <scale>1.3</scale>
+        <heading>0</heading>
+        <Icon>
+          <href>http://xdworld.vworld.kr:8080/dll_home/icons/bul_poi_b_1.png</href>
+        </Icon>
+        <hotSpot x="0" y="0" xunits="" yunits="" />
+      </IconStyle>
+      <LabelStyle>
+        <color>ffffffff</color>
+        <colorMode>normal</colorMode>
+        <scale>1</scale>
+        <vx:OutLineColor>
+          <color>ffa0a0a0</color>
+        </vx:OutLineColor>
+      </LabelStyle>
+    </Style>
+    <StyleMap id="m_bul_poi_b_1">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#s_bul_poi_b_1</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#s_bul_poi_b_1_hl</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Placemark>
+      <name>효자웰빙타운SK뷰3차아파트</name>
+      <visibility>1</visibility>
+      <open>0</open>
+      <AddressDetails xmlns="xal">경상북도 포항시남구 효성로 0088</AddressDetails>
+      <styleUrl>#m_bul_poi_b_1</styleUrl>
+      <Point>
+        <extrude>0</extrude>
+        <altitudeMode>clampToGround</altitudeMode>
+        <coordinates>129.3432618,36.00493433,0</coordinates>
+      </Point>
+    </Placemark>
+  </Folder>
+</kml>

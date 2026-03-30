@@ -1,0 +1,159 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>SOPLayer</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta http-equiv="Content-Script-Type" content="text/javascript" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+
+<SCRIPT type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9"></SCRIPT>
+<script type="text/javascript">
+var SOPPlugin;
+var map = null;  
+var SOPTimeseries = null;
+var time_status = false;
+
+vworld.showMode = false; 
+vworld.init(
+	"vMap"	// rootDiv
+	, "earth-first" // mapType
+	,function() {},
+	initCallback
+	,failureCallback//failCallback
+);
+
+//2D/3D 전환후에 실행할 콜백함수 지정
+function setModeCallback(){
+	vworld.setModeCallback(modecallback);
+}
+
+//모드전환후 실행할 함수
+function modecallback(){
+	// 통합지도의 모드 반환
+	alert("현재모드는 " + vworld.getMode() + "입니다."); //0: 2D base, 1: 2D raster, 2: 3D
+}
+
+//통합지도의 모드 3D 여부 반환
+function is3D(){
+	alert("현재 3D 모드가 " + vworld.is3D() + "입니다.");
+}
+function initCallback(obj){
+    SOPPlugin = obj;
+    	SOPPlugin.getViewCamera().moveLonLat(127.0405,37.5016);
+		SOPPlugin.getViewCamera().setAltitude(5000);
+		
+		if(SOPTimeseries == null){
+			SOPTimeseries = SOPPlugin.createTimeSeries();
+			SOPTimeseries.addTimeLayer(1950, 10, 1, 16, "", 0, "");
+			SOPTimeseries.addTimeLayer(1950, 11, 1, 16, "", 0, "");
+			SOPTimeseries.addTimeLayer(1950, 12, 1, 16, "", 0, "");
+			SOPTimeseries.addTimeLayer(1951, 05, 1, 16, "", 0, "");
+			SOPTimeseries.addTimeLayer(1951, 10, 1, 16, "", 0, "");
+			SOPTimeseries.addTimeLayer(1952, 12, 1, 16, "", 0, "");
+			SOPTimeseries.addTimeLayer(1978, 1, 1, 16, "", 0, "");
+			SOPTimeseries.addTimeLayer(1989, 1, 1, 16, "", 0, "");
+			SOPTimeseries.addTimeLayer(1996, 1, 1, 16, "", 0, "");
+			SOPTimeseries.addTimeLayer(2006, 1, 1, 16, "", 0, "");
+			SOPTimeseries.setPosition('2','10','10');
+			if(window.sop.loader._browserCheck()==window.sop.loader.BROWSER_FIREFOX){
+				time_status = true;
+				timeStampOn();
+			}
+		}
+		SOPTimeseries.setVisible(true);//true --> false
+		//layerListVisibility('T197801',true);
+		
+}
+
+function failureCallback(msg){
+	alert(msg);
+}
+
+function jsSample1(name,visibility){
+	if(SOPPlugin != null){
+		var str="";
+		var SOPLayerList = SOPPlugin.getLayerList();
+		var vis = SOPLayerList.nameAtLayer(name).getVisible();
+		if(visibility == true){
+			vis = SOPPlugin.SOPVISIBLE_ON;
+		}else{
+			vis = SOPPlugin.SOPVISIBLE_OFF;
+		}
+		SOPLayerList.nameAtLayer(name).setVisible(vis);	
+	}
+}
+function jsSample2(){
+	if(SOPPlugin != null){
+		var str="";
+		var SOPLayerList = SOPPlugin.getLayerList();
+		var layerCount = SOPLayerList.count();
+		for(i=0;i< layerCount;i++){
+			str+=SOPLayerList.indexAtLayer(i).getName();
+			if(i<layerCount){
+				str+="\n";
+			}			
+		}
+		alert(str);
+	}
+}
+
+function layerListVisibility(name,visibility){
+	if(isPluginLoad()){
+		var vis = SOPLayerList.getVisible(name);
+		if(visibility == true){
+			vis = sop.cons.enums.SOPVISIBLE_ON;
+		}else{
+			vis = sop.cons.enums.SOPVISIBLE_OFF;
+		}
+		jsSetLayerVisibility(name, vis);
+		
+		SOPMap.requestMapData();
+		SOPMap.MapRender();
+	}
+}
+
+function jsSetLayerVisibility(layer, state){
+	//레이어 체크해서 있으면 설정하기
+	if (SOPLayerList == null) return;
+	var	targetLayer = SOPLayerList.nameAtLayer(layer);
+	
+	if (targetLayer == null) return;	
+	SOPLayerList.setVisible(layer, state);
+}
+
+function jsTimeSample(name,visibility){
+	if(SOPPlugin != null){
+		SOPTimeseries.setVisible(false);
+		if (visibility) SOPTimeseries.setVisible(true);		
+		
+		var str="";
+		var SOPLayerList = SOPPlugin.getLayerList();
+		var vis = SOPLayerList.nameAtLayer(name).getVisible();
+		if(visibility == true){
+			vis = SOPPlugin.SOPVISIBLE_ON;
+		}else{
+			vis = SOPPlugin.SOPVISIBLE_OFF;
+		}
+		SOPLayerList.nameAtLayer(name).setVisible(vis);	
+	}
+}
+
+</script>
+<body>
+<!-- 지도가 들어갈 영역 시작 -->
+<div id="vMap" style="width:100%;height:650px;left:0px;top:0px"></div>
+<!-- 지도가 들어갈 영역 끝 -->
+
+<div id="desc" style="padding:5px 0 0 5px;">
+<input type="button" value="레이어 ON" onclick="jsSample1('hybrid_road',true)"/>
+<input type="button" value="레이어 OFF" onclick="jsSample1('hybrid_road',false)"/>
+<input type="button" value="레이어 목록보기" onclick="jsSample2()"/>
+
+<input type="button" value="1978 ON" onclick="jsTimeSample('T197801',true)"/>
+<input type="button" value="1978 OFF" onclick="jsTimeSample('T197801',false)"/>
+<input type="button" value="1989 ON" onclick="jsTimeSample('T198901',true)"/>
+<input type="button" value="1989 OFF" onclick="jsTimeSample('T198901',false)"/>
+</div>
+
+</body>
+</html>

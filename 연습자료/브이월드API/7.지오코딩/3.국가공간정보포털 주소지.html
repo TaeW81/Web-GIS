@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+<!-- 
+data API2.0 활용 샘플
+ -->
+<meta charset="UTF-8">
+<title>국가공간정보 포털 주소지반환</title>
+</head>
+<link rel="stylesheet" href="http://openlayers.org/en/latest/css/ol.css" type="text/css">
+<script src="http://code.jquery.com/jquery-latest.min.js"></script>
+<body>
+	<!-- 국가공간정보 포털 API  http://openapi.nsdi.go.kr/nsdi/eios/OpenapiList.do?provOrg=NIA&gubun=S  -->
+	<form id="nsdiSearchForm" action="#" class="form_data" onsubmit="return false;search();">
+	<!-- nsdi apikey 시작 -->	
+		<input type="hidden" id="sido_key" value="12685d425f1af0872d756c" />
+		<input type="hidden" id="sigoon_key" value="b0888bae39fbd0463a9252" /> 
+		<input type="hidden" id="dong_key" value="91afccaa8d7f499151ee3b" /> 
+		
+		<select id="sido_code">
+			<option>선택</option>
+		</select>
+		<select id="sigoon_code">
+			<option>선택</option>
+		</select>
+		<select id="dong_code">
+			<option>선택</option>
+		</select>
+	</form>
+<script>
+$.support.cors = true;
+	
+	$(function(){
+			/* 국가공간정보포털 API  */
+		
+		$.ajax({
+			type: "get",
+			url: "http://openapi.nsdi.go.kr/nsdi/eios/service/rest/AdmService/admCodeList.json",
+			data : {authkey : $('#sido_key').val()},
+			async: false,
+			dataType: 'json',
+			success: function(data) {
+				var html = "<option>선택</option>";
+				
+				for(var i=0;i<data.admVOList.admVOList.length;i++){ 
+					html +="<option value='"+data.admVOList.admVOList[i].admCode+"'>"+data.admVOList.admVOList[i].lowestAdmCodeNm+"</option>"
+				}
+				
+	            $('#sido_code').html(html);
+				
+			},
+			error: function(xhr, stat, err) {}
+		});
+		
+		
+		$(document).on("change","#sido_code",function(){
+			var thisVal = $(this).val();		
+			
+			$.ajax({
+				type: "get",
+				url: "http://openapi.nsdi.go.kr/nsdi/eios/service/rest/AdmService/admSiList.json",
+				data : {admCode : thisVal, authkey : $('#sigoon_key').val()},
+				async: false,
+				dataType: 'json',
+				success: function(data) {
+					var html = "<option>선택</option>";
+					
+					for(var i=0;i<data.admVOList.admVOList.length;i++){ 
+						html +="<option value='"+data.admVOList.admVOList[i].admCode+"'>"+data.admVOList.admVOList[i].lowestAdmCodeNm+"</option>"
+					}
+					
+		            $('#sigoon_code').html(html);
+					
+				},
+				error: function(xhr, stat, err) {}
+			});
+		});
+		
+		$(document).on("change","#sigoon_code",function(){ <!--  아직 key 인증을 받지 못함... -->
+			var thisVal = $(this).val();		
+			
+			$.ajax({
+				type: "get",
+				url: "http://openapi.nsdi.go.kr/nsdi/eios/service/rest/AdmService/admDongList.json",
+				data : {admCode : thisVal, authkey : $('#dong_key').val()},
+				async: false,
+				dataType: 'json',
+				success: function(data) {
+					var html = "<option>선택</option>";
+					
+					for(var i=0;i<data.admVOList.admVOList.length;i++){ 
+						html +="<option value='"+data.admVOList.admVOList[i].admCode+"'>"+data.admVOList.admVOList[i].lowestAdmCodeNm+"</option>"
+					}
+					
+		            $('#dong_code').html(html);
+					
+				},
+				error: function(xhr, stat, err) {}
+			});
+		});
+	})
+</script>
+</body>
+
+</html>

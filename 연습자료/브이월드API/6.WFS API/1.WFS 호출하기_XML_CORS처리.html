@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>브이월드 WMTS 배경지도 사용하기 오픈레이어스 3버전 이상</title>
+<link rel="stylesheet" href="../js/ol.css" type="text/css">
+<script src="../js/ol.js"></script>
+<script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
+</head>
+
+<body>
+<div id="map" style="width: 100%; height: 350px; left: 0px; top: 0px"></div>
+<div id="result"></div>
+
+<!-- WFS 샘플 
+형태로 호출
+http://localhost:8080/6.WFS%20API/1.WFS%20%ED%98%B8%EC%B6%9C%ED%95%98%EA%B8%B0_XML_CORS%EC%B2%98%EB%A6%AC.html
+  -->
+<script type="text/javascript">
+	var Base = new ol.layer.Tile({
+		name : "Base",
+		source: new ol.source.XYZ({
+			url: 'http://api.vworld.kr/req/wmts/1.0.0/CEB52025-E065-364C-9DBA-44880E3B02B8/Base/{z}/{y}/{x}.png'
+		})
+	}); // WMTS API 사용
+  
+    var olView = new ol.View({
+        center: [14157718.984940762,4488628.819907329],//좌표계 변환
+        zoom: 14
+    })// 뷰 설정
+    var map = new ol.Map({
+        layers: [Base],
+        target: 'map',
+        view: olView
+    });
+	
+	$.ajax({
+		type : "get",
+		url : "/proxy.jsp?url=http://api.vworld.kr/req/wfs?key=CEB52025-E065-364C-9DBA-44880E3B02B8&domain=http://localhost:8080&SERVICE=WFS&version=1.1.0&"+
+			   "request=GetFeature&TYPENAME=lt_c_uq112&OUTPUT=text/xml; subtype=gml/2.1.2&SRSNAME=EPSG:3857&"+
+			    "BBOX=14157718.984940762,4488628.819907329,14157718.984940762,4488628.819907329&server=dev" ,
+		dataType : 'xml',
+		async : false,
+		success : function(data) {
+			var wfs_html="";
+			$(data).children().children().children().children().each(function(){
+				if($(this).context.nodeName.toUpperCase().indexOf("AG_GEOM")==-1){
+					wfs_html+=$(this).context.nodeName+" : "+$(this).context.textContent;
+				}
+			})
+			
+			$('#result').html(wfs_html);
+			
+			//openlayers 파서를 이용 gml/2.1.2
+			var gml = new ol.format.GML2();
+			var 더블유에프에스피쳐배열 = gml.readFeatures(data);
+			
+			var vectorSource = new ol.source.Vector({features:더블유에프에스피쳐배열})
+			
+			var vector_layer = new ol.layer.Vector({
+	    	  	  source: vectorSource
+    	  	})
+			map.addLayer(vector_layer);
+		},
+		error : function(xhr, stat, err) {
+		}
+	});
+	
+</script>
+</body>
+</html>

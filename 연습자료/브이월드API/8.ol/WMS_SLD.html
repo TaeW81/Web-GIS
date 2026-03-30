@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<!--
+Created using JS Bin
+http://jsbin.com
+
+Copyright (c) 2019 by anonymous (http://jsbin.com/pehidevivi/1/edit)
+
+Released under the MIT license: http://jsbin.mit-license.org
+-->
+<meta name="robots" content="noindex">
+<html>
+<head>
+<script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+<script src="https://openlayers.org/en/v4.6.5/build/ol.js"></script>
+<!-- <script type="text/javascript" src="https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=CEB52025-E065-364C-9DBA-44880E3B02B8"></script> -->
+
+<meta charset="UTF-8">
+<title>브이월드 SLD</title>
+</head>
+
+<body>
+<div style="float: left;">	
+</div>
+<div id="map" style="float: clear; width: 800px; height: 300px;" ></div>
+<script type="text/javascript">
+
+//지도 영역
+var layer = new ol.layer.Tile({
+      source:  new ol.source.OSM()
+  	 ,opacity : 0.5,
+  	 name : "mapLayer"
+});
+
+var Base = new ol.layer.Tile({
+	name : "mapLayer",
+	id : "Base",
+	source: new ol.source.XYZ({
+		url: 'https://api.vworld.kr/req/wmts/1.0.0/CEB52025-E065-364C-9DBA-44880E3B02B8/Base/{z}/{y}/{x}.png'
+	})
+}); // 기본지도 타일
+
+
+
+var view = new ol.View({
+	 projection: ol.proj.get("EPSG:4326"),
+     extent: ol.proj.get("EPSG:4326").getExtent() || undefined,
+	 center:[127.100616,37.402142],
+     zoom: 8
+});
+var map = new ol.Map({
+  layers: [Base],
+  target: document.getElementById('map'),
+  view: view
+});
+
+/* 선택시 스타일 설정*/
+var selectFeature = new ol.style.Style({
+    stroke: new ol.style.Stroke({
+        color: [00, 255, 00, .7],
+        width: 3
+    }),
+    fill: new ol.style.Fill({
+        color: [255, 00, 00, .7]
+    })
+});
+
+var sldbody = `<StyledLayerDescriptor xmlns="http://www.opengis.net/sld" xmlns:ogc="http://www.opengis.net/ogc" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" version="1.0.0" xsi:schemaLocation="http://www.opengis.net/sld StyledLayerDescriptor.xsd">
+<NamedLayer>
+<Name>sop:lt_c_ud801</Name>
+<UserStyle>
+<Name>Default Styler</Name>
+<Title>(연속주제)개발제한구역지관리/개발제한구역</Title>
+<Abstract>(연속주제)개발제한구역지관리/개발제한구역</Abstract>
+<FeatureTypeStyle>
+<Name>name</Name>
+<Rule>
+<Name>LT_C_UD801</Name>
+<Title>미분류</Title>
+<Abstract>미분류</Abstract>
+<ogc:Filter>
+<ogc:PropertyIsLike>
+<ogc:PropertyName>mnum</ogc:PropertyName>
+<ogc:Literal>%UDV000%</ogc:Literal>
+</ogc:PropertyIsLike>
+</ogc:Filter>
+<PolygonSymbolizer>
+<Fill>
+<CssParameter name="fill">#E5FF00</CssParameter>
+<CssParameter name="fill-opacity">0.6</CssParameter>
+</Fill>
+<Stroke>
+<CssParameter name="stroke">#434343</CssParameter>
+<CssParameter name="stroke-opacity">0.3</CssParameter>
+<CssParameter name="stroke-width">0.8</CssParameter>
+</Stroke>
+</PolygonSymbolizer>
+</Rule>
+<Rule>
+<Name>LT_C_UD801</Name>
+<Title>기타</Title>
+<Abstract>기타</Abstract>
+<ogc:Filter>
+<ogc:PropertyIsLike>
+<ogc:PropertyName>mnum</ogc:PropertyName>
+<ogc:Literal>%UDV999%</ogc:Literal>
+</ogc:PropertyIsLike>
+</ogc:Filter>
+<PolygonSymbolizer>
+<Fill>
+<CssParameter name="fill">#FF0000</CssParameter>
+<CssParameter name="fill-opacity">0.6</CssParameter>
+</Fill>
+<Stroke>
+<CssParameter name="stroke">#434343</CssParameter>
+<CssParameter name="stroke-opacity">0.3</CssParameter>
+<CssParameter name="stroke-width">0.8</CssParameter>
+</Stroke>
+</PolygonSymbolizer>
+</Rule>
+<Rule>
+<Name>LT_C_UD801</Name>
+<Title>개발제한구역</Title>
+<Abstract>개발제한구역</Abstract>
+<ogc:Filter>
+<ogc:PropertyIsLike>
+<ogc:PropertyName>mnum</ogc:PropertyName>
+<ogc:Literal>%UDV100%</ogc:Literal>
+</ogc:PropertyIsLike>
+</ogc:Filter>
+<PolygonSymbolizer>
+<Fill>
+<CssParameter name="fill">#000000</CssParameter>
+<CssParameter name="fill-opacity">0.6</CssParameter>
+</Fill>
+<Stroke>
+<CssParameter name="stroke">#434343</CssParameter>
+<CssParameter name="stroke-opacity">0.3</CssParameter>
+<CssParameter name="stroke-width">0.8</CssParameter>
+</Stroke>
+</PolygonSymbolizer>
+</Rule>
+</FeatureTypeStyle>
+</UserStyle>
+</NamedLayer>
+</StyledLayerDescriptor>`;
+
+var wms_title = '개발제한구역';
+var wms_val = 'LT_C_UD801';
+wms_val = wms_val.toLowerCase();
+var wms_tile = new ol.layer.Tile({
+	name : "WMS_LAYER",
+	source : new ol.source.TileWMS({
+		url : "https://api.vworld.kr/req/wms?",
+		//url : "//2d.vworld.kr:8895/2DCache/gis/map/WMS2?",
+		params : {
+			LAYERS : wms_val,
+			STYLES : wms_val,
+			CRS : "EPSG:900913",
+			apikey : "CEB52025-E065-364C-9DBA-44880E3B02B8",
+			DOMAIN : "//loacalhost:8080",
+			title : wms_title,
+			FORMAT : "image/png",
+			domain : "//localhost"
+			,SLD_BODY : sldbody
+			//,SLD : "http://map.vworld.kr/getXmlFile.do?fleNam=administrator_LYRIDE_0000000000032.xml"
+		}
+	})
+});
+map.addLayer(wms_tile);
+map.getView().setZoom(12);	
+
+function movexy(){
+	map.getView().setCenter([x,y])
+	map.getView().setZoom(13);
+}
+
+</script>
+</body>
+</html>

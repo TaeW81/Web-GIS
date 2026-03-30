@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xml="http://www.opengis.net/kml/2.2">
+ <Document>
+  <name>청도군청</name>
+  <Style id="PT">
+   <IconStyle>
+    <Icon>
+     <href>http://xdworld.vworld.kr:8080/dll_home/icons/pin-ylwb.png</href>
+    </Icon>
+   </IconStyle>
+   <LabelStyle>
+    <color>FFFFFFFF</color>
+   </LabelStyle>
+  </Style>
+  <Style id="LN">
+   <LineStyle>
+    <color>ff0808fe</color>
+    <width>7</width>
+   </LineStyle>
+  </Style>
+  <Style id="PL">
+   <LineStyle>
+    <color>fff42e09</color>
+    <width>7</width>
+    <color>fff42e09</color>
+   </LineStyle>
+   <PolyStyle>
+    <color>fff42e09</color>
+   </PolyStyle>
+  </Style>
+  <Placemark>
+   <name>청도군청</name>
+   <LookAt>
+    <longitude>128.7341051921385</longitude>
+    <latitude>35.646555551113586</latitude>
+    <altitude>91.07277777777779</altitude>
+    <heading>0.5038642682578961</heading>
+    <tilt>2.0000000000000284</tilt>
+    <range>504.29</range>
+   </LookAt>
+   <visibility>1</visibility>
+   <styleUrl>#PL</styleUrl>
+   <Polygon>
+    <outerBoundaryIs>
+     <LinearRing>
+      <coordinates>128.7341051921385,35.646555551113586,91.88
+128.73325738304527,35.64698296263164,95.09
+128.7333384787694,35.647351830760684,93.44
+128.733551577407,35.64754913295284,92.39
+128.7337516998749,35.64744402386973,92.27
+128.73402773633836,35.64770626093231,91.18
+128.7341907093519,35.64791098558285,90.47
+128.73433910211,35.647865798796154,90.18
+128.73439028247966,35.64792621219119,90
+128.73447939866656,35.64791748935387,90
+128.73456040434044,35.64799377211594,90
+128.7346344071799,35.647973005124804,90
+128.73477938083886,35.64780630691183,90
+128.73525667920833,35.64737676349773,89.17
+128.73496948130736,35.647242929491185,89.67
+128.7349706503552,35.64707525643387,89.53
+128.7341051921385,35.646555551113586,91.88
+128.73406795828436,35.646685958592485,92.16</coordinates>
+     </LinearRing>
+    </outerBoundaryIs>
+   </Polygon>
+  </Placemark>
+ </Document>
+</kml>
+

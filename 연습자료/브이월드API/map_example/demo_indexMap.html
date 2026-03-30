@@ -1,0 +1,56 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html> <head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+<title>VWORLD DEMO SAMPLE(인덱스맵)</title> 
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=D2F96ADF-C7F4-3FE6-9021-7949E462F8C6"></script>
+</head> 
+
+<script type="text/javascript">  
+	 
+		var map = null;
+		var output = "xml";
+		var stat_style = null;
+		
+		vworld.showMode = false; 
+		vworld.init("MapArea", "map-only", 
+				function() {         
+					map = this.vmap; 
+					map.addVWORLDControl("indexMap");
+				}
+				,function (obj){}//initCallback
+				,function (msg){}//failCallback
+			);
+	function fnResizeOM(){
+		map.vworldIndex.setSize(300,300);
+	}
+	
+	function trans(){
+		var lng = '127.02797636367406';
+		var lat = '37.494616565832395';
+		/*var point = map.getTransformXY(document.getElementById('centerx').value,
+										document.getElementById('centery').value,
+										"EPSG:4326","EPSG:900913");
+		*/
+		var point = new OpenLayers.Geometry.Point(lng, lat).transform("EPSG:4326","EPSG:900913");
+		
+		document.getElementById('centergx').value = point.x;
+		document.getElementById('centergy').value = point.y;		
+	}
+	
+</script> 
+
+<body >
+	<div>			
+		<button type="button" onclick="javascript:fnResizeOM();" name="addcache" >인덱스맵크기조정</button>	
+		<button type="button" onclick="javascript:trans();" >좌표변환</button>	
+		<input type="text" name='q' id='centergx' value="0" maxlength="20" style="ime-mode:active;width:100px;"/>
+		<input type="text" name='q' id='centergy' value="0" maxlength="20" style="ime-mode:active;width:100px;"/>
+	</div>
+	
+	<div style="display:inline;float:left;width:100%;height:600px;left:0px;top:0px">
+		<div id="MapArea" style="width:100%;height:100%;left:0px;top:0px;position:relative;"></div>	
+	</div>	
+	
+</body> 
+</html>

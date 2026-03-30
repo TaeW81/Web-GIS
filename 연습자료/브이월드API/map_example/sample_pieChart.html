@@ -1,0 +1,175 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=Edge">
+<title>pieChart</title>
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9"></script>
+<script type="text/javascript">
+
+var apiMap;//2D map
+var SOPPlugin;//3D map
+var vChartLayer = null;//차트변수명을 vChartLayer로 설정해야함
+var pieChart;//파이chart 변수
+vworld.showMode = false;//브이월드 배경지도 설정 컨트롤 유무(true:배경지도를 컨트롤 할수 있는 버튼 생성/false:버튼 해제)
+vworld.useChart = true;//차트 사용 유무
+
+/**
+ * - rootDiv, mapType, mapFunc, 3D initCall, 3D failCall
+ * - 브이월드 5가지 파라미터를 셋팅하여 지도 호출
+ */
+vworld.init("vMap", "map-first", 
+	function() {        
+		apiMap = this.vmap;//브이월드맵 apiMap에 셋팅 
+		apiMap.setBaseLayer(apiMap.vworldBaseMap);//기본맵 설정 
+		apiMap.setControlsType({"simpleMap":true});	//간단한 화면
+		apiMap.addVWORLDControl("zoomBar");//panzoombar등록
+		apiMap.setCenterAndZoom(14243425.793355, 4342305.8698004, 7);//화면중심점과 레벨로 이동 (초기 화면중심점과 레벨) 	
+	},
+	function (obj){//3D initCall(성공)
+		SOPPlugin = obj;
+	},
+	function (msg){//3D failCall(실패)
+		alert(msg);
+	}
+);
+
+/**
+ * 파이chart생성 및 차트 추가
+ */
+function createPieChart(){
+	vChartLayer = apiMap.getLayerByName("chartMap");//pieCharMap을 vchartLayer 변수에 저장
+	if (vChartLayer == null) {
+		//차트객체 생성
+		vChartLayer = new vworld.Charts("chartMap",{displayInLayerSwitcher:false}); //false로 반영할것.
+	}
+	
+	//파이chart 보일준비 완료
+	vChartLayer.setVisibility(true);
+	
+	//파이chart 투명도 설정(0~1 실수)
+	vChartLayer.setOpacity(1);
+	
+	//파이 chart 설정
+	pieChart = new vworld.Chart(
+			new OpenLayers.LonLat(14135087.165466234,4518348.216242027),//위치
+			{
+				type:'pie',//차트 종류(파이:pie,막대:bar,라인:line)
+				values:[5,2,1,2],//통계값
+				labels:['계:5','남:2','여:1','게이:2'],//통계값 라벨
+				animate:true,//애니메이션 효과
+				minlevel:6,//차트가 보여질 최소 레벨
+				makelegend:true,//통계범례
+				maxlevel:19,//차트가 보여질 최대 레벨
+				title:'서울특별시',//통계제목
+				colors:['#d26900','#d89243','#726056','#d26900']//통계색상
+			}
+	);	
+	vChartLayer.addChart(pieChart);//차트 객체에 파이객체를 add
+}
+
+/**
+ * 차트 추가
+ */
+function addPieChart(){
+	if(vChartLayer == null){
+		alert("차트 객체가 생성이 되어 있지 않습니다.");
+	}
+	
+	pieChart = new vworld.Chart(
+			new OpenLayers.LonLat(14368621.862591665,4188437.443236093),//위치
+			{
+				type:'pie',//차트 종류(파이:pie,막대:bar,라인:line)  
+				values:[5000000,2000000,3000000],//통계값
+				labels:['계:5000000','남:2000000','녀:3000000'],//통계값 라벨
+				animate:true,//애니메이션 효과 
+				minlevel:6,//차트가 보여질 최소 레벨
+				makelegend:true,//통계범례
+				maxlevel:19,//차트가 보여질 최대 레벨
+				title:'부산광역시'//통계제목
+			}
+	);	
+	vChartLayer.addChart(pieChart);//차트 객체에 파이객체를 add
+}
+
+/**
+ * 차트 숨기기
+ */
+function pieChartHide(){
+	var chartArray = 0;//차트 갯수 변수
+	
+	//차트 객체 생성 유무
+	if(vChartLayer != null){
+		//차트 레이어 갯수
+		chartArray = vChartLayer.getAllChart();
+	}else{
+		alert("파이chart가 생성되어 있지 않습니다.");
+	}
+	
+	if(chartArray.length != 0){
+		vChartLayer.chartMapHide();//차트 레이어가 있으면 차트 숨기기
+	}else{
+		alert("파이chart 레이어가 없습니다");
+	}
+}
+
+/**
+ * 차트보이기
+ */
+function pieChartShow(){
+	var chartArray = 0;//차트 갯수 변수
+	
+	//차트 객체 생성 유무
+	if(vChartLayer != null){
+		//차트 레이어 갯수
+		chartArray = vChartLayer.getAllChart();
+	}else{
+		alert("파이chart가 생성되어 있지 않습니다.");
+	}
+	
+	if(chartArray.length != 0){
+		vChartLayer.chartMapShow();//차트 레이어가 있으면 차트 보이기
+	}else{
+		alert("파이chart 레이어가 없습니다.");
+	}
+}
+
+/**
+ * 차트 레이어 지우기
+ */
+function clearChart(){
+	if(vChartLayer != null){
+		vChartLayer.clearCharts();//차트 레이어 지우기
+	}
+}
+
+/**
+ * 차트 객체 삭제
+ */
+function delChart(){
+	if(vChartLayer != null){
+		vChartLayer.clearCharts();//차트 레이어 지우기
+		vChartLayer = null;//객체 초기화
+	}	
+}
+
+</script>
+</head>
+<body>
+
+<!-- 지도가 들어갈 영역 시작 -->
+<div id="vMap" style="width:100%;height:650px;left:0px;top:0px"></div>
+<!-- 지도가 들어갈 영역 끝 -->
+
+<!-- chart control -->
+<div id="desc" style="padding:5px 0 0 5px;">
+	<button type="button" onclick="createPieChart();">파이차트생성</button>
+	<button type="button" onclick="addPieChart();">파이차트추가</button>
+	<button type="button" onclick="pieChartHide();">파이차트숨기기</button>
+	<button type="button" onclick="pieChartShow();">파이차트보이기</button>
+	<button type="button" onclick="clearChart();">파이차트삭제</button>
+	<button type="button" onclick="delChart();">파이차트객체삭제</button>
+</div>
+<!-- chart control -->
+</body>
+</html>

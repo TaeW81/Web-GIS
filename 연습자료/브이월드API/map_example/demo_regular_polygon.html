@@ -1,0 +1,205 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html> 
+<head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<title>VWORLD DEMO SAMPLE</title> 
+<SCRIPT language="JavaScript" type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9"></SCRIPT>
+</head> 
+<body>
+<script type="text/javascript">
+	var map = null;  
+	vworld.showMode = false; 
+   
+   // 통합지도 초기화
+	vworld.init(
+		"cont1"	// rootDiv
+		, "map-first" // mapType
+		,function() {         
+			map = this.vmap; 
+			map.setBaseLayer(map.vworldBaseMap); 
+			map.setControlsType({"simpleMap":true});	//간단한 화면	 
+			
+			//화면중심점과 레벨로 이동
+			map.setCenterAndZoom(14137792.751626197, 4092051.278263237, 8);  	
+		}
+		,function (obj){SOPPlugin = obj; }//initCallback
+		,function (msg){alert('vworld init fail');}//failCallback
+	);
+	
+	//========RegularPolygon=============================
+	var RegularPolygon = null;
+	
+	function createBounds(bounds){
+		var points = [];
+		points.push(new OpenLayers.Geometry.Point(bounds.left, bounds.top)); 
+		points.push(new OpenLayers.Geometry.Point(bounds.right, bounds.top)); 
+		points.push(new OpenLayers.Geometry.Point(bounds.right, bounds.bottom)); 
+		points.push(new OpenLayers.Geometry.Point(bounds.left, bounds.bottom)); 
+		
+		var style = {strokeColor: "#00FF00", fillColor: "#00FF00", strokeOpacity: 1, fillOpacity:0.1, strokeWidth: 2}; 
+		var poly = new vworld.Polygon(points, style);
+		
+		map.vectorLayer.addFeatures([poly]);
+	}
+	
+	function createRegularPolygon(){
+		
+		map.setZoomLevel(14);
+		var center = map.getCenter();		
+		var style_green = {strokeColor: "#00FF00", strokeOpacity: 1, strokeWidth: 2}; 
+				
+		RegularPolygon = new vworld.RegularPolygon({x:center.lon, y:center.lat}, 1000, 4, 0, style_green);
+		
+		map.vectorLayer.addFeatures([RegularPolygon]); 
+		return RegularPolygon;
+	}
+	function setRegularPolygonLineStyle(){
+		var line;
+		if (RegularPolygon == null){
+			line = createRegularPolygon();
+		}else {
+			line = RegularPolygon;
+		}
+		//var oldw = line.getStyle();
+		line.setStyle("dot");
+	}
+	function setRegularPolygonLineWeight(w){
+		var line;
+		if (RegularPolygon == null){
+			line = createRegularPolygon();
+		}else {
+			line = RegularPolygon;
+		}
+		var oldw = line.getWeight();
+		line.setWeight(w);
+		alert('기존굵기:' + oldw + ",변경굵기:" + w);
+	}
+	function setRegularPolygonLineColor(color){
+		//map.setZoomLevel(14);
+		var line;
+		if (RegularPolygon == null){
+			line = createRegularPolygon();
+		}else {
+			line = RegularPolygon;
+		}
+		var oldc = line.getColor();
+		line.setColor(color);
+		alert('라인기존색상:' + oldc + ",변경색상:" + color);
+	}
+	function setRegularPolygonColor(color){
+		var line;
+		if (RegularPolygon == null){
+			line = createRegularPolygon();
+		}else {
+			line = RegularPolygon;
+		}
+		var oldc = line.getFillColor();
+		line.setFillColor(color);
+		alert('면기존색상:' + oldc + ",변경색상:" + color);
+	}	
+	
+	function setRegularPolygonOpacity(opacity){
+		var poly;
+		if (RegularPolygon == null){
+			poly = createRegularPolygon();
+		}else {
+			poly = RegularPolygon;
+		}
+		var oldO = poly.getFillOpacity();
+		poly.setFillOpacity(opacity);
+		poly.setOpacity(opacity);
+		alert('면투명도:' + oldO + ",변경투명도:" + opacity);
+	}
+	function addRegularPolygonPoint(){
+		//map.setZoomLevel(14);
+		var line;
+		if (RegularPolygon == null){
+			line = createRegularPolygon();
+		}else {
+			line = RegularPolygon;
+		}
+		var center = map.getCenter();
+		line.addNewPoint(new OpenLayers.Geometry.Point(center.lon, center.lat));
+	}
+	
+	function getRegularPolygonBound(){
+		var line;
+		if (RegularPolygon == null){
+			line = createRegularPolygon();
+		}else {
+			line = RegularPolygon;
+		}
+		var oldb = line.getBounds();
+		createBounds(oldb);
+		alert('Bound:' + oldb);
+	}
+	
+	function setRegularPolygonSides(sides){
+		var poly;
+		if (RegularPolygon == null){
+			poly = createRegularPolygon();
+		}else {
+			poly = RegularPolygon;
+		}
+		var oldO = poly.getSides();
+		poly.setSides(sides);
+		alert('면타입:' + oldO + ",변경면타입:" + sides);
+	}
+	
+	function setRegularPolygonAutoSides(){
+		var poly;
+		if (RegularPolygon == null){
+			poly = createRegularPolygon();
+		}else {
+			poly = RegularPolygon;
+		}
+		var oldS = poly.getSides();
+		poly.setSides(oldS*2);
+		var newS = poly.getSides();
+		alert('면타입:' + oldS + ",변경면타입:" + newS);
+	}
+	
+	function setRegularPolygonAutoRadius(){
+		var poly;
+		if (RegularPolygon == null){
+			poly = createRegularPolygon();
+		}else {
+			poly = RegularPolygon;
+		}
+		var oldS = poly.getRadius();
+		poly.setRadius(oldS*2);
+		var newS = poly.getRadius();
+		alert('이전반경:' + oldS + ",적용반경:" + newS);
+	}
+	
+	function setRegularPolygonOrigin(){
+		var poly;
+		if (RegularPolygon == null){
+			poly = createRegularPolygon();
+		}else {
+			poly = RegularPolygon;
+		}
+		var center = map.getCenter();	
+		poly.setOrigin({x:center.lon, y:center.lat});
+	}
+
+</script> 
+
+<div>
+	<button type="button" onclick="javascript:createRegularPolygon();" name="rpg_1" >RegularPolygon(생성-기본4각형)</button>
+	<button type="button" onclick="javascript:setRegularPolygonAutoSides();" name="rpg_8" >포인트변경(2배수증가)</button>
+	<button type="button" onclick="javascript:setRegularPolygonLineStyle();" name="rpg_11" >라인스타일조회/지정</button>
+	<button type="button" onclick="javascript:setRegularPolygonLineWeight(10);" name="rpg_2" >라인굵기조회/지정</button>
+	<button type="button" onclick="javascript:setRegularPolygonLineColor('#ff0000');" name="rpg_3" >라인색상조회/지정</button>
+	<button type="button" onclick="javascript:setRegularPolygonColor('#ff0000');" name="rpg_6" >면색상조회/지정</button>
+	<button type="button" onclick="javascript:setRegularPolygonOpacity(0.5);" name="rpg_7" >투명도조회/지정</button>
+	<button type="button" onclick="javascript:getRegularPolygonBound();" name="rpg_5" >Bound조회</button>
+	<button type="button" onclick="javascript:setRegularPolygonAutoRadius();" name="rpg_9" >반경조정(기본1000)</button>
+	<button type="button" onclick="javascript:setRegularPolygonOrigin();" name="rpg_10" >중심이동</button>
+</div>
+<div style="display:inline;float:left;width:100%;height:500px;left:0px;top:0px">
+<div id="cont1" style="width:100%;height:650px;left:0px;top:0px"></div>	
+</div>
+
+</body> 
+</html>

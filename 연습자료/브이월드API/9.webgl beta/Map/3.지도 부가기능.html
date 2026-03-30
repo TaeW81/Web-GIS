@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+<title>Webgl API 부가기능 측정</title>
+</head>
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?version=wBeta&apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9&domain=http://localhost:8080"></script>
+<script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
+<script>
+var Map3D;
+function init(){
+	var optMapOptions =new vw.MapOptions(
+	vw.BasemapType.GRAPHIC, // 초기배경지도
+	"", // 디폴트레이어 설정됨 //레이어 목록
+	vw.DensityType.FULL, // navi, scale, coordinate 3개의 컨트롤이 나타남.
+	vw.DensityType.FULL, //인터렉션 밀도 ?
+	new vw.CameraPosition(new vw.CoordZ(127.12636278475038, 37.410307881426085, 500), new vw.Direction(0, 60, 0)),// 홈 카메라 위치
+	new vw.CameraPosition(new vw.CoordZ(127.126366626566, 37.41007333074048, 500), new vw.Direction(0, 60, 0)), // 초기 카메라 위치
+	true
+	);
+	//create 3d map object
+	Map3D = new vw.Map('globarea', optMapOptions);
+}
+
+$(window).load(function(){
+	init();
+})
+	
+</script>
+<body>
+<!-- 
+지도저장 '저장명'
+Map3D.saveAsImage('현재화면저장')
+
+지도 현재화면 프린트
+Map3D.printImage()
+
+POI 생성
+Map3D.loadUserMarker(33.361035142178046, 126.5320207342673,'marker_blue.png')
+
+카메라레벨 반환
+Map3D.getCameraLevel()
+
+좌표반환
+Map3D.getGlobePos()
+ -->
+
+<div style="width: 1000px; height: 25px; background-color: gray">
+<input type="button" value="이동" onclick="Map3D.createExplore(33.361035142178046, 126.5320207342673,10000)">
+<input type="button" value="부드러운 이동" onclick="Map3D.gotoSplineCurve(37.58860932877919,127.04001534308335,1000)">
+
+<input type="button" value="이미지저장" onclick="Map3D.saveAsImage('현재화면저장')">
+<input type="button" value="이미지출력" onclick="Map3D.printImage()">
+<input type="button" value="POI생성" onclick="Map3D.loadUserMarker(33.361035142178046, 126.5320207342673,'marker_blue.png')">
+<input type="button" value="카메라레벨 반환" onclick="this.value=('카메라레벨 반환 : '+Map3D.getCameraLevel());">
+<input type="button" value="현재위치 반환" onclick="this.value=('현재위치 반환 : '+Map3D.getGlobePos());">
+
+
+</div>
+<!--
+경관보기   - > Map3D.clearAll() 로 종료
+Map3D.aroundView()
+
+높이측정 - > Map3D.clearAll() 로 이벤트 unbound
+Map3D.visibleElev()
+
+거리측정 - > Map3D.clearAll() 로 이벤트 unbound
+Map3D.visibleDistance()
+
+면적측정 - > Map3D.clearAll() 로 이벤트 unbound
+Map3D.visibleArea()
+
+
+  -->
+<div style="width: 1000px; height: 25px; background-color: white">
+<input type="button" value="경관보기" onclick="Map3D.aroundView()">
+<input type="button" value="높이측정" onclick="Map3D.visibleElev()">
+<input type="button" value="거리측정" onclick="Map3D.visibleDistance()">
+<input type="button" value="면적측정" onclick="Map3D.visibleArea()">
+<input type="button" value="초기화" onclick="Map3D.clearAll()">
+<input type="button" value="줌인" onclick="Map3D.toolbar_zoomIn()">
+<input type="button" value="줌아웃" onclick="Map3D.toolbar_zoomOut() ">
+<input type="button" value="최대 줌 인" onclick="Map3D.getNavi().navi_zoomIn('1', Map3D)">
+<input type="button" value="최대 줌아웃" onclick="Map3D.getNavi().navi_zoomOut('1', Map3D) ">
+</div>
+<!-- 
+지도 생성 
+ -->
+<div id="maparea" style="display:inline-block;position:absolute;width:1000px;height:600px;">
+	<div id="globarea" style="display:inline-block;position:relative;width:100%;height:100%;">
+	</div>
+</div>
+
+
+</body>
+
+</html>

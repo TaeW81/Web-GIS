@@ -1,0 +1,382 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=Edge">
+<title>KMLLayer</title>
+<script language="JavaScript" type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9"></script>
+<script type="text/javascript" src="/jquery/jquery-1.7.1.min.js"></script>
+<script type="text/javascript" src="/jquery/jquery-ui/jquery-ui-1.7.2.custom.min.js"></script>
+</head> 
+
+<script type="text/javascript">  
+
+	var map = null;
+	var controls = null;  
+	
+	window.onload = function(){
+	//showMode : false 화면전환 버튼 감춘다.
+	//단, map-only, earth-only 인 경우 자동으로 버튼이 안보임.
+	vworld.showMode = true; 
+	vworld.init("PrintArea", "map-base",//"map-base",//"earth-first",//"raster", // 
+		function() {         
+			map = this.vmap; 					
+			map.setControlsType({"simpleMap":true});	//간단한 화면					
+			map.addVWORLDControl("layerSwitch");
+		}
+		,function (obj){
+		}//initCallback
+		,function (msg){alert('oh my god');}
+	);
+	};
+	
+	function jsAddFile(fileobj){
+		var files = fileobj.files;
+		if (files.length > 1){
+			alert('1개의 파일만 허용합니다.');
+			return;
+		}
+		if (files != null) jsKmlFileTreat(files);
+	}
+	
+	var vLayer = null;	
+	function jsKmlFileTreat(files){
+		//2d
+		
+		var f;
+		f = files[0];
+		window.URL = window.URL || window.webkitURL;
+		var tmppath = window.URL.createObjectURL(files[0]);
+		var layerid = OpenLayers.Util.createUniqueID("vworldKML_");
+		var option = {title:'test', desc:'testlayer'};
+	  //중요- 프록시 설정할것..
+		OpenLayers.ProxyHost = "/proxy.do?url=";
+		vworld.KMLLocalLayer.prototype.getRealExtent = function(){
+			
+			var maxExtent = null;
+	        var features = (this.strategies.length == 2)? this.strategies[1].features : this.features;
+	        if(features && (features.length > 0)) {
+	            var geometry = null;
+	            for(var i=0, len=features.length; i<len; i++) {
+	                geometry = features[i].geometry;
+	                if (geometry) {
+	                    if (maxExtent === null) {
+	                        maxExtent = new OpenLayers.Bounds();
+	                    }
+	                    maxExtent.extend(geometry.getBounds());
+	                }
+	            }
+	        }
+	        return maxExtent;
+		};
+		vLayer = new vworld.KMLLocalLayer(layerid, tmppath, 'EPSG:4326', option);
+		vLayer.events.register("loadend", vLayer, function (e) {
+			var extent = this.getRealExtent();
+			this.map.zoomToExtent(extent, true);
+	    });
+		//map.addLayer(vLayer);
+		
+				
+	}
+	
+	function calculateFeatures(){
+		alert("현재갯수:" + vLayer.features.length);
+		alert("원본갯수:" + vLayer.strategies[1].features.length);
+	}
+				
+/*
+
+KMLLayer2 = OpenLayers.Class(OpenLayers.Layer.Vector, {
+	popupClass : vworld.FramedBox,
+	//map : null,
+	overflow : "auto",
+	fixedRelativePosition : true, 
+	relativePosition : "tm",
+	autoSize : true,
+	initDisplay : false,
+	layer : null,
+	name : "",
+	url : "",
+	epsg : "EPSG:4326",
+	title : "",
+	desc : "",
+	style : null,
+	//features : null,
+	initialize: function(name, value, epsg, options) {
+		OpenLayers.Layer.prototype.initialize.apply(this, arguments);
+		this.name = name;
+		this.epsg = epsg;
+		typeof(options.style) != 'undefined' ? options.style : null;
+		typeof(options.title) != 'undefined' ? this.title = options.title : this.title = 'no_title';
+		typeof(options.desc) != 'undefined' ? this.desc = options.desc : this.desc = 'no_desc';
+		this.addLayer(value);
+    },
+    addLayer : function(objectURL){
+    	this.url = objectURL;
+    	
+    	this.strategies = [new OpenLayers.Strategy.Fixed(),new OpenLayers.Strategy.Cluster({distance: 25, threshold: 2})];
+    	
+    	if(this.epsg == 'EPSG:4326'){
+    		this.protocol = new OpenLayers.Protocol.HTTP({
+    	        url: this.url,
+    	        format: new OpenLayers.Format.KML({
+    	        	internalProjection:'EPSG:900913',
+    	        	baseUrl: this.url,
+    	        	extractStyles: true, 
+    	            extractAttributes: true,
+    	            maxDepth: 10
+    	        })
+    	    });
+    	} else if(this.epsg == 'EPSG:900913') {
+    		this.protocol = new OpenLayers.Protocol.HTTP({
+    	        url: this.url,
+    	        format: new OpenLayers.Format.KML({
+    	        	baseUrl: this.url,
+    	        	extractStyles: true, 
+    	            extractAttributes: true,
+    	            maxDepth: 10
+    	        })
+    	    });
+    	}
+    	
+    	
+	    this.renderers = ['SVG','VML','Canvas'];
+	    var defaultStyle = this.defaultStyle();
+		if (this.style != null) {
+			this.styleMap =  new OpenLayers.StyleMap(this.style);
+		}else{
+			this.styleMap = defaultStyle;
+		}
+	    var newArguments = [];
+	    newArguments.push(this.name, this.url,{});
+	    
+		OpenLayers.Feature.Vector.style["default"].cursor = "pointer";
+		OpenLayers.Layer.Vector.prototype.initialize.apply(this, newArguments);	
+		
+		this.events.on({
+			'featureclick':this.onSelect
+		});
+		
+		
+		vmap.addLayer(this);
+    },
+    defaultStyle : function(){
+    	var colors = {
+                low: "rgb(181, 226, 140)", 
+                middle: "rgb(241, 211, 87)", 
+                high: "rgb(253, 156, 115)"
+            };
+	
+		var lowRule = new OpenLayers.Rule({
+				filter: new OpenLayers.Filter.Comparison({
+					type: OpenLayers.Filter.Comparison.LESS_THAN,
+					property: "count",
+					value: 15
+				}),
+				symbolizer: {
+					fillColor: colors.low,
+					fillOpacity: 0.9, 
+					strokeColor: colors.low,
+					strokeOpacity: 0.5,
+					strokeWidth: 12,
+					pointRadius: 10,
+					label: "${count}",
+					labelOutlineWidth: 1,
+					fontColor: "#ffffff",
+					fontOpacity: 0.8,
+					fontSize: "12px"
+				}
+			});
+		var middleRule = new OpenLayers.Rule({
+				filter: new OpenLayers.Filter.Comparison({
+					type: OpenLayers.Filter.Comparison.BETWEEN,
+					property: "count",
+					lowerBoundary: 15,
+					upperBoundary: 50
+				}),
+				symbolizer: {
+					fillColor: colors.middle,
+					fillOpacity: 0.9, 
+					strokeColor: colors.middle,
+					strokeOpacity: 0.5,
+					strokeWidth: 12,
+					pointRadius: 15,
+					label: "${count}",
+					labelOutlineWidth: 1,
+					fontColor: "#ffffff",
+					fontOpacity: 0.8,
+					fontSize: "12px"
+				}
+			});
+		var highRule = new OpenLayers.Rule({
+				filter: new OpenLayers.Filter.Comparison({
+					type: OpenLayers.Filter.Comparison.GREATER_THAN,
+					property: "count",
+					value: 50
+				}),
+				symbolizer: {
+					fillColor: colors.high,
+					fillOpacity: 0.9, 
+					strokeColor: colors.high,
+					strokeOpacity: 0.5,
+					strokeWidth: 12,
+					pointRadius: 20,
+					label: "${count}",
+					labelOutlineWidth: 1,
+					fontColor: "#ffffff",
+					fontOpacity: 0.8,
+					fontSize: "12px"
+				}
+			});
+		style = new OpenLayers.Style(null, {rules: [lowRule, middleRule, highRule]});
+		
+		return style;
+    },
+    
+    onSelect: function(feature) {
+    	feature = feature.feature;
+    	var layer = feature.layer;
+	    if (feature.popup != null){ 
+			if (feature.popup.map != null) {
+				feature.popup.toggle(); 
+				return;
+			}else {
+				feature.popup.destroy();
+				delete feature.popup; 
+			}								
+		}
+		var text = '';
+		if (typeof feature.cluster == 'object') {
+			for (var i in feature.cluster){
+				var feat = feature.cluster[i];
+				var namestr = eval('feat.attributes.' + this.title) || feat.fid;
+				var descstr = eval('feat.attributes.' + this.desc);
+				var color = '#FFFFFF';
+				if(i%2 ==0){
+					color = '#F3F3F3';
+				}
+				if(namestr == undefined && descstr == undefined){
+					namestr = '정보가 없습니다.';
+					descstr = '<br />';
+				} else if(namestr == undefined && descstr != undefined){
+					namestr = '정보가 없습니다.';
+				} else if(namestr != undefined && descstr == undefined){
+					descstr = '';
+				}
+				text += "<div style='background-color:"+color+"'><h4>"+namestr + "<hr size='1' noshade/></h4>" + descstr + "</div><font size='1'><br /></font>";
+				if(i == 49 && feature.cluster.length == 50){
+					break;
+				} else if(i == 49 && feature.cluster.length > 50){
+					text += "<center>...</center><br /><br />총[" + feature.cluster.length + "]건의 데이터가<br />포함되어있습니다.";
+					break;
+				}
+		    }
+		} else {
+			var namestr = eval('feature.attributes.' + this.title) || feature.fid;
+			var descstr = eval('feature.attributes.' + this.desc);
+			
+			if(namestr == undefined && descstr == undefined){
+				namestr = '정보가 없습니다.';
+				descstr = '<br />';
+			} else if(namestr == undefined && descstr != undefined){
+				namestr = '정보가 없습니다.';
+			} else if(namestr != undefined && descstr == undefined){
+				descstr = '';
+			}
+			text += "<div><h3>"+namestr + "<hr size='1' noshade/></h3>" + descstr + "</div>";
+		}
+        
+		if (!this.popup) {
+			var popupClass = layer.popupClass ? 
+				          layer.popupClass : OpenLayers.Popup.FramedCloud;
+		     feature.popup = new popupClass(feature.id + "_popup", 
+		                        feature.geometry.getBounds().getCenterLonLat(),
+		                        null,text,null,true, null, true);
+		}
+	    if (layer.overflow != null) {
+            feature.popup.contentDiv.style.overflow = layer.overflow;
+        } 
+        if (layer.closeDisplayClass !=null && feature.popup !=null && feature.popup.closeDiv !=null){					    		
+    		feature.popup.closeDisplayClass = layer.closeDisplayClass;
+        	feature.popup.closeDiv.className = feature.popup.closeDisplayClass;
+        }
+        layer.setFixedRelativePosition(feature, layer.fixedRelativePosition);
+	    this.map.addPopup(feature.popup, layer.initDisplay);	
+    },
+	setFixedRelativePosition : function(feature, fixed){
+		if (feature.layer.fixedRelativePosition && feature.popup) {
+			feature.popup.relativePosition = feature.layer.relativePosition;					                         
+            feature.popup.updateRelativePosition(); 
+			feature.popup.calculateRelativePosition = function(px) {
+            	return this.relativePosition;
+            };
+        }
+	},
+	getRealExtent: function () {
+        var maxExtent = null;
+        var features = (this.strategies.length == 2)? this.strategies[1].features : this.features;
+        alert(features.length);
+        if(features && (features.length > 0)) {
+            var geometry = null;
+            for(var i=0, len=features.length; i<len; i++) {
+                geometry = features[i].geometry;
+                if (geometry) {
+                    if (maxExtent === null) {
+                        maxExtent = new OpenLayers.Bounds();
+                    }
+                    maxExtent.extend(geometry.getBounds());
+                }
+            }
+        }
+        return maxExtent;
+    },
+	CLASS_NAME: "KMLLayer2"
+});
+*/
+/* 
+var kmlUrl = "./kml/RDR_CMI_201409011310_web.kml";
+var groundOverlay = new OpenLayers.Layer.Vector("KML2", {
+    //renderers: location.search.indexOf('Canvas') >= 0 ? ['Canvas', 'SVG', 'VML'] : ['SVG', 'VML', 'Canvas'],
+    //projection: map.displayProjection,
+    strategies: [new OpenLayers.Strategy.Fixed()],
+    protocol: new OpenLayers.Protocol.HTTP({
+        url: kmlUrl,
+        format: new OpenLayers.Format.KML({
+            internalProjection:'EPSG:900913',
+        	externalProjection:'EPSG:4326',
+        	maxDepth: 10,
+            baseUrl: kmlUrl,
+            extractStyles: true,
+            extractAttributes: true
+        })
+    })
+});
+map.addLayer(groundOverlay);
+*/
+
+
+
+	
+
+//TEST===============================
+
+	/**
+* 2D KML레이어(KMLLocalLayer) 작성하기
+* @param files
+*/
+
+//TEST===============================
+</script> 
+
+<body >
+	<div>	
+		<input type="file" id="kmlfile" name="kmlfile" accept=".kml, .kmz" onchange="jsAddFile(this);"/>
+		<button type="button" onclick="javascript:calculateFeatures();" >피쳐갯수확인</button>	
+	</div>
+		
+	<div style="display:inline;float:left;width:100%;height:600px;left:0px;top:0px">
+		<div id="PrintArea" style="width:100%;height:100%;left:0px;top:0px;position:relative;"></div>	
+	</div>	
+</body> 
+
+</html>

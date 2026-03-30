@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=CEB52025-E065-364C-9DBA-44880E3B02B8&domain=http://localhost:8080"></script>
+<meta charset="UTF-8">
+<title>데이터 API 마커, 오버레이</title>
+</head>
+
+<body>
+<div id="map" style="float: left; width: 800px;"></div>
+<div style="border: 1px solid black; float: left; width: 224px; " >
+	
+	<form id="dataForm">
+		<input type="hidden" name="key" value="CEB52025-E065-364C-9DBA-44880E3B02B8">
+		<input type="hidden" name="domain" value="http://localhost:8080">
+		<input type="hidden" name="service" value="data">
+		<input type="hidden" name="version" value="2.0">
+		<input type="hidden" name="request" value="getfeature">
+		<input type="hidden" name="format" value="json">
+		<input type="hidden" name="size" value="100">
+		<input type="hidden" name="page" value="1">
+		<input type="hidden" name="data" value="LT_P_EDRSE002">
+		<input type="hidden" name="geometry" value="true">
+		<input type="hidden" name="attribute" value="true">
+		<input type="hidden" name="crs" value="EPSG:900913">
+		<input type="hidden" name="geomfilter" value="BOX(14028876.609587036,3912653.333809428,14151175.854843318,3974414.4526638505)">
+	</form>
+</div>
+<script type="text/javascript">
+vw.ol3.MapOptions = {
+   basemapType: vw.ol3.BasemapType.GRAPHIC
+ , controlDensity: vw.ol3.DensityType.EMPTY
+ , interactionDensity: vw.ol3.DensityType.BASIC
+ , controlsAutoArrange: true
+ , homePosition: vw.ol3.CameraPosition
+ , initPosition: vw.ol3.CameraPosition
+}; 
+  
+var vmap = new vw.ol3.Map("map",  vw.ol3.MapOptions);
+
+var vectorStyle = function(feature) {
+    var style = new ol.style.Style({
+	    stroke: new ol.style.Stroke({
+	        color: [0, 256, 0, 1],
+	        width: 5
+	    }),
+	    fill: new ol.style.Fill({
+	        color: [256, 0, 0, .7]
+	    })
+    });
+    return [style];
+}
+  
+$.ajax({
+	type: "get",
+	url: "http://api.vworld.kr/req/data",
+	data : $('#dataForm').serialize(),
+	dataType: 'jsonp',
+	async: false,
+	success: function(data) {
+		
+		// 오픈레이어스 기반 마커 설정
+	    var vectorSource = new ol.source.Vector({features: (new ol.format.GeoJSON()).readFeatures(data.response.result.featureCollection)})
+	    
+	    var iconStyle = new ol.style.Style({
+            image: new ol.style.Icon(/** @type {olx.style.IconOptions} */ ({
+              anchor: [0.5, 46],
+              anchorXUnits: 'fraction',
+              anchorYUnits: 'pixels',
+              src: 'https://map.vworld.kr/images/maps/marker.png',
+              scale : 1
+            }))
+         });
+	    var vector_layer = new ol.layer.Vector({
+	  	  source: vectorSource,
+	  	  style: iconStyle
+	  	})
+	    
+	 	vmap.addLayer(vector_layer);
+	},
+	error: function(xhr, stat, err) {}
+});
+
+vmap.getView().setCenter([14097278.195273742, 3944833.3227174818])
+vmap.getView().setZoom(10)
+
+/* 이벤트 추가 */
+vmap.on("click", function(evt) {
+	var coordinate = evt.coordinate //좌표정보
+	var pixel = evt.pixel
+	var features = [];
+	
+	//선택한 픽셀정보로  feature 체크 
+  vmap.forEachFeatureAtPixel(pixel, function(feature, layer) {
+ 	
+	var shel_ad = feature.get("shel_ad");
+	var shel_nm = feature.get("shel_nm");
+	var shel_tp = feature.get("shel_tp");
+	var olId = feature.getId();
+	
+	var olOverlay="olOverlay";
+  	
+  	if(feature!=null){
+  		
+		var overlayElement= document.createElement("div"); // 오버레이 팝업설정 
+  		overlayElement.setAttribute("class", "overlayElement");
+  		overlayElement.setAttribute("style", "background-color: #3399CC; border: 2px solid white; color:white");
+  		overlayElement.setAttribute("onclick", "deleteOverlay('"+olOverlay+"')");
+  		overlayElement.innerHTML="<p>"+shel_ad+"</p>";
+  		overlayElement.innerHTML="<p>"+shel_nm+" "+shel_tp+"</p>";
+  		
+  		var overlayInfo = new ol.Overlay({
+  			id:olOverlay,
+  			element:overlayElement,
+  			offset: [0, -10],
+  			position: coordinate,
+  		});
+  		if(vmap.getOverlayById(olOverlay)!=null){
+  			deleteOverlay(olOverlay);
+  		}
+  		vmap.addOverlay(overlayInfo)
+  		
+  	}
+  });
+});
+
+/**
+오버레이 삭제
+*/
+var deleteOverlay = function(id){
+	vmap.removeOverlay(vmap.getOverlayById(id));
+}
+
+</script>
+</body>
+</html>

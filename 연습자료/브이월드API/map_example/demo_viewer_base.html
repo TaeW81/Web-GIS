@@ -1,0 +1,201 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+		<html xmlns="http://www.w3.org/1999/xhtml">
+		  <head>
+		    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+		    <title>2DMap</title>
+		    <meta http-equiv='imagetoolbar' content='no'/>
+		    <style type="text/css"> v\:* {behavior:url(#default#VML);}
+		        html, body { overflow: hidden; padding: 0; height: 100%; width: 100%; font-family: 'Lucida Grande',Geneva,Arial,Verdana,sans-serif; }
+		        body { margin: 0px; background: #fff; }
+		        h1 { margin: 0; padding: 0px; border:0; font-size: 20pt; }
+		        #header { height: 43px; padding: 0; background-color: #eee; border: 1px solid #888; }
+		        #subheader { height: 12px; text-align: right; font-size: 10px; color: #555;}
+		        #map { height: 100%; border: 0px solid #888; }
+		    </style>
+		    <script src="http://www.openlayers.org/api/2.13/OpenLayers.js" type="text/javascript"></script>
+		    <script src="http://api.maps.yahoo.com/ajaxymap?v=3.0&amp;appid=INSERT_YOUR_YAHOO_APP_ID_HERE"></script>
+		    <SCRIPT language="JavaScript" type="text/javascript" src="http://map.vworld.kr/js/apis.do?type=Base&apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9&domain=vworld.kr"></SCRIPT>
+		    <script type="text/javascript">
+		      var map;
+			    var mapBounds = new OpenLayers.Bounds(123 , 32, 134 , 43);
+			    var mapMinZoom = 7;
+			    var mapMaxZoom = 19;
+
+		        // avoid pink tiles
+		        OpenLayers.IMAGE_RELOAD_ATTEMPTS = 3;
+		        OpenLayers.Util.onImageLoadErrorColor = "transparent";
+		        
+		        function init(){
+	            var options = {
+	                controls: [],
+	                projection: new OpenLayers.Projection("EPSG:900913"),
+	                displayProjection: new OpenLayers.Projection("EPSG:4326"),//("EPSG:900913"),//
+	                units: "m",
+	                controls : [],
+	                numZoomLevels:21,
+	                maxResolution: 156543.0339,
+	                maxExtent: new OpenLayers.Bounds(-20037508.34, -20037508.34, 20037508.34, 20037508.34)
+		            };
+	            map = new OpenLayers.Map('map', options);
+				
+				var osm = new OpenLayers.Layer.OSM();
+   				var options = {serviceVersion : "",
+					layername: "",
+					isBaseLayer: false,
+					opacity : 1,
+					type: 'png',
+					transitionEffect: 'resize',
+					tileSize: new OpenLayers.Size(256,256),
+					min_level : 7,
+					max_level : 18,
+					buffer:0};
+                vBase = new vworld.Layers.Base('VBASE');//'브이월드배경지도');//, options);
+				if (vBase != null){map.addLayer(vBase);}
+				vSAT = new vworld.Layers.Satellite('VSAT');
+				if (vSAT != null) {map.addLayer(vSAT);};
+				vHybrid = new vworld.Layers.Hybrid('VHYBRID');
+				if (vHybrid != null) {vHybrid.isBaseLayer=true;map.addLayer(vHybrid);} 
+				//4. Gray지도 추가하기
+				vGray = new vworld.Layers.Gray('VGRAY');
+				if (vGray != null){map.addLayer(vGray);}
+				//5. Midnight지도 추가하기
+				vMidnight = new vworld.Layers.Midnight('VMIDNIGHT');
+				if (vMidnight != null){map.addLayer(vMidnight);}
+				
+				map.addLayers([osm]);
+
+	            var switcherControl = new OpenLayers.Control.LayerSwitcher();
+	            map.addControl(switcherControl);
+	            switcherControl.maximizeControl();
+	
+	            map.zoomToExtent( mapBounds.transform(map.displayProjection, map.projection ) );
+			    map.zoomTo(11);
+			        
+	            map.addControl(new OpenLayers.Control.PanZoomBar());
+	            //map.addControl(new OpenLayers.Control.MousePosition());
+	            map.addControl(new OpenLayers.Control.Attribution({separator:" "})) 
+	        }
+			    function osm_getTileURL(bounds) {
+	            var res = this.map.getResolution();
+	            var x = Math.round((bounds.left - this.maxExtent.left) / (res * this.tileSize.w));
+	            var y = Math.round((this.maxExtent.top - bounds.top) / (res * this.tileSize.h));
+	            var z = this.map.getZoom();
+	            var limit = Math.pow(2, z);
+
+	            if (y < 0 || y >= limit) {
+	                return "http://www.maptiler.org/img/none.png";
+	            } else {
+	                x = ((x % limit) + limit) % limit;
+	                return this.url + z + "/" + x + "/" + y + "." + this.type;
+	            }
+	        }
+	        
+	        function nsm_getTileURL(bounds) {
+	            var res = this.map.getResolution();
+	            var x = Math.round((bounds.left - this.maxExtent.left) / (res * this.tileSize.w));
+	            var y = Math.round((this.maxExtent.top - bounds.top) / (res * this.tileSize.h));
+	            
+	            var z = this.map.getZoom();
+	            var limit = Math.pow(2, z);
+
+	            if (y < 0 || y >= limit) {
+	                return "http://www.maptiler.org/img/none.png";
+	            } else {
+	                x = ((x % limit) + limit) % limit;
+	                return this.url + z + "/" + x + "/" + y + "." + this.type;
+	            }
+	        }
+	
+	        function overlay_getTileURL(bounds) {
+	            var res = this.map.getResolution();
+	            
+	            //var x = Math.round((bounds.left + 20037508) / (res * this.tileSize.w));
+	            //var y = Math.round((bounds.bottom + 20037508) / (res * this.tileSize.h));
+	            var x = Math.round((bounds.left - this.maxExtent.left) / (res * this.tileSize.w));
+	            var y = Math.round((this.maxExtent.top - bounds.top) / (res * this.tileSize.h));
+	            var z = this.map.getZoom();
+	            
+		        if (mapBounds.intersectsBounds( bounds ) && z >= mapMinZoom && z <= mapMaxZoom ) {
+	               return this.url + "" + z + "/" + x + "/" + y + "." + this.type;
+                } else {
+                   return "http://www.maptiler.org/img/none.png";
+                }
+	        }		
+	        
+	        function overlay_osm_getTileURL(bounds) {
+	            var res = this.map.getResolution();
+	            var x = Math.round((bounds.left - this.maxExtent.left) / (res * this.tileSize.w));
+	            var y = Math.round((this.maxExtent.top - bounds.top) / (res * this.tileSize.h));
+	            var z = this.map.getZoom();
+	            var limit = Math.pow(2, z);
+
+	            if (y < 0 || y >= limit) {
+	                return "http://www.maptiler.org/img/none.png";
+	            } else {
+	                x = ((x % limit) + limit) % limit;
+	                return this.url + "satellite/" + z + "/" + x + "/" + y + "." + this.type;
+	            }
+	        }
+	        
+			
+			function overlay_osm_getTileURL2(bounds) {
+	            var res = this.map.getResolution();
+	            var x = Math.round((bounds.left - this.maxExtent.left) / (res * this.tileSize.w));
+	            var y = Math.round((this.maxExtent.top - bounds.top) / (res * this.tileSize.h));
+	            var z = this.map.getZoom();
+	            var limit = Math.pow(2, z);
+
+	            if (y < 0 || y >= limit) {
+	                return "http://www.maptiler.org/img/none.png";
+	            } else {
+	                x = ((x % limit) + limit) % limit;
+	                return this.url + "SST/" +z + "/" + x + "/" + y + "." + this.type;
+	            }
+	        }
+	        
+			
+		   function getWindowHeight() {
+		        if (self.innerHeight) return self.innerHeight;
+		        if (document.documentElement && document.documentElement.clientHeight)
+		            return document.documentElement.clientHeight;
+		        if (document.body) return document.body.clientHeight;
+			        return 0;
+		    }
+
+		    function getWindowWidth() {
+			    if (self.innerWidth) return self.innerWidth;
+			    if (document.documentElement && document.documentElement.clientWidth)
+			        return document.documentElement.clientWidth;
+			    if (document.body) return document.body.clientWidth;
+			        return 0;
+		    }
+
+		    function resize() {  
+			    //var map = document.getElementById("map2D");  
+			    //map.style.height = (getWindowHeight()-80) + "px";
+			    //map.style.width = (getWindowWidth()-20) + "px";
+			    
+				//if (map.updateSize) { map.updateSize(); };
+		    } 
+			function deleteLayerByName(name){
+				for (var i=0, len=map.layers.length; i<len; i++) {
+		            var layer = map.layers[i];
+		            if (layer.name == name) {
+		            	map.removeLayer(layer);
+		                //return layer;
+		                break;
+		            }
+		        }
+			}
+		    onresize=function(){ resize(); };
+
+		    </script>
+		  </head>
+		  <body onload="init()">
+		    <div id="map" style="height:600px;"></div>
+		    <div >
+		    	<button type="button" onclick="javascript:deleteLayerByName('VHYBRID');" name="rpg_1" >레이어삭제하기</button>
+			</div>
+		    <script type="text/javascript" >resize()</script>
+		  </body>
+		</html>

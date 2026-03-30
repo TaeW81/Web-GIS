@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<!--
+Created using JS Bin
+http://jsbin.com
+
+Copyright (c) 2019 by anonymous (http://jsbin.com/cezexoliqa/1/edit)
+
+Released under the MIT license: http://jsbin.mit-license.org
+-->
+<meta name="robots" content="noindex">
+<html>
+  <head>
+    <title>Draw Shapes</title>
+    <link rel="stylesheet" href="https://openlayers.org/en/v5.3.0/css/ol.css" type="text/css">
+    <!-- The line below is only needed for old environments like Internet Explorer and Android 4.x -->
+    <script src="https://cdn.polyfill.io/v2/polyfill.min.js?features=requestAnimationFrame,Element.prototype.classList,URL"></script>
+    <script src="https://openlayers.org/en/v5.3.0/build/ol.js"></script>
+  </head>
+  <body>
+    <div id="map" class="map" style="width: 600px;height: 70%;"></div>
+    <form class="form-inline">
+      <label>Shape type &nbsp;</label>
+      <select id="type">
+        <option value="Square">Square</option>
+        <option value="Box">Box</option>
+        <option value="None">None</option>
+      </select>
+    </form>
+    <div id="result"></div>
+    <script>
+      var raster = new ol.layer.Tile({
+         source: new ol.source.XYZ({
+				url: 'https://api.vworld.kr/req/wmts/1.0.0/CEB52025-E065-364C-9DBA-44880E3B02B8/Base/{z}/{y}/{x}.png'
+			})
+      });
+
+      var source = new ol.source.Vector({wrapX: false});
+
+      var vector = new ol.layer.Vector({
+        source: source
+      });
+
+      var map = new ol.Map({
+        layers: [raster, vector],
+        target: 'map',
+        view: new ol.View({
+            center: ol.proj.transform([126.9380517322744,37.16792263658907], 'EPSG:4326', 'EPSG:900913'), //위경도 좌표계 변환
+            zoom: 10
+        })
+      });
+
+      var typeSelect = document.getElementById('type');
+
+
+
+      //그리기 이벤트 
+
+      var draw; // global so we can remove it later
+      function addInteraction() {
+        var value = typeSelect.value;
+        if (value !== 'None') {
+          var geometryFunction;
+          if (value === 'Square') {
+            value = 'Circle';
+            geometryFunction = ol.interaction.Draw.createRegularPolygon(4);
+          } else if (value === 'Box') {
+            value = 'Circle';
+            geometryFunction = ol.interaction.Draw.createBox();
+          }
+          draw = new ol.interaction.Draw({
+            source: source,
+            type: value,
+            geometryFunction: geometryFunction
+          });
+          map.addInteraction(draw);
+
+         var result_html = "";
+
+         draw.on('drawend', // 그리기 종료 시 해당 객체 정보를 반환
+         function (evt) {
+            // set sketch
+            sketch = evt.feature;
+
+            sketch.getGeometry().getCoordinates()[0].forEach(function(point,index){
+               result_html+=index+"의 좌표="+point+"<br />";
+            })
+
+            document.getElementById('result').innerHTML = result_html;
+            
+         }, this);
+        }
+      }
+
+      
+
+      /**
+       * Handle change event.
+       */
+      typeSelect.onchange = function() {
+        map.removeInteraction(draw);
+        addInteraction();
+      };
+
+      addInteraction();
+    </script>
+  </body>
+</html>

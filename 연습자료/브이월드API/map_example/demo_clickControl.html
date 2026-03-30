@@ -1,0 +1,91 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/> 
+<title>VWORLD DEMO SAMPLE(ClickControl)</title> 
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=D2F96ADF-C7F4-3FE6-9021-7949E462F8C6"></script>
+<script type="text/javascript" src="http://map.vworld.kr/jquery/jquery-1.7.1.min.js"></script>
+<script type="text/javascript">
+var map = null; 
+jQuery(document).ready(function(){
+            	            
+	vworld.showMode = false;
+	vworld.init("cont1", "map-first", function () {
+	             map = this.vmap; 
+	             map.setControlsType({ "simpleMap": true });
+	             map.setCenterAndZoom(14135792.751626197, 4512051.278263237, 12);
+	             //사용자정의 Control 추가
+	             fnSetControl();
+	
+	          }, function (obj) {
+	              SOPPlugin = obj;
+	          }, function (msg){alert('vworld init fail');}//failCallback
+	);
+});
+            
+function fnSetControl(){
+	OpenLayers.Control.Click = OpenLayers.Class(OpenLayers.Control, {
+        defaultHandlerOptions: {
+            'single': true,
+            'double': false,
+            'pixelTolerance': 0,
+            'stopSingle': false,
+            'stopDouble': false
+        },
+
+        initialize: function (options) {
+            this.handlerOptions = OpenLayers.Util.extend(
+                {}, this.defaultHandlerOptions
+            );
+            OpenLayers.Control.prototype.initialize.apply(
+                this, arguments
+            );
+            this.handler = new OpenLayers.Handler.Click(
+                this, {
+                    'click': this.trigger
+                }, this.handlerOptions
+            );
+        },
+
+        trigger: function (e) {
+            var lonlat = map.getLonLatFromPixel(e.xy);
+            var point = map.getTransformXY(lonlat.lon, lonlat.lat, "EPSG:900913", "EPSG:4326");
+            document.getElementById('centergx').value = point.x;
+            document.getElementById('centergy').value = point.y;
+            document.getElementById('centerglon').value = lonlat.lon;
+            document.getElementById('centerglat').value = lonlat.lat;
+            alert("lon=" + point.x + "&lat=" + point.y);
+            //sendData();
+        }
+    });
+	
+	var click = new OpenLayers.Control.Click();
+    map.addControl(click);
+    click.activate();
+}
+            
+function sendData() {
+    //window.parent.frameTest.document.subpage.hiddenData.value = "얍!";
+    // alert('aa');
+    document.frameForm.target = "query";
+    document.frameForm.action = "http://localhost:36317/WebPage/Pages/Map/List.aspx";
+    document.frameForm.submit();
+}
+
+</script>
+</head> 
+<body >
+	
+  	<div>			
+		<input type="text" name='q' id='centergx' value="0" maxlength="20" style="ime-mode:active;width:100px;"/>
+		<input type="text" name='q' id='centergy' value="0" maxlength="20" style="ime-mode:active;width:100px;"/>
+		
+		<input type="text" name='q' id='centerglon' value="0" maxlength="20" style="ime-mode:active;width:100px;"/>
+		<input type="text" name='q' id='centerglat' value="0" maxlength="20" style="ime-mode:active;width:100px;"/>	
+	</div>	
+	<div style="display:inline;float:left;width:100%;height:600px;left:0px;top:0px">
+		<div id="cont1" style="width:100%;height:100%;left:0px;top:0px;position:relative;"></div>	
+	</div>	
+	
+</body> 
+</html>

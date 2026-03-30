@@ -1,0 +1,105 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/> 
+<title>VWORLD DEMO SAMPLE(폴리곤작성)</title> 
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=D2F96ADF-C7F4-3FE6-9021-7949E462F8C6"></script>
+<script type="text/javascript" src="/jquery/jquery-1.7.1.min.js"></script>
+<script type="text/javascript">
+var map = null;
+var drawControls = null;
+jQuery(document).ready(function(){
+	vworld.showMode = false; 
+	vworld.init("MapArea", "map-only", 
+			function() {         
+				map = this.vmap; 
+				map.addVWORLDControl("zoomBar");
+			}
+			,function (obj){}//initCallback
+			,function (msg){}//failCallback
+		);
+});
+//Draw Control 등록
+function fnSetDrawControl(){
+	if ((map != null) && (map.drawControls != null)) return true;
+	drawControls = {
+           polygon: new OpenLayers.Control.DrawFeature(map.vectorLayer,
+                OpenLayers.Handler.Polygon),
+           point: new OpenLayers.Control.DrawFeature(map.vectorLayer,
+                    OpenLayers.Handler.Point),
+           line: new OpenLayers.Control.DrawFeature(map.vectorLayer,
+               OpenLayers.Handler.Path)
+        };
+	map.drawControls = drawControls;
+	for(var key in drawControls) {
+		drawControls[key].featureAdded = fnFeatureAdded;
+        map.addControl(drawControls[key]);
+    }
+	return true;
+}
+//Feature 추가하기
+function fnFeatureAdded(feature){
+	var geometry = feature.geometry;
+	var featureId = feature.fid;
+	var vlist = [];
+	switch (geometry.CLASS_NAME){
+		case "OpenLayers.Geometry.Point":
+			break;
+		case "OpenLayers.Geometry.LineString":
+			break;
+		case "OpenLayers.Geometry.LinearRing":
+			break;
+		case "OpenLayers.Geometry.Polygon":
+			//평면좌표계로 얻기
+			var polygeom = geometry.clone();
+			//경위도 좌표로 변환 후 구하기
+			//var polygeom = geometry.clone().transform("EPSG:900913","EPSG:4326");
+			for (var j=0; j <polygeom.components.length; j++ ) {
+				var vertices = polygeom.components[j].getVertices();
+			    var vlength = vertices.length;
+		        for (var i= 0; i< vlength;i++ ){
+					if ((typeof(vertices[i]) == 'undefined')) continue;	
+					vlist.push(vertices[i].x+ "," + vertices[i].y);
+				}
+			}
+			//한번만 그리고 기능 취소
+			if (drawControls['polygon'] != null){drawControls['polygon'].deactivate();}
+			alert(vlist.join(' '));
+			break;
+		default:
+			break;							
+	}
+}
+//그리기 기능 활성화
+function fnDrawFeature(type) {
+	fnSetDrawControl();
+    for(key in drawControls) {
+        var control = drawControls[key];
+        if(type == key) {
+            control.activate();
+        } else {
+            control.deactivate();
+        }
+    }
+}
+//화면비우기
+function fnInitAll(){
+	for(key in drawControls) {
+        drawControls[key].deactivate();
+    }
+	map.initAll();
+}
+</script> 
+</head> 
+<body >
+	<div>
+		<button type="button" onclick="javascript:fnInitAll();" name="addcache" >화면비우기</button>	
+		<button type="button" onclick="javascript:fnDrawFeature('polygon');" name="addcache" >폴리곤그리기</button>	
+	</div>
+	
+	<div style="display:inline;float:left;width:100%;height:600px;left:0px;top:0px">
+		<div id="MapArea" style="width:100%;height:100%;left:0px;top:0px;position:relative;"></div>	
+	</div>	
+	
+</body> 
+</html>

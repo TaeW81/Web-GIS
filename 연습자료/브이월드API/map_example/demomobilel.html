@@ -1,0 +1,67 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html> <head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>VWORLD DEMO SAMPLE</title> 
+<script language="JavaScript" type="text/javascript" src="http://map.vworld.kr/jquery/jquery-1.7.1.min.js"></script>
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=D2F96ADF-C7F4-3FE6-9021-7949E462F8C6"></script>
+</head> 
+
+<script type="text/javascript">  
+	
+		var map = null;  
+		//showMode : false 화면전환 버튼 감춘다.
+		//단, map-only, earth-only 인 경우 자동으로 버튼이 안보임.
+		vworld.showMode = false; 
+		//vworld.useOSM = true;
+		//레이어별 표출속성 정의
+   		//레이어별 표출속성 정의
+		vworld.init("PrintArea", "map-first", 
+				function() {         
+					map = this.vmap; 
+					map.setControlsType({"simpleMap":true});	//간단한 화면	 
+					map.setMapToolPosition("left-top");
+					//기능버튼 추가
+					//map.addVWORLDControl("zoomBar");
+					//map.addVWORLDControl("layerSwitch");
+					//map.addVWORLDControl("indexMap");										
+					//map.setIndexMapPosition("right-bottom");				
+					//map.addMapToolButton("init");		//초기화       
+					map.addMapToolButton("zoomin"); 	//확대     
+					map.addMapToolButton("zoomout"); 	//축소     
+					//map.addMapToolButton("zoominbox"); 	//영역확대     
+					//map.addMapToolButton("zoomoutbox"); //영역축소     
+					//map.addMapToolButton("pan");   		//이동      
+					map.addMapToolButton("prev");     	//이전화면    
+					map.addMapToolButton("next");   	//다음화면
+					map.addMapToolButton("geolocate");   	//다음화면
+					//map.addMapToolButton("info");   	//정보조회      
+					//map.addMapToolButton("fullext");	//전체보기
+					//map.addMapToolButton("caldist");	//거리측정
+					//map.addMapToolButton("calarea");	//면적측정
+					// = "vworld.kr";					
+				}
+				,function (obj){
+					SOPPlugin = obj; 
+					window.sop.earth.addEventListener(SOPPlugin, "lmouseup", function(event){
+						var cod=event.getMapCoordinate();
+						alert("좌표 x:" + cod.Longitude + ",y:" + cod.Latitude + ", 픽셀 x:" + event.x + ",y:" + event.y);
+					});
+				}//initCallback
+				,function (msg){alert('oh my god');}//failCallback
+			);
+	
+</script> 
+
+<body >
+<!-- 
+<div style="display:inline;float:left;width:100px;height:100px;">
+ <button type="button" onclick="javascript:alert('ttttttttttttt');" name="addcache" >버튼클릭테스트</button>	
+</div>-->
+	
+	<div style="display:inline;float:left;width:100%;height:240px;left:0px;top:0px">
+		<div id="PrintArea" style="width:100%;height:100%;left:0px;top:0px;position:relative;"></div>	
+	</div>	
+	
+</body> 
+</html>

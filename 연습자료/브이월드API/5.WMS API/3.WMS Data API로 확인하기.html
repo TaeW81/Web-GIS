@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>브이월드 WMTS 배경지도 사용하기 오픈레이어스 3버전 이상</title>
+<link rel="stylesheet" href="../js/ol.css" type="text/css">
+<script src="../js/ol.js"></script>
+<script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
+</head>
+
+<body>
+<div id="map" style="width: 100%; height: 350px; left: 0px; top: 0px"></div>
+<div id="result">
+
+</div>
+<script type="text/javascript">
+	var Base = new ol.layer.Tile({
+		name : "Base",
+		source: new ol.source.XYZ({
+			url: 'http://api.vworld.kr/req/wmts/1.0.0/CEB52025-E065-364C-9DBA-44880E3B02B8/Base/{z}/{y}/{x}.png'
+		})
+	}); // WMTS API 사용
+  
+    var olView = new ol.View({
+        center: ol.proj.transform([127.100616,37.402142], 'EPSG:4326', 'EPSG:3857'),//좌표계 변환
+        zoom: 6
+    })// 뷰 설정
+    var map = new ol.Map({
+        layers: [Base],
+        target: 'map',
+        view: olView
+    });
+	
+
+	var wms_title = '도시지역';
+	var wms_val = 'lt_c_uq111';
+
+	var wms_tile = new ol.layer.Tile({
+		name : "WMS_LAYER",
+		source : new ol.source.TileWMS({
+			url : "http://api.vworld.kr/req/wms?",
+			params : {
+				LAYERS : wms_val,
+				STYLES : wms_val,
+				CRS : "EPSG:900913",
+				apikey : "CEB52025-E065-364C-9DBA-44880E3B02B8",
+				DOMAIN : "http://loacalhost:8080",
+				title : wms_title,
+				FORMAT : "image/png",
+				domain : "http://localhost"
+			}
+		})
+	});
+	map.addLayer(wms_tile);
+	
+	/* Data API 구현하기 정보 출력하기 , 폴리곤 그려보기  */
+	
+	map.on("click", function(evt) {
+		console.log(evt);
+		var coordinate = evt.coordinate //좌표 정보
+		var pixel = evt.pixel //선택한 픽셀 값
+		
+		$.ajax({
+			type : "get",
+			url : "http://api.vworld.kr/req/data?service=data&version=2.0&request=getfeature&key=CEB52025-E065-364C-9DBA-44880E3B02B8&domain=http://localhost:8080&format=json&errorformat=json&size=10&page=1&data=LT_C_UQ111&geometry=true&attribute=true&crs=EPSG%3A900913&geomfilter=point("
+					+evt.coordinate[0]+" "+ +evt.coordinate[1]+")" ,
+			dataType : 'jsonp',
+			async : false,
+			success : function(data) {
+				var features= (new ol.format.GeoJSON()).readFeatures(data.response.result.featureCollection);
+				console.log(features);
+
+
+			},
+			error : function(xhr, stat, err) {
+			}
+		});
+	})
+	
+</script>
+</body>
+</html>

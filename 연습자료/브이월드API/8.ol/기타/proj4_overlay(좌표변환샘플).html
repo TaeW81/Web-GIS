@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>openlayere 좌표계 변환</title>
+
+  </head>
+  <body>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+
+  <!-- openlayers JS, CSS  -->
+  <script src="http://openlayers.org/en/master/build/ol.js" type="text/javascript"></script>
+  <link rel="stylesheet" href="https://openlayers.org/en/v5.3.0/css/ol.css" type="text/css">
+
+  <!-- 좌표계 변환지원 JS  -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.4.4/proj4.js"></script>
+
+      <div id="map" style="width: 100%; height:500px; margin-top: 50px;"></div>
+  </body>
+
+    
+<script>
+  //기본지도 설정 시작
+  var map = new ol.Map({
+    target: 'map',
+    layers: [
+      new ol.layer.Tile({
+        source: new ol.source.XYZ({ // 브이월드 WMTS API 호출
+          url: 'https://api.vworld.kr/req/wmts/1.0.0/CEB52025-E065-364C-9DBA-44880E3B02B8/Base/{z}/{y}/{x}.png'
+        })
+      })
+    ],
+    view: new ol.View({ //지도위치 설정
+      center: ol.proj.transform([126.9380517322744,37.16792263658907], 'EPSG:4326', 'EPSG:900913'), //위경도 좌표계 변환
+      zoom: 7
+    })
+  });
+
+
+  //지도설정 종료
+
+  //
+  // var epsg4919 ="+proj=geocent +ellps=GRS80 +units=m +no_defs";
+  // proj4.defs("EPSG:4919", epsg4919);
+
+
+  // 좌표계에 해당하는 proj 등록 
+  var epsg5179 ="+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs";
+
+  //var epsg5181 ="+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=500000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs";
+  proj4.defs("EPSG:5179", epsg5179);
+  ol.proj.proj4.register(proj4)
+  newProj = ol.proj.get("EPSG:5179");
+  var fromLonLat = ol.proj.getTransform('EPSG:4326', newProj);
+  var extent = [-123870.90884057757, -50276.019735198519,611155.1411121186,1156561.2321973774]
+  newProj.setExtent(extent);
+  newProjExtent = newProj.getExtent(); 
+  centerc = ol.proj.transform([127.100616,37.402142], 'EPSG:4326', 'EPSG:5179');
+  console.log(centerc);
+
+  function setCenter() {
+    map.getView().setZoom(15);
+    map.getView().setCenter(ol.proj.transform([1019661.3321063605, 1885421.5087908092], 'EPSG:5179', 'EPSG:3857'))
+  }
+//제주도 설정 추가
+
+map.getView().setCenter([14097278.195273742, 3944833.3227174818])
+map.getView().setZoom(10)
+
+var jeju = '{"response" : {"service" : {"name" : "data", "version" : "2.0", "operation" : "getfeature", "time" : "71(ms)"}, "status" : "OK", "record" : {"total" : "26", "current" : "10"}, "page" : {"total" : "3", "current" : "1", "size" : "10"}, "result" : {"featureCollection" : {"type":"FeatureCollection","bbox":[903893.343607417,1499706.5079718193,939953.3479594422,1503457.0538329266],"features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[910239.3676422922,1502877.0644087924]},"properties":{"shel_id":"5045","b_area_cd":"6448","d_cell_id":"옥외대피소","lat":"33.514023999999999","lon":"126.533502999999996","tm_x":"","tm_y":"","shel_nm":"제주동초등학교 운동장","shel_tp":"","shel_tl1":"064-755-9312","shel_tl2":"제주시교육지원청","shel_fx":"","shel_ad":"제주특별자치도 제주시 건입동   1105","shel_av":"2149","shel_op_dt":"","shel_cl_dt":"","shel_nt":"","near_nd":"","gis_id":"","create_id":"제주특별자치도 제주시","create_dat":"2018-08-17","update_id":"","update_dat":"2018-08-17","shel_statu":"Y"},"id":"LT_P_EDRSE002.3387"},{"type":"Feature","geometry":{"type":"Point","coordinates":[939953.3479594423,1503457.0538329266]},"properties":{"shel_id":"5046","b_area_cd":"6299","d_cell_id":"옥외대피소","lat":"33.521338000000000","lon":"126.853386999999998","tm_x":"","tm_y":"","shel_nm":"세화중학교 운동장","shel_tp":"","shel_tl1":"064-783-1226","shel_tl2":"제주시교육지원청","shel_fx":"","shel_ad":"제주특별자치도 제주시 구좌읍일주동로 3132","shel_av":"2099","shel_op_dt":"","shel_cl_dt":"","shel_nt":"","near_nd":"","gis_id":"","create_id":"제주특별자치도 제주시","create_dat":"2018-08-17","update_id":"","update_dat":"2018-08-17","shel_statu":"Y"},"id":"LT_P_EDRSE002.3388"},{"type":"Feature","geometry":{"type":"Point","coordinates":[910696.287275054,1500784.0827920095]},"properties":{"shel_id":"5047","b_area_cd":"6774","d_cell_id":"옥외대피소","lat":"33.495187000000001","lon":"126.538630999999995","tm_x":"","tm_y":"","shel_nm":"제주제일중학교 운동장","shel_tp":"","shel_tl1":"064-750-3207","shel_tl2":"제주시교육지원청","shel_fx":"","shel_ad":"제주특별자치도 제주시 남광로 33  (이도이동)","shel_av":"2248","shel_op_dt":"","shel_cl_dt":"","shel_nt":"","near_nd":"","gis_id":"","create_id":"제주특별자치도 제주시","create_dat":"2018-08-17","update_id":"","update_dat":"2018-08-17","shel_statu":"Y"},"id":"LT_P_EDRSE002.3389"},{"type":"Feature","geometry":{"type":"Point","coordinates":[904872.9801428712,1499706.5079718193]},"properties":{"shel_id":"5048","b_area_cd":"4143","d_cell_id":"옥외대피소","lat":"33.484966999999997","lon":"126.476065000000006","tm_x":"","tm_y":"","shel_nm":"노형초등학교 운동장","shel_tp":"","shel_tl1":"064-740-8400","shel_tl2":"제주시교육지원청","shel_fx":"","shel_ad":"제주특별자치도 제주시 노형로 383  (노형동)","shel_av":"1381","shel_op_dt":"","shel_cl_dt":"","shel_nt":"","near_nd":"","gis_id":"","create_id":"제주특별자치도 제주시","create_dat":"2018-08-17","update_id":"","update_dat":"2018-08-17","shel_statu":"Y"},"id":"LT_P_EDRSE002.3390"},{"type":"Feature","geometry":{"type":"Point","coordinates":[903893.343607417,1501612.175490802]},"properties":{"shel_id":"5050","b_area_cd":"8800","d_cell_id":"옥외대피소","lat":"33.502065100000003","lon":"126.465317400000004","tm_x":"","tm_y":"","shel_nm":"도리초등학교 운동장","shel_tp":"","shel_tl1":"064-743-1303","shel_tl2":"제주시교육지원청","shel_fx":"","shel_ad":"제주특별자치도 제주시 도리로 129  (도두일동)","shel_av":"2943","shel_op_dt":"","shel_cl_dt":"","shel_nt":"","near_nd":"","gis_id":"","create_id":"제주특별자치도 제주시","create_dat":"2018-08-17","update_id":"","update_dat":"2018-08-17","shel_statu":"Y"},"id":"LT_P_EDRSE002.3391"},{"type":"Feature","geometry":{"type":"Point","coordinates":[909891.4881037874,1501631.8555109908]},"properties":{"shel_id":"5051","b_area_cd":"5500","d_cell_id":"옥외대피소","lat":"33.502764999999997","lon":"126.529882999999998","tm_x":"","tm_y":"","shel_nm":"광양초등학교 운동장","shel_tp":"","shel_tl1":"064-755-0012","shel_tl2":"제주시교육지원청","shel_fx":"","shel_ad":"제주특별자치도 제주시 돈내길 5  (이도일동)","shel_av":"1833","shel_op_dt":"","shel_cl_dt":"","shel_nt":"","near_nd":"","gis_id":"","create_id":"제주특별자치도 제주시","create_dat":"2018-08-17","update_id":"","update_dat":"2018-08-17","shel_statu":"Y"},"id":"LT_P_EDRSE002.3392"},{"type":"Feature","geometry":{"type":"Point","coordinates":[915834.8980896894,1500196.091677946]},"properties":{"shel_id":"5052","b_area_cd":"9166","d_cell_id":"옥외대피소","lat":"33.490301000000002","lon":"126.593997999999999","tm_x":"","tm_y":"","shel_nm":"봉개초등학교 운동장","shel_tp":"","shel_tl1":"064-721-0012","shel_tl2":"제주시교육지원청","shel_fx":"","shel_ad":"제주특별자치도 제주시 번영로 484  (봉개동)","shel_av":"3055","shel_op_dt":"","shel_cl_dt":"","shel_nt":"","near_nd":"","gis_id":"","create_id":"제주특별자치도 제주시","create_dat":"2018-08-17","update_id":"","update_dat":"2018-08-17","shel_statu":"Y"},"id":"LT_P_EDRSE002.3393"},{"type":"Feature","geometry":{"type":"Point","coordinates":[908539.3168965367,1500782.2883348844]},"properties":{"shel_id":"5053","b_area_cd":"19000","d_cell_id":"옥외대피소","lat":"33.494988499999998","lon":"126.515414000000007","tm_x":"","tm_y":"","shel_nm":"제주종합경기장 주경기장","shel_tp":"","shel_tl1":"064-728-3273","shel_tl2":"제주시","shel_fx":"","shel_ad":"제주특별자치도 제주시 서광로2길 24  (오라일동)","shel_av":"6340","shel_op_dt":"","shel_cl_dt":"","shel_nt":"","near_nd":"","gis_id":"","create_id":"제주특별자치도 제주시","create_dat":"2018-08-17","update_id":"","update_dat":"2018-08-17","shel_statu":"Y"},"id":"LT_P_EDRSE002.3394"},{"type":"Feature","geometry":{"type":"Point","coordinates":[908621.1407295974,1502661.2987989495]},"properties":{"shel_id":"5054","b_area_cd":"6916","d_cell_id":"옥외대피소","lat":"33.511941000000000","lon":"126.516103000000001","tm_x":"","tm_y":"","shel_nm":"제주중학교 운동장","shel_tp":"","shel_tl1":"064-750-7000","shel_tl2":"제주시교육지원청","shel_fx":"","shel_ad":"제주특별자치도 제주시 서문로 47  (용담일동)","shel_av":"2305","shel_op_dt":"","shel_cl_dt":"","shel_nt":"","near_nd":"","gis_id":"","create_id":"제주특별자치도 제주시","create_dat":"2018-08-17","update_id":"","update_dat":"2018-08-17","shel_statu":"Y"},"id":"LT_P_EDRSE002.3395"},{"type":"Feature","geometry":{"type":"Point","coordinates":[910360.6344232154,1501973.997147818]},"properties":{"shel_id":"5063","b_area_cd":"10000","d_cell_id":"옥외대피소","lat":"33.505890000000001","lon":"126.534898999999996","tm_x":"","tm_y":"","shel_nm":"신산공원","shel_tp":"","shel_tl1":"064-726-0885","shel_tl2":"제주시","shel_fx":"","shel_ad":"제주특별자치도 제주시 일도이동   879","shel_av":"3350","shel_op_dt":"","shel_cl_dt":"","shel_nt":"","near_nd":"","gis_id":"","create_id":"제주특별자치도 제주시","create_dat":"2018-08-17","update_id":"","update_dat":"2018-08-17","shel_statu":"Y"},"id":"LT_P_EDRSE002.906"}]}}}}';
+var json = jQuery.parseJSON(jeju);
+
+//좌표계 변환 5179 -> 3857
+json.response.result.featureCollection.features.forEach(function(i){
+  i.geometry.coordinates = ol.proj.transform(i.geometry.coordinates, 'EPSG:5179', 'EPSG:3857');
+})
+
+// 오픈레이어스 기반 마커 설정 GeoJson 형태를 features 배열로 반환
+var features = new Array();
+
+features = new ol.format.GeoJSON().readFeatures(json.response.result.featureCollection)
+var vectorSource = new ol.source.Vector({features: features})
+var iconStyle = new ol.style.Style({
+      image: new ol.style.Icon(/** @type {olx.style.IconOptions} */ ({
+        anchor: [0.4, 20],
+        anchorXUnits: 'fraction',
+        anchorYUnits: 'pixels',
+        src: 'https://map.vworld.kr/images/maps/marker.png',
+        scale : 1
+      }))
+    });
+var vector_layer = new ol.layer.Vector({
+  source: vectorSource
+  ,style: iconStyle
+})
+  
+map.addLayer(vector_layer);
+
+
+
+/* 이벤트 추가 */
+map.on("click", function(evt) {
+	var coordinate = evt.coordinate //좌표정보
+	var pixel = evt.pixel
+	var features = [];
+	
+	//선택한 픽셀정보로  feature 체크 
+  map.forEachFeatureAtPixel(pixel, function(feature, layer) {
+ 	
+	var shel_ad = feature.get("shel_ad");
+	var shel_nm = feature.get("shel_nm");
+	var shel_tp = feature.get("shel_tp");
+	var olId = feature.getId();
+	
+	var olOverlay="olOverlay";
+  	
+  	if(feature!=null){
+  		
+		var overlayElement= document.createElement("div"); // 오버레이 팝업설정 
+  		overlayElement.setAttribute("class", "overlayElement");
+  		overlayElement.setAttribute("style", "background-color: #3399CC; border: 2px solid white; color:white");
+  		overlayElement.setAttribute("onclick", "deleteOverlay('"+olOverlay+"')");
+  		overlayElement.innerHTML="<p>"+shel_ad+"</p>";
+  		overlayElement.innerHTML="<p>"+shel_nm+" "+shel_tp+"</p>";
+  		
+  		var overlayInfo = new ol.Overlay({
+  			id:olOverlay,
+  			element:overlayElement,
+  			offset: [0, -10],
+  			position: coordinate,
+  		});
+  		if(map.getOverlayById(olOverlay)!=null){
+  			deleteOverlay(olOverlay);
+  		}
+  		map.addOverlay(overlayInfo)
+  		
+  	}
+  });
+});
+
+
+/**
+오버레이 삭제
+*/
+var deleteOverlay = function(id){
+	map.removeOverlay(map.getOverlayById(id));
+}
+
+</script>
+<button onclick="setCenter();"> EPSG:5179([1019661.3321063605, 1885421.5087908092])위치로 이동</button>
+  </body>
+</html>

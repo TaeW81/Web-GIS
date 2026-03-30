@@ -1,0 +1,161 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html> <head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<title>VWORLD DEMO SAMPLE</title> 
+<script language="JavaScript" type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9"></script>
+<SCRIPT language="JavaScript" type="text/javascript" src="/jquery/jquery-1.7.1.min.js"></SCRIPT>
+
+</head> 
+
+<script type="text/javascript">  
+
+	var map = null;
+	var controls = null;  
+	//showMode : false 화면전환 버튼 감춘다.
+	//단, map-only, earth-only 인 경우 자동으로 버튼이 안보임.
+	vworld.showMode = true; 
+	vworld.init("PrintArea", "raster-base",//"map-base",//"earth-first",//"raster", // 
+		function() {         
+			map = this.vmap; 					
+			map.setControlsType({"simpleMap":true});	//간단한 화면					
+			map.addVWORLDControl("layerSwitch");
+		}
+		,function (obj){
+		}//initCallback
+		,function (msg){alert('oh my god');}
+	);
+	
+	function createKMLClass(){
+		if (typeof vworld.KMLLayer === 'Object' ) return true;
+		//STYLE
+		var colors = {
+                low: "rgb(181, 226, 140)", 
+                middle: "rgb(241, 211, 87)", 
+                high: "rgb(253, 156, 115)"
+            };
+	
+		var lowRule = new OpenLayers.Rule({
+                filter: new OpenLayers.Filter.Comparison({
+                    type: OpenLayers.Filter.Comparison.LESS_THAN,
+                    property: "count",
+                    value: 15
+                }),
+                symbolizer: {
+                	fillColor: colors.low,
+                    fillOpacity: 0.9, 
+                    strokeColor: colors.low,
+                    strokeOpacity: 0.5,
+                    strokeWidth: 12,
+                    pointRadius: 10,
+                    label: "${count}",
+                    labelOutlineWidth: 1,
+                    fontColor: "#ffffff",
+                    fontOpacity: 0.8,
+                    fontSize: "12px"
+                }
+            });
+		var middleRule = new OpenLayers.Rule({
+                filter: new OpenLayers.Filter.Comparison({
+                    type: OpenLayers.Filter.Comparison.BETWEEN,
+                    property: "count",
+                    lowerBoundary: 15,
+                    upperBoundary: 50
+                }),
+                symbolizer: {
+                    fillColor: colors.middle,
+                    fillOpacity: 0.9, 
+                    strokeColor: colors.middle,
+                    strokeOpacity: 0.5,
+                    strokeWidth: 12,
+                    pointRadius: 15,
+                    label: "${count}",
+                    labelOutlineWidth: 1,
+                    fontColor: "#ffffff",
+                    fontOpacity: 0.8,
+                    fontSize: "12px"
+                }
+            });
+		var highRule = new OpenLayers.Rule({
+                filter: new OpenLayers.Filter.Comparison({
+                    type: OpenLayers.Filter.Comparison.GREATER_THAN,
+                    property: "count",
+                    value: 50
+                }),
+                symbolizer: {
+                    fillColor: colors.high,
+                    fillOpacity: 0.9, 
+                    strokeColor: colors.high,
+                    strokeOpacity: 0.5,
+                    strokeWidth: 12,
+                    pointRadius: 20,
+                    label: "${count}",
+                    labelOutlineWidth: 1,
+                    fontColor: "#ffffff",
+                    fontOpacity: 0.8,
+                    fontSize: "12px"
+                }
+            });
+        style = new OpenLayers.Style(null, {rules: [lowRule, middleRule, highRule]});
+		//STYLE END		
+		return true;
+	}
+	function addKMLLayerFromClass(){
+		if (!createKMLClass()) return;
+		urls = [
+				"kml/COL_0000000000000960.kml",
+				"kml/COL_0000000000000961.kml",
+				"kml/COL_0000000000000962.kml",
+				"kml/COL_0000000000000963.kml",
+				"kml/test2.kml",
+				"kml/RDR_CMI_201409011310_web.kml"
+				];
+		urls.forEach(function(url, index){
+			var vLayer = new vworld.KMLLayer('KMLC' + index, url, {style:style});
+			//var vLayer = new vworld.KMLLayer('KMLC' + index, url);
+			vLayer.initDisplay = false;
+			map.addLayer(vLayer);
+		});
+		
+	}
+				
+jQuery(document).ready(function(){
+    if (!('vworld' in window)) {
+        window.vworld = {};
+    }
+});
+
+/* 
+var kmlUrl = "./kml/RDR_CMI_201409011310_web.kml";
+var groundOverlay = new OpenLayers.Layer.Vector("KML2", {
+    //renderers: location.search.indexOf('Canvas') >= 0 ? ['Canvas', 'SVG', 'VML'] : ['SVG', 'VML', 'Canvas'],
+    //projection: map.displayProjection,
+    strategies: [new OpenLayers.Strategy.Fixed()],
+    protocol: new OpenLayers.Protocol.HTTP({
+        url: kmlUrl,
+        format: new OpenLayers.Format.KML({
+            internalProjection:'EPSG:900913',
+        	externalProjection:'EPSG:4326',
+        	maxDepth: 10,
+            baseUrl: kmlUrl,
+            extractStyles: true,
+            extractAttributes: true
+        })
+    })
+});
+map.addLayer(groundOverlay);
+*/
+	
+</script> 
+
+<body >
+	<div>	
+		<button type="button" onclick="javascript:addKMLLayerFromClass();" >KML레이어추가(API)</button>	
+		
+	</div>
+		
+	<div style="display:inline;float:left;width:100%;height:600px;left:0px;top:0px">
+		<div id="PrintArea" style="width:100%;height:100%;left:0px;top:0px;position:relative;"></div>	
+	</div>	
+</body> 
+
+</html>

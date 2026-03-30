@@ -1,0 +1,43 @@
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<title>국가인터넷지도 | 지도 오픈API 샘플</title>
+<style type="text/css">
+.olImageLoadError { 
+	display: none !important;
+}
+</style>
+<script type="text/javascript" src="http://map.ngii.go.kr/emap/js/jquery/jquery-2.1.1.min.js"></script>
+<script type="text/javascript" src="http://map.ngii.go.kr/emap/js/map/OpenLayers.js"></script>
+<script type="text/javascript" src="http://map.ngii.go.kr//openapi/ngiiMap.js?apikey=48B39DEAF1939913FAD957A5BA699048"></script>
+<script>
+var map1;
+window.onload = function(){
+	map1 = new ngii.map("map1", {
+		mapMode:9
+	});
+	$(map1._getAirMapList()).each(function(index, value){
+		var name=value.split('_');
+		$("#layers").append("<option value='"+value+"'>"+name[1]+"</option>");
+	});
+	$("#layers").change(function(){
+		var value= $( this ).val();
+		if(value == 'base'){
+			map1._setMapMode(9);
+		}else{
+			map1._setAirMapYear(value);
+		}
+	});
+};
+</script>
+</head>
+<body>
+<div id="map1" style="width:700px;height:700px;"></div>
+시계열: <select id="layers" ><option value='base'>base</option></select>
+</body>
+</html>

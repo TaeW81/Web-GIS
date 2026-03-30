@@ -1,0 +1,1080 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html> <head> 
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"> 
+<title>VWORLD DEMO SAMPLE</title> 
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9&version=1.3"></script>
+<script language="JavaScript" type="text/javascript" src="http://map.vworld.kr/jquery/jquery-1.7.1.min.js"></script>
+<script language="JavaScript" type="text/javascript" src="http://map.vworld.kr/js/map/proj4js.js"></script>
+</head> 
+
+<script type="text/javascript">  
+	 
+		var map = null;  
+		//showMode : false 화면전환 버튼 감춘다.
+		//단, map-only, earth-only 인 경우 자동으로 버튼이 안보임.
+		vworld.showMode = true; 
+		
+		vworldUrlsExt.blankimage = "";
+		
+		//레이어별 표출속성 정의
+   		//레이어별 표출속성 정의
+    /*vworld.setLayerShowField ([
+    	{layer:'LT_C_UQ111',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ112',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ113',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ114',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ121',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ122',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ123',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ124',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ125',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ126',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ127',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ128',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ129',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ130',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ141',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] },
+    	{layer:'LT_C_UQ162',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] }
+    	,{layer:'LT_C_UD801',fields:['UNAME','DYEAR','DNUM','SIDO_NAME','SIGUNGU_NAME'],titles:['용도지역명','고시년도','고시번호','시도명','시군구명'] }
+    	,{layer:'ST_SIDO',fields:['SIG_NAM','CRI_CNT','CRI_RNK','CRI_INC','UNT_CNT','UNT_RNK','UNT_INC'],titles:['시도명','범죄발생건수','범죄발생순위','증감건수','인구대비건수','인구대비순위','인구대비증감'] }
+    	,{layer:'ST_SIGUNGU',fields:['SIG_NAM','CRI_CNT','CRI_RNK','CRI_INC','UNT_CNT','UNT_RNK','UNT_INC'],titles:['시군구명','범죄발생건수','범죄발생순위','증감건수','인구대비건수','인구대비순위','인구대비증감'] }
+    	]);*/
+		vworld.init("PrintArea", "map-first", 
+				function() {         
+					map = this.vmap; 
+					//map.setMinLevel(1);
+					//map.useOSM = true;
+					//기본맵 설정  
+					//map.setBaseLayer(map.vworldBaseMap); 
+					//simpleMap : true (simple내비게이션바, simplelogo 설정)
+					//map.setControlsType({"simpleMap":true});	//간단한 화면	 
+					
+					//지리원 WMS 영상연계
+					//map.ImportWMSLayer2('항공사진2','http://air.ngii.go.kr/ServletConnector/apiimage.do','apiImage','','EPSG:900913','image/png','1.1.1'); //title,  url, layerIds, coord, imgType
+					//map.setControlsType({"isSimpleMap":false, "zoomBarPosition":"right","mapToolPosition":"left-top","mapToolDirection":"horizontal"});	
+					
+					//map.setZoomBarPosition("left");
+					map.setMapToolPosition("left-top");
+					//기능버튼 추가
+					map.addVWORLDControl("zoomBar");
+					map.addVWORLDControl("layerSwitch");
+					map.addVWORLDControl("indexMap");
+										
+					//map.setIndexMapPosition("right-bottom");				
+					map.addMapToolButton("init");		//초기화       
+					//map.addMapToolButton("zoomin"); 	//확대     
+					map.addMapToolButton("zoomout"); 	//축소     
+					//map.addMapToolButton("zoominbox"); 	//영역확대     
+					//map.addMapToolButton("zoomoutbox"); //영역축소     
+					map.addMapToolButton("pan");   		//이동      
+					map.addMapToolButton("prev");     	//이전화면    
+					map.addMapToolButton("next");   	//다음화면
+					map.addMapToolButton("info");   	//정보조회      
+					map.addMapToolButton("fullext");	//전체보기
+					map.addMapToolButton("caldist");	//거리측정
+					map.addMapToolButton("calarea");	//면적측정
+					/**/
+					//화면중심점과 레벨로 이동
+					//map.setCenterAndZoom(14137792.751626197, 4092051.278263237, 8);  	
+					
+					//화면이동시 좌표표출 이벤트 등록
+					map.events.register('moveend', this, moveend);
+					//alert(document.domain);
+					// = "vworld.kr";  
+					
+					Proj4js.defs["EPSG:5181"] = "+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=500000 +ellps=GRS80 +units=m +no_defs";
+					
+					
+				}
+				,function (obj){
+					SOPPlugin = obj; 
+					window.sop.earth.addEventListener(SOPPlugin, "lmouseup", function(event){
+						var cod=event.getMapCoordinate();
+						alert("좌표 x:" + cod.Longitude + ",y:" + cod.Latitude + ", 픽셀 x:" + event.x + ",y:" + event.y);
+					});
+				}//initCallback
+				,function (msg){alert('oh my god');}//failCallback
+			);
+	
+	function printSave(){
+		map.getPrintMap();
+	}
+	
+	function httpTest(){
+		//alert(OpenLayers.ProxyHost);
+		OpenLayers.ProxyHost = "/proxy.do?url=";
+		//OpenLayers.ProxyHost = "";
+		
+		SearchTest();
+	
+	}
+	function add3DThemeLayer(title,layer){
+		map.show3DThemeLayer(title,{layers: layer});
+	}
+	function hide3DThemeLayer(title){
+		map.hide3DThemeLayer(title);			
+	}
+	
+	//주제도 레이어 추가하기(보기)
+	function addThemeLayer(title, layer){
+		map.showThemeLayer(title, {layers:layer});			
+	}
+	//주제도 레이어 감추기(끄기)
+	function hideThemeLayer(title){
+		map.hideThemeLayer(title);			
+	}
+	
+	function addTileCache(){
+		map.showTileCacheLayer('국토환경성평가지도', 'ECVAM',{min:9,max:12});	
+		//map.showTileCacheLayer('산사태위험지도', 'SANSATAI',{min:9,max:15});						
+	}
+	//마우스 이동완료시
+	function moveend(e){
+		//var point = map.getTransformXY(map.getCenter().lon,map.getCenter().lat,"EPSG:900913","EPSG:4326");
+		var point = map.getTransformXY(map.getCenter().lon,map.getCenter().lat,"EPSG:900913","EPSG:5181");
+		var query = "lon=" + point.x + "&lat=" + point.y;
+		if (point== null) return;
+		document.getElementById('centerx').value = point.x;
+		document.getElementById('centery').value = point.y;		
+		document.getElementById('centergx').value = map.getCenter().lon;
+		document.getElementById('centergy').value = map.getCenter().lat;
+		document.getElementById('level').value = map.getZoom();	
+		document.getElementById('scale').value = map.getScale();
+		document.getElementById('scaleunit').value = map.getUnits();
+		document.getElementById('resolution').value = map.getResolution();
+	}
+	//좌표변환 s
+	function trans(){
+		var point = map.getTransformXY(document.getElementById('centerx').value,
+										document.getElementById('centery').value,
+										"EPSG:4326","EPSG:900913");
+		document.getElementById('centergx').value = point.x;
+		document.getElementById('centergy').value = point.y;		
+	}
+	
+	function trans2(){
+		Proj4js.defs["EPSG:5181"] = "+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=500000 +ellps=GRS80 +units=m +no_defs";
+					
+		var point = map.getTransformXY(document.getElementById('centerx').value,
+										document.getElementById('centery').value,
+										"EPSG:5181","EPSG:900913");
+		document.getElementById('centergx2').value = point.x;
+		document.getElementById('centergy2').value = point.y;		
+	}
+	//독도 cctv 팝업
+	/*var pop;
+	function DokdoCCTV(zoom){
+		var width = 320;//640;
+		var height = 240;//480;
+		var url = 'http://10.1.2.124/democallcctv.html#' + zoom;
+		var pop = window.open(url,'','top=100px, left=100px, width='+width+'px, height='+height+'px,resizable=no,scrollbars=no,toolbar=no,menubar=no,location=no,directories=no,status=no');
+		pop.opener = self;
+		pop.focus();
+	}*/
+	
+	//화면클릭 이벤트 등록 및 마커찍기
+	var markerControl;
+	var curIndex = 1;
+	
+	function addMarkingEvent(){	
+		var pointOptions = {persist:true}
+		if (markerControl == null) {
+			markerControl = new OpenLayers.Control.Measure(OpenLayers.Handler.Point,{handlerOptions:pointOptions});
+        	markerControl.events.on({"measure": mapclick});
+        	map.addControl(markerControl);
+		}        
+		map.init();
+        markerControl.activate();
+		//mapp.events.register('click', this, addMarker);
+	}
+	//화면클릭 이벤트 해제
+	function removeMarkingEvent(){
+		map.events.unregister('click', this, mapclick);
+	}
+	//클릭이벤트 받아 마커찍기 호출
+	function mapclick(event){
+		map.init();	
+		var temp = event.geometry;	
+		var pos = new OpenLayers.LonLat(temp.x, temp.y);
+		
+		document.getElementById('mousex').value = pos.lon;
+		document.getElementById('mousey').value = pos.lat;
+		var infoPixelX = 100;
+        var infoPixelY = 100; 
+		//vworldUtil.requestSearch(pos.lon, pos.lat, infoPixelX, infoPixelY, "EPSG:900913", "LT_C_UQ111");
+		//addMarker(pos.lon, pos.lat,"오류신고지역입니다.", null);	
+		addCustomMarker(pos.lon, pos.lat,"오류신고지역입니다.", null);			
+	}	
+	
+	//좌표받아 마커찍기
+	function addMarker(lon, lat, message, imgurl){
+		
+		var marker = new vworld.Marker(lon, lat,message,"","","EPSG:900913",{w:36,h:42});  
+		//1. 팝업메세지 빈 문자열로 넣기  
+		//var marker = new vworld.Marker(lon, lat, "","","","EPSG:900913",{w:36,h:42});   
+		imgurl = '/images/map2/bul_poi_b_' + curIndex + '.png';
+		if (typeof imgurl == 'string' && marker != null) {marker.setIconImage(imgurl);}   
+		
+		//var marker = new vworld.Marker(lon, lat, "","",imgurl,"EPSG:900913",{w:36,h:42}); 		
+		map.addMarker(marker); 
+		curIndex += 1;
+		//2. 마커 생성 후 임의의 식별키값 설정하기
+		marker.seq = OpenLayers.Util.createUniqueID('testMarker');
+		//alert("id:" + marker.id);
+		//3. 마커 클릭이벤트 함수 새로 생성하기 	
+		marker.events.register('click', marker, markerClicked);		        
+				
+	}
+	
+	function addCustomMarker(lon, lat, message, imgurl){
+		
+		var marker = new vworld.Marker(lon, lat,message,"","","EPSG:900913",{w:36,h:42});  
+		//1. 팝업메세지 빈 문자열로 넣기  
+		//var marker = new vworld.Marker(lon, lat, "","","","EPSG:900913",{w:36,h:42});   
+		imgurl = '/images/map2/bul_poi_b_' + curIndex + '.png';
+		if (typeof imgurl == 'string' && marker != null) {marker.setIconImage(imgurl);}   
+		
+		var strHtml = "<em>hello world<\/em>";
+		/*marker.popupClass =OpenLayers.Popup.Anchored;//OpenLayers.Popup.AnchoredBubble;//OpenLayers.Popup.FramedCloud;
+		marker.overflow = "auto";
+		marker.popupContentHTML = strHtml;
+		marker.createPopup(true);
+		
+		var markerClick = function (evt) {
+			
+            if (this.popup != null) {
+            	this.popup.toggle();
+                 
+            } else {
+            	this.popup = this.createPopup(true);
+                this.createPopup(true);
+                map.addPopup(this.popup);
+                this.popup.show();
+                OpenLayers.Event.stop(evt, true);
+                return;
+            }
+            //currentPopup = this.popup;
+            OpenLayers.Event.stop(evt);
+            //OpenLayers.Event.stop(evt, true);
+        };*/
+        //marker.events.unregister("click", marker, marker.clickEventHandler);
+		//marker.events.register("click", marker, markerClick);
+		
+				            	
+		//var marker = new vworld.Marker(lon, lat, "","",imgurl,"EPSG:900913",{w:36,h:42}); 		
+		map.addMarker(marker); 
+		
+		curIndex += 1;
+		//2. 마커 생성 후 임의의 식별키값 설정하기
+		marker.seq = OpenLayers.Util.createUniqueID('testMarker');
+		//alert("id:" + marker.id);
+		//3. 마커 클릭이벤트 함수 새로 생성하기 	
+		//marker.events.register('click', marker, markerClicked);		        
+				
+	}
+	
+	function markerClicked(evt){
+		alert("클릭한마커:" + this.seq);
+	}
+	//레이어 리스트 얻기
+	function layerListShow(){
+		var cat = vworldCategory.theme;
+		for (var i=0, len=map.layers.length; i<len; i++) {
+            var layer = map.layers[i];
+            alert(layer.name + ":" + layer.isBaseLayer);
+            /*if (layer.name.indexOf(cat) > -1) {
+            	layer.setVisibility(false);
+				layer.redraw();
+            }*/
+        }
+	}
+	//2D/3D 전환후에 실행할 콜백함수 지정
+	function setModeCallback(){
+		vworld.setModeCallback(modecallback);
+	}
+	//모드전환후 실행할 함수
+	function modecallback(){
+		alert("현재모드는 " + vworld.getMode() + "입니다.");
+	}
+	//외부 WMS 레이어 추가
+	function importWMS(){
+		/*map.ImportWMSLayer('개발제한구역',
+			{
+			url:'http://10.1.2.5:8089/cgi-bin/anyGuide.cgi',
+			layers:'LT_C_UD801',
+			version: '1.3.0',
+			crs:'EPSG:900913',
+			srs:'EPSG:900913',
+			format:'image/png'
+			});*/	
+			
+		map.ImportWMSLayer('테스트WMS',
+			{
+			url:'http://vmap0.tiles.osgeo.org/wms/vmap0',
+			layers:'basic',
+			styles:'',
+			version: '1.1.1',
+			crs:'EPSG:900913',
+			srs:'EPSG:900913',
+			format:'image/png'
+			,tilesize:new OpenLayers.Size(512,512)
+			});		
+
+	//map.ImportWMSLayer('항공사진2','http://air.ngii.go.kr/ServletConnector/apiimage.do','apiImage','','EPSG:900913','image/png','1.1.1'); //title,  url, layerIds, coord, imgType
+								
+	}
+	//레이어 삭제하기
+	function removeLayer(layername){
+		var cat = vworldCategory.theme;
+		var len=map.layers.length;
+		for (var i=len-1; i>= 0; i--) {
+            var layer = map.layers[i];
+            if (layer.name.indexOf(layername) > -1) {
+            	map.removeLayer(layer);           	
+            }
+        }
+	}
+	
+	function printPreview(){
+		
+		OpenLayers.ProxyHost = "/proxy.do?url=";
+		
+		var mode = vworld.getMode();
+		var msgDialog = window.showModalDialog('/map/print_setup.html', null, 
+			'dialogWidth:250px; dialogHeight:100px;center:yes; help:no,status:no;scroll:no;resizable:no');
+		if (msgDialog){
+			map.setPrintPage({page:'a4',direct:msgDialog});		
+			if (mode == 2){
+				var tmpdir = "c:\\";
+				var filename = 'tempimg.png';			
+				try {tmpdir = SOPPlugin.getOption().getTempFolder();}catch(e){}
+			
+				var filepath = tmpdir.replace(/\\/gi,'\\') + filename;
+				filepath = filepath.replace(':\\',':\\\\');
+				SOPPlugin.getUtil().saveScreenimg(filepath);
+				var filepath2 = tmpdir.replace(/\\/gi,'/') + filename;							
+				setTimeout("jsPrintCallBack('" + filepath2 + "');",1000);
+			
+				//var file = 'C:\\tempimg.png';
+				//SOPPlugin.getUtil().saveScreenimg(file);
+				//setTimeout("printcallback3d('c:/tempimg.png');",1000);
+			} else {				
+				map.getPreviewMap(printcallback);
+			}
+		}
+	}
+	function jsPrintCallBack(file){
+		var url = "";
+		if ((file != null) && (file != "") ){url = file;}	
+		if (url == "") return;
+		
+		var size = map.getPrintSize();
+		var print = map.getPrintPage();
+		
+		var popupPage="/preview2D.do?width=" + size.width + "&height=" + size.height + "&page=" + print.page + "&direct=" + print.direct + "&file=" + url;
+		var popupCondition  ='width=640px,height=760px,scrollbars=yes,resizable=yes';
+		var winPopup = window.open(popupPage,"preview",popupCondition);
+	}
+	function printcallback(response){
+		//
+		alert(vworldUrls.print);
+		var url = "";
+		if ((response != null) && (response.responseText != "") ){url = response.responseText;}	
+		if (url == "") return;
+		
+		var size = map.getPrintSize();
+		var print = map.getPrintPage();
+		
+		var popupPage="/preview2D.do?width=" + size.width + "&height=" + size.height + "&page=" + print.page + "&direct=" + print.direct + "&url=" + vworldUrls.print + "?file="+ url;
+		var popupCondition  ='width=640px,height=760px,scrollbars=yes,resizable=yes';
+		var winPopup = window.open(popupPage,"preview",popupCondition);
+		
+	}
+	
+	//
+	function jsImageSaveAs(){
+		var txt=document.all.tmpimage.src;
+		if (txt.indexOf("gif")>=0 || txt.indexOf("jpg") >= 0 || txt.indexOf("png") >= 0){	
+			document.getElementById('tmpimage').contentWindow.document.execCommand('saveas');		
+			//window.frames["tmpimage"].document.execCommand('SaveAs');
+		}
+	}
+	
+	function markerReOrder(index, type){
+		//alert('origin Index:' + map.getMarkerIndex(marker));
+		//map.setMarkerOrder(marker,'bottom'); //ok
+		//map.setMarkerOrder(marker,'down'); //ok
+		//map.setMarkerOrder(pMarker,'front'); //ok			
+		//map.setMarkerOrder(pMarker,'back');
+		var pMarker = map.getMarker(index);
+		if (pMarker != null) {
+			map.setMarkerOrder(pMarker,type);
+		}			
+	}
+	
+	function markerMove(){
+		var pMarker = map.getMarker(0);
+		if (pMarker != null) {			
+			pMarker.setPosition(new OpenLayers.LonLat(map.getCenter().lon,map.getCenter().lat));
+		}	
+	}
+	//========InfoWindow 예제=============================
+	//InfoWindow 생성/삭제
+	var infowindow ;
+	function showInfoWindow(){
+		infowindow = new vworld.InfoWindow('info',map.getCenter().lon,map.getCenter().lat,new OpenLayers.Size(100,100),'테스트입니다.');
+		map.addPopup(infowindow, true);
+		return infowindow;
+	}
+	//InfoWindow getPosition
+	function getInfoWindow(){
+		if (infowindow == null){
+			var info = showInfoWindow();
+		} else {
+			var info = infowindow;		
+			
+		}
+		alert(info.getPosition().left + ":" + info.getPosition().top);
+		
+	}
+	//========InfoWindow=============================
+	
+	//test
+	function check2DNumTest(){
+		//checkUrl = new Array(
+		//	"http://map.vworld.kr/check2DNum.do?key=" + vworld.vworldApiKey//vworldUrls.apiCheck
+		//	);
+		//vworldFunc._loadExtLibs(checkUrl, function(){});
+		
+		srcUrl = "http://map.vworld.kr/check2DNum.do?key=" + vworldApiKey;
+		var js = vworldFunc._CreateElement('script');
+		js.setAttribute('type', "text/javascript");
+		js.setAttribute('src', srcUrl);//vworldUrls.apiCheck
+		js.setAttribute('async', false);
+		document.getElementsByTagName('head')[0].appendChild(js);
+		document.getElementsByTagName('head')[0].removeChild(js);
+	}
+	
+	var polyline;
+	function createPolyline(){
+		OpenLayers.Renderer.symbol.lightning = [0, 0, 4, 2, 6, 0, 10, 5, 6, 3, 4, 5, 0, 0];		
+		OpenLayers.Renderer.symbol.rectangle = [0, 0, 4, 0, 4, 10, 0, 10, 0, 0];
+		OpenLayers.Renderer.symbol.church = [4, 0, 6, 0, 6, 4, 10, 4, 10, 6, 6, 6, 6, 14, 4, 14, 4, 6, 0, 6, 0, 4, 4, 4, 4, 0];
+		OpenLayers.Renderer.symbol.arrow = [0,2, 1,0, 2,2, 1,0, 0,2];//
+		
+		map.setZoomLevel(14);
+		var center = map.getCenter();
+		
+		var style_green = {rotation:0, pointRadius: 10, graphicName: "arrow", fillColor: "#00FF00", strokeColor: "#00FF00", strokeOpacity: 1, strokeWidth: 2}; 
+		//var style_green = {fillColor: "#FF0000", strokeColor: "#00FF00", strokeOpacity: 1, strokeWidth: 2}; 
+		////images/map2/bul_poi_b_1.png
+		var points = [];
+		points.push(new OpenLayers.Geometry.Point(center.lon, center.lat)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat - 1000)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat - 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat - 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat + 1000)); 
+		
+		polyline = new vworld.Polyline(points, style_green);
+		map.vectorLayer.addFeatures([polyline]); 	
+		//polyline.setEnd();
+		//polyline.style.externalGraphic ='http://www.local.kr/images/map2/bul_poi_b_1.png';					
+		
+		//alert(map.vectorLayer.features.length);
+		return polyline;
+		
+	}
+	
+	function setPolylineStyle(){
+		//[dot | dash | dashdot | longdash | longdashdot | solid]
+		var line;
+		if (polyline == null){
+			line = createPolyline();
+		}else {
+			line = polyline;
+		}
+		var oldw = line.getStyle();
+		line.setStyle("dash");
+		
+	}
+	
+	function setPolylineWeight(w){
+		//map.setZoomLevel(14);
+		var line;
+		if (polyline == null){
+			line = createPolyline();
+		}else {
+			line = polyline;
+		}
+		var oldw = line.getWeight();
+		line.setWeight(w);
+		alert('기존굵기:' + oldw + ",변경굵기:" + w);
+	}
+	function setPolylineColor(color){
+		//map.setZoomLevel(14);
+		var line;
+		if (polyline == null){
+			line = createPolyline();
+		}else {
+			line = polyline;
+		}
+		var oldc = line.getColor();
+		line.setColor(color);
+		alert('기존색상:' + oldc + ",변경색상:" + color);
+	}
+	
+	function addPolylinePoint(){
+		//map.setZoomLevel(14);
+		var line;
+		if (polyline == null){
+			line = createPolyline();
+		}else {
+			line = polyline;
+		}
+		var center = map.getCenter();
+		line.addNewPoint(new OpenLayers.Geometry.Point(center.lon, center.lat));
+	}
+	
+	function getPolylineBound(){
+		var line;
+		if (polyline == null){
+			line = createPolyline();
+		}else {
+			line = polyline;
+		}
+		var oldb = line.getPolyBounds();
+		createBounds(oldb);
+		alert('Bound:' + oldb);
+	}
+	
+	function createBounds(bounds){
+		var points = [];
+		points.push(new OpenLayers.Geometry.Point(bounds.left, bounds.top)); 
+		points.push(new OpenLayers.Geometry.Point(bounds.right, bounds.top)); 
+		points.push(new OpenLayers.Geometry.Point(bounds.right, bounds.bottom)); 
+		points.push(new OpenLayers.Geometry.Point(bounds.left, bounds.bottom)); 
+		
+		var style = {strokeColor: "#00FF00", fillColor: "#00FF00", strokeOpacity: 1, fillOpacity:0.1, strokeWidth: 2}; 
+		var poly = new vworld.Polygon(points, style);
+		
+		map.vectorLayer.addFeatures([poly]);
+	}
+	
+	//========Polygon=============================
+	var Polygon
+	function createPolygon(){
+		
+		map.setZoomLevel(14);
+		var center = map.getCenter();
+		
+		var style_green = {strokeColor: "#00FF00", strokeOpacity: 1, strokeWidth: 2}; 
+		var points = [];
+		points.push(new OpenLayers.Geometry.Point(center.lon, center.lat)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat - 1000)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat - 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat - 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 2000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat + 200)); 
+		points.push(new OpenLayers.Geometry.Point(center.lon + 1000, center.lat + 1000)); 
+		
+		Polygon = new vworld.Polygon(points, style_green);		
+		//Polygon = new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LinearRing(points), style_green);		
+		map.vectorLayer.addFeatures([Polygon]); 
+		
+		return Polygon;
+		
+	}
+	function setPolygonLineStyle(){
+		var line;
+		if (Polygon == null){
+			line = createPolygon();
+		}else {
+			line = Polygon;
+		}
+		var oldw = line.getStyle();
+		line.setStyle("dot");
+	}
+	
+	function setPolygonLineWeight(w){
+		var line;
+		if (Polygon == null){
+			line = createPolygon();
+		}else {
+			line = Polygon;
+		}
+		var oldw = line.getWeight();
+		line.setWeight(w);
+		alert('기존굵기:' + oldw + ",변경굵기:" + w);
+	}
+	function setPolygonLineColor(color){
+		var line;
+		if (Polygon == null){
+			line = createPolygon();
+		}else {
+			line = Polygon;
+		}
+		var oldc = line.getColor();
+		line.setColor(color);
+		alert('라인기존색상:' + oldc + ",변경색상:" + color);
+	}
+	function setPolygonColor(color){
+		var line;
+		if (Polygon == null){
+			line = createPolygon();
+		}else {
+			line = Polygon;
+		}
+		var oldc = line.getFillColor();
+		line.setFillColor(color);
+		alert('면기존색상:' + oldc + ",변경색상:" + color);
+	}	
+	
+	function setPolygonOpacity(opacity){
+		var poly;
+		if (Polygon == null){
+			poly = createPolygon();
+		}else {
+			poly = Polygon;
+		}
+		var oldO = poly.getFillOpacity();
+		poly.setFillOpacity(opacity);
+		poly.setOpacity(opacity);
+		alert('면투명도:' + oldO + ",변경투명도:" + opacity);
+	}
+	function addPolygonPoint(){
+		var line;
+		if (Polygon == null){
+			line = createPolygon();
+		}else {
+			line = Polygon;
+		}
+		var center = map.getCenter();
+		line.addNewPoint(new OpenLayers.Geometry.Point(center.lon, center.lat));
+	}
+	
+	function getPolygonBound(){
+		var line;
+		if (Polygon == null){
+			line = createPolygon();
+		}else {
+			line = Polygon;
+		}
+		var oldb = line.getBounds();
+		createBounds(oldb);
+		alert('Bound:' + oldb);
+	}
+	
+		
+	//========RegularPolygon=============================
+	var RegularPolygon = null;
+	function createRegularPolygon(){
+		
+		map.setZoomLevel(14);
+		var center = map.getCenter();		
+		var style_green = {strokeColor: "#00FF00", strokeOpacity: 1, strokeWidth: 2}; 
+				
+		RegularPolygon = new vworld.RegularPolygon({x:center.lon, y:center.lat}, 1000, 4, 0, style_green);
+		
+		map.vectorLayer.addFeatures([RegularPolygon]); 
+		return RegularPolygon;
+	}
+	function setRegularPolygonLineStyle(){
+		var line;
+		if (RegularPolygon == null){
+			line = createRegularPolygon();
+		}else {
+			line = RegularPolygon;
+		}
+		line.setStyle("dot");
+	}
+	function setRegularPolygonLineWeight(w){
+		var line;
+		if (RegularPolygon == null){
+			line = createRegularPolygon();
+		}else {
+			line = RegularPolygon;
+		}
+		var oldw = line.getWeight();
+		line.setWeight(w);
+		alert('기존굵기:' + oldw + ",변경굵기:" + w);
+	}
+	function setRegularPolygonLineColor(color){
+		var line;
+		if (RegularPolygon == null){
+			line = createRegularPolygon();
+		}else {
+			line = RegularPolygon;
+		}
+		var oldc = line.getColor();
+		line.setColor(color);
+		alert('라인기존색상:' + oldc + ",변경색상:" + color);
+	}
+	function setRegularPolygonColor(color){
+		var line;
+		if (RegularPolygon == null){
+			line = createRegularPolygon();
+		}else {
+			line = RegularPolygon;
+		}
+		var oldc = line.getFillColor();
+		line.setFillColor(color);
+		alert('면기존색상:' + oldc + ",변경색상:" + color);
+	}	
+	
+	function setRegularPolygonOpacity(opacity){
+		var poly;
+		if (RegularPolygon == null){
+			poly = createRegularPolygon();
+		}else {
+			poly = RegularPolygon;
+		}
+		var oldO = poly.getFillOpacity();
+		poly.setFillOpacity(opacity);
+		poly.setOpacity(opacity);
+		alert('면투명도:' + oldO + ",변경투명도:" + opacity);
+	}
+	function addRegularPolygonPoint(){
+		var line;
+		if (RegularPolygon == null){
+			line = createRegularPolygon();
+		}else {
+			line = RegularPolygon;
+		}
+		var center = map.getCenter();
+		line.addNewPoint(new OpenLayers.Geometry.Point(center.lon, center.lat));
+	}
+	
+	function getRegularPolygonBound(){
+		var line;
+		if (RegularPolygon == null){
+			line = createRegularPolygon();
+		}else {
+			line = RegularPolygon;
+		}
+		var oldb = line.getBounds();
+		createBounds(oldb);
+		alert('Bound:' + oldb);
+	}
+	
+	function setRegularPolygonSides(sides){
+		var poly;
+		if (RegularPolygon == null){
+			poly = createRegularPolygon();
+		}else {
+			poly = RegularPolygon;
+		}
+		var oldO = poly.getSides();
+		poly.setSides(sides);
+		alert('면타입:' + oldO + ",변경면타입:" + sides);
+	}
+	
+	function setRegularPolygonAutoSides(){
+		var poly;
+		if (RegularPolygon == null){
+			poly = createRegularPolygon();
+		}else {
+			poly = RegularPolygon;
+		}
+		var oldS = poly.getSides();
+		poly.setSides(oldS*2);
+		var newS = poly.getSides();
+		alert('면타입:' + oldS + ",변경면타입:" + newS);
+	}
+	
+	function setRegularPolygonAutoRadius(){
+		var poly;
+		if (RegularPolygon == null){
+			poly = createRegularPolygon();
+		}else {
+			poly = RegularPolygon;
+		}
+		var oldS = poly.getRadius();
+		poly.setRadius(oldS*2);
+		var newS = poly.getRadius();
+		alert('이전반경:' + oldS + ",적용반경:" + newS);
+	}
+	
+	function setRegularPolygonOrigin(){
+		var poly;
+		if (RegularPolygon == null){
+			poly = createRegularPolygon();
+		}else {
+			poly = RegularPolygon;
+		}
+		var center = map.getCenter();	
+		poly.setOrigin({x:center.lon, y:center.lat});
+	}
+	
+	function SearchTest(){
+	
+		var params = "q=서울";
+		params += "&category=Juso";
+		params += "&pageUnit=10";
+		params += "&pageIndex=1";
+		params += "&output=xml";
+		params += "&apiKey=CFFD8B05-1E8C-3EB3-BC6F-0FCCEFCC2043";
+		
+		
+		var reqConfig = OpenLayers.Util.extend({
+        		url: "http://map.vworld.kr/search.do?" + unescape(params),
+        		//url: "http://61.97.240.69/search.do?" + unescape(params),
+        		//headers: {"Content-Type": "text/plain"},
+        		success: success,
+        		//failure: failureCall,
+        		scope: this
+    		}, {method: "GET"});
+	    //OpenLayers.Request.issue(reqConfig);
+	    
+	    var keyword = "서울";
+		var params1 = "q=" + keyword;
+		params1 += "&category=Juso";
+		params1 += "&pageUnit=10";
+		params1 += "&pageIndex=1";
+		params1 += "&output=json"; //xml or json
+		params1 += "&apiKey=CFFD8B05-1E8C-3EB3-BC6F-0FCCEFCC2043";	
+		
+	    $.ajax({
+		    	type:'GET',
+		    	url: "/proxy.do?url=" + encodeURIComponent("http://map.vworld.kr/search.do?"+ params1), 
+		    	//url: "/proxy.do?url=" + encodeURIComponent("http://61.97.240.69/search.do?"+ params1), 
+		    	dataType: "text",
+		    	success: function(res){    
+		    		alert(res);	    		
+		    	}
+	    	}
+	    );
+	    
+	}
+	function success(res){
+		alert(res.responseText);
+	}
+	
+	function linelength(){
+		//13775786.985667605 4383204.9499851465
+		//14088873.053523685 4696291.017841227	
+		var dists =[];
+		//7
+		var p1 = new OpenLayers.Geometry.Point(13775786.985667605,4383204.9499851465);
+		var p2 = new OpenLayers.Geometry.Point(14088873.053523685,4383204.9499851465);
+		var segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		var tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		//8
+		//13932330.01959565,4539747.983913187,14088873.053523685,4696291.017841227
+		var p1 = new OpenLayers.Geometry.Point(13932330.01959565,4539747.983913187);
+		var p2 = new OpenLayers.Geometry.Point(14088873.053523685,4539747.983913187);
+		var segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		var tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		//9
+		//13932330.01959565 4539747.983913187,14010601.536559667 4618019.500877209
+		var p1 = new OpenLayers.Geometry.Point(13932330.01959565,4539747.983913187);
+		var p2 = new OpenLayers.Geometry.Point(14010601.536559667,4539747.983913187);
+		var segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		var tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		//10
+		//13932330.01959565 4578883.7423952, 13971465.778077658 4618019.500877209
+		var p1 = new OpenLayers.Geometry.Point(13932330.01959565,4578883.7423952);
+		var p2 = new OpenLayers.Geometry.Point(13971465.778077658,4578883.7423952);
+		var segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		var tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		//11
+		//13932330.01959565 4578883.7423952, 13951897.898836653 4598451.621636204
+		var p1 = new OpenLayers.Geometry.Point(13932330.01959565,4578883.7423952);
+		var p2 = new OpenLayers.Geometry.Point(13951897.898836653,4578883.7423952);
+		var segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		var tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		//12
+		//13932330.01959565 4588667.682015702,13942113.959216151 4598451.621636204
+		var p1 = new OpenLayers.Geometry.Point(13932330.01959565,4588667.682015702);
+		var p2 = new OpenLayers.Geometry.Point(13942113.959216151,4588667.682015702);
+		var segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		var tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		//13
+		//13932330.01959565 4593559.651825953,13937221.989405896 4598451.621636204
+		var p1 = new OpenLayers.Geometry.Point(13932330.01959565, 4593559.651825953);
+		var p2 = new OpenLayers.Geometry.Point(13937221.989405896, 4593559.651825953);
+		var segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		var tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		//14
+		//13932330.01959565 4596005.636731077, 13934776.004500772 4598451.621636204
+		var p1 = new OpenLayers.Geometry.Point(13932330.01959565, 4596005.636731077);
+		var p2 = new OpenLayers.Geometry.Point(13934776.004500772, 4596005.636731077);
+		var segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		var tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		//15
+		//13932330.01959565,4597228.629183639,13933553.012048211,4598451.621636204
+		var p1 = new OpenLayers.Geometry.Point(13932330.01959565,4597228.629183639);
+		var p2 = new OpenLayers.Geometry.Point(13933553.012048211,4597228.629183639);
+		var segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		var tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		//16
+		//13932941.51582193,4597228.629183639,13933553.012048211,4597840.1254099235
+		var p1 = new OpenLayers.Geometry.Point(13932941.51582193,4597228.629183639);
+		var p2 = new OpenLayers.Geometry.Point(13933553.012048211,4597228.629183639);
+		var segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		var tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		//17
+		var p1 = new OpenLayers.Geometry.Point(14135041.01860790,4518345.61599334);
+		var p2 = new OpenLayers.Geometry.Point(14135346.76672100,4518345.61599334);
+		var segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		var tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		//18
+		var p1 = new OpenLayers.Geometry.Point(14135499.640777643,4518345.61599334);
+		var p2 = new OpenLayers.Geometry.Point(14135652.514834214,4518345.61599334);				
+		var segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		var tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		//19
+		//13933170.826906781,4597381.503240213,13933247.26393507,4597457.940268498
+		var p1 = new OpenLayers.Geometry.Point(13933170.826906781,4597381.503240213);
+		var p2 = new OpenLayers.Geometry.Point(13933247.26393507,4597381.503240213);
+		
+		segment = new OpenLayers.Geometry.LineString([p1, p2]);
+		tmpdist1 = segment.getGeodesicLength(new OpenLayers.Projection('EPSG:900913'));
+		dists.push(tmpdist1);
+		
+		alert(dists.concat(','));
+	}
+	
+</script> 
+
+<body >
+	<div>			
+		현재레벨:
+		<input type="text" name='q' id='level' value="0" maxlength="20" style="ime-mode:active;width:50px;"/>
+		축척:
+		<input type="text" name='q' id='scale' value="0" maxlength="20" style="ime-mode:active;width:150px;"/>
+		축척단위:
+		<input type="text" name='q' id='scaleunit' value="0" maxlength="20" style="ime-mode:active;width:150px;"/>
+		해상도:
+		<input type="text" name='q' id='resolution' value="0" maxlength="20" style="ime-mode:active;width:150px;"/>
+		화면중심점(경위도4326):
+		<input type="text" name='q' id='centerx' value="0" maxlength="20" style="ime-mode:active;width:100px;"/>
+		<input type="text" name='q' id='centery' value="0" maxlength="20" style="ime-mode:active;width:100px;"/>
+		<button type="button" onclick="javascript:trans();trans2();" >변환>></button>		
+		화면중심점(구글좌표):
+		<input type="text" name='q' id='centergx' value="0" maxlength="20" style="ime-mode:active;width:100px;"/>
+		<input type="text" name='q' id='centergy' value="0" maxlength="20" style="ime-mode:active;width:100px;"/>
+		화면중심점(구글좌표2):
+		<input type="text" name='q' id='centergx2' value="0" maxlength="20" style="ime-mode:active;width:100px;"/>
+		<input type="text" name='q' id='centergy2' value="0" maxlength="20" style="ime-mode:active;width:100px;"/>
+		<button type="button" onclick="javascript:alert(map.getExtent().clone().transform('EPSG:900913','EPSG:4326'));" name="addcache" >3D 도시지역도 감추기</button>
+		
+		<button type="button" onclick="javascript:linelength();" name="addcache" >라인길이체크</button>	
+	</div>
+	<!-- <div>
+		<button type="button" onclick="javascript:add3DThemeLayer('도시지역','LT_C_UQ111');" name="addcache" >3D 도시지역도 보기(추가)</button>
+		<button type="button" onclick="javascript:hide3DThemeLayer('도시지역');" name="addcache" >3D 도시지역도 감추기</button>		
+	</div>
+	
+	<div>
+		<button type="button" onclick="javascript:testLength();" name="list2d" >길이체크</button>
+		<button type="button" onclick="javascript:check2DNumTest();" name="list2d" >check2DNumTest</button>
+		<button type="button" onclick="javascript:httpTest();" name="list2d" >프록시설정</button>
+		<button type="button" onclick="javascript:layerListShow();" name="list2d" >지도목록보기</button>
+		<button type="button" onclick="javascript:addThemeLayer('도시지역','LT_C_UQ111');" name="addcache" >도시지역도 보기(추가)</button>
+		<button type="button" onclick="javascript:hideThemeLayer('도시지역');" name="addcache" >도시지역도 감추기</button>
+		<button type="button" onclick="javascript:addThemeLayer('지적도','LP_PA_CBND_BONBUN,LP_PA_CBND_BUBUN');" name="addcache" >지적도 보기(추가)</button>
+		<button type="button" onclick="javascript:hideThemeLayer('지적도');" name="addcache" >지적도 감추기</button>
+		<button type="button" onclick="javascript:addTileCache();" name="addcache" >TileCache 추가(2DCache/tile)</button>
+		<button type="button" onclick="javascript:importWMS();" name="importwms" >개발제한구역(외부WMS)추가</button>
+		<button type="button" onclick="javascript:removeLayer('개발제한구역');" name="importwms" >개발제한구역 삭제</button>
+	</div>
+	<div>
+		<button type="button" onclick="javascript:addMarkingEvent();" name="addpin" >마커찍기</button>
+		마우스클릭(구글좌표):
+		<input type="text" name='q' id='mousex' value="0" maxlength="20" style="ime-mode:active"/>
+		<input type="text" name='q' id='mousey' value="0" maxlength="20" style="ime-mode:active"/>	
+		<button type="button" onclick="javascript:markerReOrder(0, 'top');" name="markerorder1" >마커(맨앞으로)</button>
+		<button type="button" onclick="javascript:markerReOrder(0, 'front');" name="markerorder2" >마커(앞으로)</button>
+		<button type="button" onclick="javascript:markerReOrder(0, 'back');" name="markerorder3" >마커(뒤로)</button>
+		<button type="button" onclick="javascript:markerReOrder(0, 'bottom');" name="markerorder4" >마커(맨뒤로)</button>
+		
+		<button type="button" onclick="javascript:markerMove();" name="markermove" >마커이동(화면중심으로)</button>
+	</div>
+	<div>
+		<button type="button" onclick="javascript:map.addMapToolButton('zoominbox');" name="mode0" >영역확대버튼추가</button>
+		<button type="button" onclick="javascript:printSave();" name="printsave" >화면저장</button>
+		<button type="button" onclick="javascript:printPreview();" name="preview" >인쇄미리보기</button>
+		<button type="button" onclick="javascript:printPreview();" name="preview3d" >인쇄미리보기(3D)</button>
+	</div>
+	<div>
+		<button type="button" onclick="javascript:setModeCallback();" name="modecallback" >모드변경시 실행함수 설정</button>
+		<button type="button" onclick="javascript:vworld.setMode(0);" name="mode0" >2D전환</button>
+		<button type="button" onclick="javascript:vworld.setMode(2);" name="mode2" >3D전환</button>
+		<button type="button" onclick="javascript:map.init();" name="mb_1" >초기화</button>
+		<button type="button" onclick="javascript:map.clear();" name="mb_1" >화면지우기</button>
+		<button type="button" onclick="javascript:map.calcDistance();" name="mb_2" >거리측정도구</button>
+		<button type="button" onclick="javascript:map.calcArea();" name="mb_3" >면적측정도구</button>	
+		<button type="button" onclick="javascript:map.zoomIn();" name="mb_3" >확대</button>	
+		<button type="button" onclick="javascript:map.zoomOut();" name="mb_3" >축소</button>	
+		<button type="button" onclick="javascript:map.zoomBoxIn();" name="mb_3" >영역확대</button>	
+		<button type="button" onclick="javascript:map.zoomBoxOut();" name="mb_3" >영역축소</button>	
+	</div>
+	<div>
+		<button type="button" onclick="javascript:showInfoWindow();" name="iw_1" >InfoWindow(생성)</button>
+		<button type="button" onclick="javascript:getInfoWindow();" name="iw_2" >InfoWindow(위치정보)</button>
+	</div>
+	<div>
+		<button type="button" onclick="javascript:createPolyline();" name="pl_1" >polyline(생성)</button>
+		<button type="button" onclick="javascript:setPolylineStyle();" name="pl_2" >스타일조회/지정</button>
+		<button type="button" onclick="javascript:setPolylineWeight(10);" name="pl_2" >굵기조회/지정</button>
+		<button type="button" onclick="javascript:setPolylineColor('#ff0000');" name="pl_3" >색상조회/지정</button>
+		<button type="button" onclick="javascript:addPolylinePoint();" name="pl_4" >포인트추가</button>
+		<button type="button" onclick="javascript:getPolylineBound();" name="pl_5" >Bound조회</button>
+	</div>
+	<div>
+		<button type="button" onclick="javascript:createPolygon();" name="pg_1" >Polygon(생성)</button>
+		<button type="button" onclick="javascript:setPolygonLineStyle();" name="pg_2" >라인스타일조회/지정</button>
+		<button type="button" onclick="javascript:setPolygonLineWeight(10);" name="pg_2" >라인굵기조회/지정</button>
+		<button type="button" onclick="javascript:setPolygonLineColor('#ff0000');" name="pg_3" >라인색상조회/지정</button>
+		<button type="button" onclick="javascript:setPolygonColor('#ff0000');" name="pg_6" >면색상조회/지정</button>
+		<button type="button" onclick="javascript:setPolygonOpacity(0.5);" name="pg_7" >투명도조회/지정</button>
+		<button type="button" onclick="javascript:addPolygonPoint();" name="pg_4" >포인트추가</button>
+		<button type="button" onclick="javascript:getPolygonBound();" name="pg_5" >Bound조회</button>
+	</div>
+	<div>
+		<button type="button" onclick="javascript:createRegularPolygon();" name="rpg_1" >RegularPolygon(생성-기본4각형)</button>
+		<button type="button" onclick="javascript:setRegularPolygonAutoSides();" name="rpg_8" >포인트변경(2배수증가)</button>
+		<button type="button" onclick="javascript:setRegularPolygonLineStyle();" name="rpg_11" >라인스타일조회/지정</button>
+		<button type="button" onclick="javascript:setRegularPolygonLineWeight(10);" name="rpg_2" >라인굵기조회/지정</button>
+		<button type="button" onclick="javascript:setRegularPolygonLineColor('#ff0000');" name="rpg_3" >라인색상조회/지정</button>
+		<button type="button" onclick="javascript:setRegularPolygonColor('#ff0000');" name="rpg_6" >면색상조회/지정</button>
+		<button type="button" onclick="javascript:setRegularPolygonOpacity(0.5);" name="rpg_7" >투명도조회/지정</button>
+		<button type="button" onclick="javascript:getRegularPolygonBound();" name="rpg_5" >Bound조회</button>
+		<button type="button" onclick="javascript:setRegularPolygonAutoRadius();" name="rpg_9" >반경조정(기본1000)</button>
+		<button type="button" onclick="javascript:setRegularPolygonOrigin();" name="rpg_10" >중심이동</button>
+	</div>-->
+	<div style="display:inline;float:left;width:100%;height:500px;left:0px;top:0px">
+		<div id="PrintArea" style="width:100%;height:100%;left:0px;top:0px;position:relative;"></div>	
+	</div>	
+	<!-- <div id="PrintArea" style="border:1px solid #000; width:100%; height:100%;position:absolute; top:0px; left:0px;""></div>
+	-->
+</body> 
+</html>

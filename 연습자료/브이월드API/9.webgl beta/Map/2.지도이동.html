@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+<title>Webgl API 지도이동</title>
+</head>
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?version=wBeta&apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9&domain=http://localhost:8080"></script>
+<script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
+<script>
+var Map3D;
+function init(){
+	var optMapOptions =new vw.MapOptions(
+	vw.BasemapType.GRAPHIC, // 초기배경지도
+	"", // 디폴트레이어 설정됨 //레이어 목록
+	vw.DensityType.FULL, // navi, scale, coordinate 3개의 컨트롤이 나타남.
+	vw.DensityType.FULL, //인터렉션 밀도 ?
+	new vw.CameraPosition(new vw.CoordZ(37.410307881426085,127.12636278475038,  500), new vw.Direction(0, 60, 0)),// 홈 카메라 위치
+	new vw.CameraPosition(new vw.CoordZ( 37.41007333074048,127.126366626566, 500), new vw.Direction(0, 60, 0)), // 초기 카메라 위치
+	true
+	);
+	//create 3d map object
+	Map3D = new vw.Map('globarea', optMapOptions);
+}
+
+$(window).load(function(){
+	init();
+})
+	
+</script>
+<body>
+<!-- 
+
+지도이동 순간이동 
+Map3D.createExplore(위도, 경도, 높이) 
+
+지도이동 애니메이션 이동
+Map3D.gotoSplineCurve(위도, 경도, 높이) 
+ -->
+
+<div style="width: 1000px; height: 25px; background-color: gray">
+<input type="button" value="이동" onclick="Map3D.createExplore(33.361035142178046, 126.5320207342673,10000)">
+<input type="button" value="부드러운 이동" onclick="Map3D.gotoSplineCurve(37.58860932877919,127.04001534308335,1000)">
+</div>
+<!-- 
+지도 생성 
+ -->
+<div id="maparea" style="display:inline-block;position:absolute;width:1000px;height:600px;">
+	<div id="globarea" style="display:inline-block;position:relative;width:100%;height:100%;">
+	</div>
+</div>
+
+
+</body>
+
+</html>

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<!--
+Created using JS Bin
+http://jsbin.com
+
+Copyright (c) 2019 by anonymous (http://jsbin.com/wubomobize/1/edit)
+
+Released under the MIT license: http://jsbin.mit-license.org
+-->
+<meta name="robots" content="noindex">
+<meta name="robots" content="noindex">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>국가공간정보포털 지적도 비교</title>
+<!-- <script type="text/javascript" src="https://map.vworld.kr/js/vworldMapInit.js.do?version=2.0&apiKey=451153E4-7D0D-37EC-979D-E98C75EB50E9&domain=http://localhost:8080"></script>
+  -->
+  <script src="https://cdn.rawgit.com/openlayers/openlayers.github.io/master/en/v5.3.0/build/ol.js"></script>
+  <script src="https://code.jquery.com/jquery-2.2.3.min.js"></script>
+</head>
+<!--
+ 국가공간정보 포털 국토정보기본도 API 입니다. (http://openapi.nsdi.go.kr/nsdi/eios/ServiceDetail.do?svcSe=S&svcId=S013+&gubun=S&provOrg=LX&sUpperSvcId=&svcNm=)
+  
+  -->
+<body>
+<div id="map" style="width: 100%; height: 650px; left: 0px; top: 0px"></div>
+<div>
+    <label>연속 지적도 투명도</label>
+    <input id="vworld" type="range" min="0" max="1" step="0.1" value="1">
+</div>
+<div>
+    <label>편집 지적도 투명도</label>
+    <input id="nsdi" type="range" min="0" max="1" step="0.1" value="0">
+</div>
+<div>
+    <input type="text" name="pnu" value="414613503310090000">
+    <input type="button" name="search" value="지적도(pnu) 검색" onclick="callAjax()">
+    <input type="text" name="query" value="백암면 가좌리 90">
+    <input type="button" name="search_map" value="지도 검색" onclick="callSearch()">
+    <p><input type="text" id="lon" value="126.97409" /> <input type="text" id="lan" value="37.5112" /> <input type="button" id="find" value="검색"> </p>
+</div>
+ 
+<script type="text/javascript">
+ 
+    // vw.ol3.MapOptions = {
+    //         basemapType: vw.ol3.BasemapType.GRAPHIC
+    //       , controlDensity: vw.ol3.DensityType.EMPTY
+    //       , interactionDensity: vw.ol3.DensityType.BASIC
+    //       , controlsAutoArrange: true
+    //       , homePosition: vw.ol3.CameraPosition
+    //       , initPosition: vw.ol3.CameraPosition
+    // }; 
+     
+    // map = new vw.ol3.Map("map",  vw.ol3.MapOptions); //브이월드 기본지도 로드
+ 
+     
+    var Base = new ol.layer.Tile({
+		name : "Base",
+		source: new ol.source.XYZ({
+			url: 'https://api.vworld.kr/req/wmts/1.0.0/CEB52025-E065-364C-9DBA-44880E3B02B8/Base/{z}/{y}/{x}.png'
+		})
+	}); // WMTS API 사용
+  
+    var olView = new ol.View({
+        center:[14176635.921275,4464304.0568851],//좌표계 변환
+        zoom: 20
+    })// 뷰 설정
+    var map = new ol.Map({
+        layers: [Base],
+        target: 'map',
+        view: olView
+    });
+     
+    var wms_title = '지적도';
+    var wms_val = 'LP_PA_CBND_BUBUN,LP_PA_CBND_BONBUN'.toLowerCase();
+     
+    var wms_tile = new ol.layer.Tile({
+        name : "WMS_LAYER",
+        source : new ol.source.TileWMS({
+            url : "https://api.vworld.kr/req/wms?",
+            params : {
+                LAYERS : wms_val,
+                STYLES : wms_val,
+                CRS : "EPSG:3857",
+                apikey : "CEB52025-E065-364C-9DBA-44880E3B02B8",
+                DOMAIN : "http://loacalhost:8080",
+                title : wms_title,
+                FORMAT : "image/png",
+                domain : "http://localhost"
+            }
+        })
+    });
+
+        
+    /* 폴리곤의 스타일 설정 */
+function styleFunction(feature) {
+
+    return [
+        new ol.style.Style({
+            fill: new ol.style.Fill({
+            color: 'rgba(255,255,255,0.4)'
+            }),
+            stroke: new ol.style.Stroke({
+            color: '#3399CC',
+            width: 1.25
+            }),
+            text: new ol.style.Text({
+                offsetX:0.5, //위치설정
+                offsetY:20,   //위치설정
+                font: '12px Calibri,sans-serif',
+                fill: new ol.style.Fill({ color: '#000' }),
+                stroke: new ol.style.Stroke({
+                    color: '#fff', width: 3
+                }),
+                text: feature.get('addr') == null ? feature.get('parcel') : feature.get('addr')
+            }),
+            image: new ol.style.Icon(/** @type {olx.style.IconOptions} */ ({
+                anchor: [0.5, 10],
+                anchorXUnits: 'fraction',
+                anchorYUnits: 'pixels',
+                src: 'http://map.vworld.kr/images/ol3/marker_blue.png'
+            }))
+        })
+    ];
+}
+     
+    map.getView().getProjection().code_="EPSG:3857" //브이월드의 EPSG:900913 사용시 편집지적도가 작동되지 않음
+     
+    map.addLayer(wms_tile);  // 브이월드 지적도 등록 (openlayers 3.0 버전의 WMS tile layer 등록)
+     
+    //  http://openapi.nsdi.go.kr/nsdi/map/LandInfoBaseMapUTMKService - 항공영상 - 
+ 
+    //  http://openapi.nsdi.go.kr/nsdi/map/LandInfoBaseMapITRF2000Service? 지도조회(ITRF2000)
+ 
+    //  http://openapi.nsdi.go.kr/nsdi/map/LandInfoBaseMapBesselService 지도조회(Bessel)
+     
+    //  http://openapi.nsdi.go.kr/nsdi/map/LandInfoBaseMapUTMKBlueService 지도조회(UTM-K)
+     
+    //  http://openapi.nsdi.go.kr/nsdi/map/LandInfoBaseMapITRF2000BlueService - 지도조회(ITRF2000)
+ 
+    var nsdi_tile = new ol.layer.Tile({
+        name : "NSDI_LAYER",
+        source : new ol.source.TileWMS({
+            url : "http://openapi.nsdi.go.kr/nsdi/map/LandInfoBaseMapUTMKBlueService?",
+            params : {
+                authkey :   "aed1f1084e775267d81d20",
+                SERVICE : "WMS",
+                VERSION : "1.3.0",
+                REQUEST : "GetMap",
+                FORMAT  : "image/png",
+                LAYERS : "0",
+                CRS : "EPSG:3857",
+                STYLES : ""
+            }
+        })
+    });
+    nsdi_tile.setOpacity(0);
+    map.addLayer(nsdi_tile);  // 편집 지적도 등록 (openlayers 3.0 버전의 WMS tile layer 등록)
+     
+    var kop = document.getElementById('vworld');
+    var mop = document.getElementById('nsdi');
+ 
+    kop.addEventListener('input', function() {
+        map.getLayers().forEach(function(layer){ //openlayers 에서의 name 속성값을 이용한 Layer 접근
+            if(layer.get("name")=="WMS_LAYER"){
+                layer.setOpacity(kop.value) //투명도 설정
+            }
+        });
+    });
+ 
+    mop.addEventListener('input', function() {
+        map.getLayers().forEach(function(layer){ //openlayers 에서의 name 속성값을 이용한 Layer 접근
+            if(layer.get("name")=="NSDI_LAYER"){
+                layer.setOpacity(mop.value) //투명도 설정
+            }
+        });
+    });
+ 
+    $("[name=pnu]").on('input', function() {
+        callAjax();
+    })
+
+    var callAjax = function(){
+        value = $("[name=pnu]").val();
+        var data = "key=CEB52025-E065-364C-9DBA-44880E3B02B8&domain=http://localhost:8080&service=data&version=2.0&request=getfeature&format=json&size=100&page=1&data=LP_PA_CBND_BUBUN&geometry=true&attribute=true&crs=EPSG:3857"
+        data += "&attrfilter=pnu:like:"+value
+        
+        $.ajax({
+		    	type: "get",
+		    	url: "https://api.vworld.kr/req/data",
+		    	data : data,
+		    	dataType: 'jsonp',
+		    	async: false,
+		    	success: function(data) {
+		    	    
+		    	    var vectorSource = new ol.source.Vector({features: (new ol.format.GeoJSON()).readFeatures(data.response.result.featureCollection)})
+		    	    
+		    	    
+		    		map.getLayers().forEach(function(layer){
+		    			if(layer.get("name")=="search_result"){
+		    				map.removeLayer(layer);//기존결과 삭제
+		    			}
+		    		})
+		    	    var vector_layer = new ol.layer.Vector({
+		    	  	  source: vectorSource,
+		    	  	  style: styleFunction
+		    	  	})
+		    	    
+		    	    vector_layer.set("name","search_result");
+		    	 	map.addLayer(vector_layer);
+		       	},
+		    	
+		    	error: function(xhr, stat, err) {}
+        });
+    }
+
+    $("[name=pnu]").on('input', function() {
+        callAjax();
+    })
+
+    var callSearch = function(){
+        var value = $("[name=query]").val();
+        var data = "service=search&version=2.0&request=search&key=CEB52025-E065-364C-9DBA-44880E3B02B8&format=json&size=10&page=1&type=address&category=parcel&crs=EPSG:3857";
+        data += "&query="+value
+        
+        $.ajax({
+		    	type: "get",
+		    	url: "https://api.vworld.kr/req/search",
+		    	data : data,
+		    	dataType: 'jsonp',
+		    	async: false,
+		    	success: function(data) {
+		    	    var features = new Array();
+                    for(var o in data.response.result.items){ 
+                        //Feature 객체에 저장하여 활용 
+                        features[o] = new ol.Feature({
+                            geometry: new ol.geom.Point([data.response.result.items[o].point.x*1,data.response.result.items[o].point.y*1]),
+                            title: data.response.result.items[o].title,
+                            parcel: data.response.result.items[o].address.parcel,
+                            road: data.response.result.items[o].address.road,
+                            category: data.response.result.items[o].category,
+                            point: data.response.result.items[o].point
+                        });
+                        features[o].set("id",data.response.result.items[o].id);
+                        features[o].setStyle(styleFunction)
+                    }
+                      
+                    var vectorSource = new ol.source.Vector({
+                          features: features
+                    });
+                    /*
+                        기존검색결과를 제거하기 위해 키 값 생성
+                    */
+                    var vectorLayer = new ol.layer.Vector({
+                        source: vectorSource
+                    });
+                      
+                    /*
+                        기존검색결과를 제거하기 위해 키 값 생성
+                    */
+                    vectorLayer.set("vectorLayer","search_vector")
+                      
+                    map.getLayers().forEach(function(layer){
+                        if(layer.get("vectorLayer")=="search_vector"){
+                            map.removeLayer(layer);
+                        }
+                    });
+                      
+                    map.addLayer(vectorLayer);
+		       	},
+		    	
+		    	error: function(xhr, stat, err) {}
+        });
+    }
+
+    $(document).on("click","#find",function(){ 
+    	var lon = $('#lon').val();
+    	var lan = $('#lan').val();
+        var point = ol.proj.transform([ lon*1, lan*1],'EPSG:4326', "EPSG:900913");
+        map.getView().setCenter(point);
+        
+        
+        var data = "key=CEB52025-E065-364C-9DBA-44880E3B02B8&domain=http://localhost:8080&service=data&version=2.0&request=getfeature&format=json&size=100&page=1&data=LP_PA_CBND_BUBUN&geometry=true&attribute=true&crs=EPSG:3857"
+        data += "&geomfilter=POINT("+point[0]+" "+point[1]+")";
+        
+        $.ajax({
+		    	type: "get",
+		    	url: "https://api.vworld.kr/req/data",
+		    	data : data,
+		    	dataType: 'jsonp',
+		    	async: false,
+		    	success: function(data) {
+		    	    
+		    	    var vectorSource = new ol.source.Vector({features: (new ol.format.GeoJSON()).readFeatures(data.response.result.featureCollection)})
+		    	    
+		    	    
+		    		map.getLayers().forEach(function(layer){
+		    			if(layer.get("name")=="search_result"){
+		    				map.removeLayer(layer);//기존결과 삭제
+		    			}
+		    		})
+		    	    var vector_layer = new ol.layer.Vector({
+		    	  	  source: vectorSource,
+		    	  	  style: styleFunction
+		    	  	})
+		    	    
+		    	    vector_layer.set("name","search_result");
+		    	 	map.addLayer(vector_layer);
+		       	},
+		    	
+		    	error: function(xhr, stat, err) {}
+        });
+        
+    });
+    
+</script>
+</body>
+</html>

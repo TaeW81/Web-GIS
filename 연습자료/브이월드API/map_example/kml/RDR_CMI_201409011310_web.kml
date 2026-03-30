@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Folder>
+    <name>RDR_CMI_201409011310_web_4326</name>
+    <description>RDR_CMI_201409011310_web_4326</description>
+    <GroundOverlay>
+      <name>RDR_CMI_201409011310_web_4326</name>
+      <description>RDR_CMI_201409011310_web_4326</description>
+      <Icon>
+        <href>http://files.skplanet.com/weather/07_RDR/CAPPI/20140901/RDR_CMI_201409011310_web_4326.png</href>
+      </Icon>
+      <LatLonBox>
+        <north>41.813127658</north>
+        <south>30.5886985277</south>
+        <east>132.943791537</east>
+        <west>121.032976453</west>
+        <rotation>0</rotation>
+      </LatLonBox>
+    </GroundOverlay>
+  </Folder>
+</kml>

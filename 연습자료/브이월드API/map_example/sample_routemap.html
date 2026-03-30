@@ -1,0 +1,109 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=Edge">
+<title>RouteMap</title>
+
+<!-- API key를 포함하여 브이월드 API URL을 지정하여 호출 시작  -->
+<script type="text/javascript" src="http://map.vworld.kr/js/vworldMapInit.js.do?apiKey=767B7ADF-10BA-3D86-AB7E-02816B5B92E9"></script> 
+
+<script type="text/javascript">
+
+var apiMap;//2D map
+var SOPPlugin;//3D map
+vworld.showMode = false;//브이월드 배경지도 설정 컨트롤 유무(true:배경지도를 컨트롤 할수 있는 버튼 생성/false:버튼 해제)
+var mControl;//마커이벤트변수
+var tempMarker = null;//임시마커
+
+/**
+ * - rootDiv, mapType, mapFunc, 3D initCall, 3D failCall
+ * - 브이월드 5가지 파라미터를 셋팅하여 지도 호출
+ */
+vworld.init("vMap", "map-first", 
+	function() {        
+		apiMap = this.vmap;//브이월드맵 apiMap에 셋팅 
+		apiMap.setBaseLayer(apiMap.vworldBaseMap);//기본맵 설정 
+		apiMap.setControlsType({"simpleMap":true});	//간단한 화면
+		apiMap.addVWORLDControl("zoomBar");//panzoombar등록
+		apiMap.setCenterAndZoom(14243425.793355, 4342305.8698004, 7);//화면중심점과 레벨로 이동 (초기 화면중심점과 레벨) 	
+	},
+	function (obj){//3D initCall(성공)
+		SOPPlugin = obj;
+	},
+	function (msg){//3D failCall(실패)
+		alert(msg);
+	}
+);
+
+/**
+ * 마커 찍기
+ */
+ var routeMap = null;
+function jsCreatRoute(){
+	//RouteMap생성
+	if (routeMap == null) {
+		routeMap = new vworld.RouteMap("test");
+		
+	}
+}
+function jsAddRouteEvent(){
+	
+	var pointOptions = {persist:true};//포인트옵션
+	if (mControl == null) {//마커컨트롤이 정의 되어 있지 않으면
+		mControl = 
+			new OpenLayers.Control.Measure(
+					OpenLayers.Handler.Point,
+					{handlerOptions:pointOptions});//포인트 객체 생성
+    	mControl.events.on({"measure":mClick});//객체를 클릭이벤트 등록
+    	apiMap.addControl(mControl);//나의 map에 객체 추가
+	}        
+	apiMap.init();//나의 맵 초기화
+    mControl.activate();//마커컨트롤 활성화
+}
+
+/**
+ * 말풍선이벤트
+ */
+function mClick(event){
+	//apiMap.init();//나의 맵 초기화	
+	var temp = event.geometry;//마커 클릭이벤트시 나오는 좌표	
+	var pos = new OpenLayers.LonLat(temp.x, temp.y);//좌표값 셋팅
+	
+	document.getElementById('mousex').value = pos.lon;//구글좌표 x
+	document.getElementById('mousey').value = pos.lat;//구글좌표 y
+	//경로추가
+	
+	routeMap.addRoute('test', pos.lon, pos.lat, "title","desc");
+	
+}
+
+function jsInit(){
+	apiMap.init();
+}
+
+function jsSetStyle(style){
+	routeMap.setStyle('test', style);
+}
+
+</script>
+</head>
+<body>
+
+<!-- 지도가 들어갈 영역 시작 -->
+<div id="vMap" style="width:100%;height:650px;left:0px;top:0px"></div>
+<!-- 지도가 들어갈 영역 끝 -->
+
+<!-- chart control -->
+<div id="desc" style="padding:5px 0 0 5px;">
+	<button type="button" onclick="javascript:jsCreatRoute();" name="addpin" >RouteMap생성</button>
+	<button type="button" onclick="javascript:jsAddRouteEvent();" name="addpin" >경로추가</button>
+	<button type="button" onclick="javascript:jsSetStyle('dot');" name="addpin" >경로스타일변경(dot)</button>
+	<button type="button" onclick="javascript:jsInit();" name="addpin" >초기화</button>
+	마우스클릭(구글좌표):
+	<input type="text" name='q' id='mousex' value="0" maxlength="20" style="ime-mode:active"/>
+	<input type="text" name='q' id='mousey' value="0" maxlength="20" style="ime-mode:active"/>
+</div>
+<!-- chart control -->
+</body>
+</html>

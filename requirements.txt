@@ -1,0 +1,11 @@
+streamlit
+folium
+streamlit-folium
+ezdxf
+pyproj
+shapely
+pandas
+requests
+openpyxl
+python-dotenv
+pyshp
