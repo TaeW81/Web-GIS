@@ -4,6 +4,7 @@
 """
 import streamlit as st
 from streamlit_folium import st_folium
+import folium
 import tempfile
 import os
 
@@ -13,6 +14,7 @@ from modules.pnu_extractor import extract_pnu_list
 from modules.map_builder import create_map
 from modules.excel_exporter import create_multi_sheet_excel
 from modules.spatial_downloader import fetch_wfs_data, export_to_dxf, export_to_shp
+from modules.vworld_search import search_place
 from analyzers import get_all_analyzers
 
 # ============================
@@ -23,7 +25,7 @@ st.caption("캐드 구역계(DXF) 파일을 업로드하면, 자동으로 토지
 # ============================
 # 데이터 변수 및 상태 초기화
 # ============================
-DEFAULT_CENTER = [37.5665, 126.9780]
+DEFAULT_CENTER = [37.39293, 126.97286]  # 성지스타위드
 for k, v in [('map_center', DEFAULT_CENTER), ('map_zoom', 16), ('last_uploaded_file', None), 
              ('last_crs_origin', "중부"), ('last_crs_cat', "GRS80(현행)"), ('last_epsg', ""),
              ('render_center', DEFAULT_CENTER), ('render_zoom', 16), ('last_base_map', "일반지도")]:
@@ -38,7 +40,26 @@ dxf_result = {"center": st.session_state.map_center, "gps_points": [], "num_vert
 with st.sidebar:
     st.header("⚙️ 설정")
     
-    st.subheader("1️⃣ 파일 업로드")
+    st.subheader("🔍 지도 이동 (장소 검색)")
+    col1, col2 = st.columns([3, 1])
+    search_query = col1.text_input("검색어 입력", label_visibility="collapsed", placeholder="예: 평촌역")
+    if col2.button("이동", use_container_width=True):
+        if search_query:
+            with st.spinner("검색 중..."):
+                place_result = search_place(search_query, VWORLD_KEY)
+                if place_result:
+                    st.session_state.map_center = [place_result['lat'], place_result['lon']]
+                    st.session_state.map_zoom = 15
+                    st.session_state.render_center = [place_result['lat'], place_result['lon']]
+                    st.session_state.render_zoom = 15
+                    st.session_state.search_marker = place_result  # 마커 정보 저장
+                    st.success(f"✅ '{place_result['name']}'(으)로 이동했습니다.")
+                else:
+                    st.error("❌ 검색 결과를 찾을 수 없습니다.")
+
+    st.markdown("---")
+    
+    st.subheader("1️⃣ 구역계 범위 업로드")
     uploaded_file = st.file_uploader("구역계 파일(.dxf)을 올려주세요", type=["dxf"])
     is_new_file = False
     if uploaded_file and st.session_state.get('last_uploaded_file') != uploaded_file.name:
@@ -176,14 +197,25 @@ if base_map != st.session_state.last_base_map:
     st.session_state.render_center = st.session_state.map_center
     st.session_state.render_zoom = st.session_state.map_zoom
 
-# 지도 빌드 (JS 없이 안정적인 네이티브 구조)
+# 지도 빌드 — DXF 미업로드 + 검색 미사용 상태에서만 현위치 자동 찾기
+_locate_auto = (not uploaded_file) and (not st.session_state.get("search_marker"))
 vworld_map = create_map(
     center=st.session_state.render_center,
     gps_points=dxf_result["gps_points"],
     base_map=base_map if base_map else "일반지도",
-    zoom_start=st.session_state.render_zoom
+    zoom_start=st.session_state.render_zoom,
+    locate_on_start=_locate_auto
 )
 
+# 검색 마커가 있다면 지도에 표시 (아이콘 핀)
+if st.session_state.get("search_marker"):
+    marker_data = st.session_state.search_marker
+    folium.Marker(
+        location=[marker_data['lat'], marker_data['lon']],
+        popup=f"<b>{marker_data['name']}</b>",
+        tooltip=marker_data['name'],
+        icon=folium.Icon(color="blue", icon="info-sign")
+    ).add_to(vworld_map)
 # ⭐️ 해상도를 1200x750으로 못을 박고, 무한 렌더링(리로드 루프)을 일으키던 returned_objects 완전 무시 ⭐️
 st_folium(vworld_map, width=1200, height=750, key="vworld_map_main_fixed")
 
