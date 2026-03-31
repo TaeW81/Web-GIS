@@ -156,17 +156,26 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
     js_lines.append("if(!ol)ol=document.querySelector('.leaflet-control-layers-list');")
     js_lines.append("if(ol){")
     js_lines.append("var w=document.createElement('div');w.className='btn-accordion-wrap';")
+    # 1. 전체 열기 버튼
     js_lines.append("var ob=document.createElement('button');ob.textContent='\uc804\uccb4 \uc5f4\uae30';")
     js_lines.append("ob.onclick=function(e){e.preventDefault();e.stopPropagation();")
     js_lines.append("document.querySelectorAll('.accordion-layer-item').forEach(function(x){x.classList.add('open');});")
     js_lines.append("document.querySelectorAll('.leaflet-control-layers-group-name').forEach(function(x){")
     js_lines.append("x.textContent=x.textContent.replace('\u25b6','\u25bc');});};")
+    # 2. 전체 닫기 버튼
     js_lines.append("var cb=document.createElement('button');cb.textContent='\uc804\uccb4 \ub2eb\uae30';")
     js_lines.append("cb.onclick=function(e){e.preventDefault();e.stopPropagation();")
     js_lines.append("document.querySelectorAll('.accordion-layer-item').forEach(function(x){x.classList.remove('open');});")
     js_lines.append("document.querySelectorAll('.leaflet-control-layers-group-name').forEach(function(x){")
     js_lines.append("x.textContent=x.textContent.replace('\u25bc','\u25b6');});};")
-    js_lines.append("w.appendChild(ob);w.appendChild(cb);ol.appendChild(w);")
+    # 3. 전체 해제 버튼 (New!)
+    js_lines.append("var ub=document.createElement('button');ub.textContent='\uc804\uccb4 \ud574\uc81c';")
+    js_lines.append("ub.style.marginTop='5px';ub.style.width='90%';") # 버튼이 3개라 아래로 배치하거나 스타일 조정
+    js_lines.append("ub.onclick=function(e){e.preventDefault();e.stopPropagation();")
+    js_lines.append("document.querySelectorAll('.leaflet-control-layers-selector:checked').forEach(function(x){")
+    js_lines.append("if(x.type==='checkbox') x.click();});};")
+    
+    js_lines.append("w.appendChild(ob);w.appendChild(cb);w.appendChild(ub);ol.appendChild(w);")
     js_lines.append("}")
     # 마우스 휠 줌 전파 차단
     js_lines.append("var p=document.querySelector('.leaflet-control-layers');")
