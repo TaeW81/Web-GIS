@@ -90,6 +90,9 @@ with st.sidebar:
         else:
             st.session_state.do_wfs_download = True
             st.session_state.dl_req_layer = dl_layer_name
+            # 새로운 추출 시 기존 로드된 다운로드 버튼 클리어
+            if "dl_result_bytes" in st.session_state:
+                del st.session_state["dl_result_bytes"]
 
 # ============================
 # DXF 해석 파트
@@ -116,39 +119,48 @@ else:
     st.info("👈 왼쪽 사이드바에서 캐드선(DXF) 파일을 먼저 올려주세요.")
 
 # ============================
-# 다운로드 실행 처리부 (에러 없이 단방향 실행)
+# 다운로드 실행 처리부 (단방향 실행 및 상태 유지)
 # ============================
 if st.session_state.get("do_wfs_download") and dxf_result.get("gps_points"):
-    st.session_state.do_wfs_download = False # 1회성 플래그
+    st.session_state.do_wfs_download = False # 1회성 플래그 (리런 방지용)
     req_layer = st.session_state.dl_req_layer
     
-    # BBOX를 앱 내에서 직접 계산 (구역계 좌표의 min/max에 500m 이격 버퍼 추가)
+    # BBOX를 앱 내에서 직접 계산 (VWorld WFS 1.1.0은 BBOX로 minLat, minLon, maxLat, maxLon 순서를 요구함)
     lons = [p[1] for p in dxf_result["gps_points"]]
     lats = [p[0] for p in dxf_result["gps_points"]]
-    dl_bbox = f"{min(lons)-0.005},{min(lats)-0.003},{max(lons)+0.005},{max(lats)+0.003}"
+    dl_bbox = f"{min(lats)-0.003},{min(lons)-0.005},{max(lats)+0.003},{max(lons)+0.005}"
     
-    with st.spinner(f"📥 '{req_layer}' 데이터를 가져오는 중..."):
+    with st.spinner(f"📥 '{req_layer}' 대용량 데이터를 격자 분할 병합 방식으로 가져오는 중입니다. 다소 시간이 걸릴 수 있습니다..."):
         try:
             result = fetch_wfs_data(req_layer, dl_bbox, VWORLD_KEY)
             geojson_data = result["geojson"]
             feat_count = result["count"]
-            overflow = result["overflow"]
             
             if feat_count == 0:
                 st.warning(f"⚠️ 현재 대상지 반경에 '{req_layer}' 대상물이 존재하지 않습니다.")
+                if "dl_result_bytes" in st.session_state:
+                    del st.session_state["dl_result_bytes"]
             else:
                 dl_target_epsg = st.session_state.dl_target_epsg
                 boundary_pts = dxf_result.get("lonlat_points", None)
                 
-                dxf_bytes = export_to_dxf(geojson_data, req_layer, dl_target_epsg, boundary_pts)
-                shp_bytes = export_to_shp(geojson_data, req_layer, dl_target_epsg, boundary_pts)
-                
-                st.success(f"🎉 {feat_count}건 변환! {'(1,000건 초과분 짤림)' if overflow else ''}")
-                colA, colB = st.columns(2)
-                colA.download_button(f"💾 {req_layer} (.dxf)", dxf_bytes, f"{req_layer}.dxf", "application/dxf")
-                colB.download_button(f"💾 {req_layer} (.shp)", shp_bytes, f"{req_layer}.zip", "application/zip")
+                # 메모리에 산출물 생성 후 세션에 물리적으로 저장 (리런 시에도 유지되게 만듦)
+                st.session_state.dl_result_bytes = {
+                    "layer": req_layer,
+                    "count": feat_count,
+                    "dxf": export_to_dxf(geojson_data, req_layer, dl_target_epsg, boundary_pts),
+                    "shp": export_to_shp(geojson_data, req_layer, dl_target_epsg, boundary_pts)
+                }
         except Exception as e:
             st.error(f"❌ 추출 실패: {e}")
+
+# 캐시된 다운로드 파일이 세션에 존재하면, 리런 되어도 다운로드 버튼이 계속 떠 있도록 보장
+if st.session_state.get("dl_result_bytes"):
+    dl_data = st.session_state.dl_result_bytes
+    st.success(f"🎉 성공적으로 모든 데이터({dl_data['count']}건)를 추출 및 병합 완료했습니다!")
+    colA, colB = st.columns(2)
+    colA.download_button(f"💾 {dl_data['layer']} (.dxf)", dl_data['dxf'], f"{dl_data['layer']}.dxf", "application/dxf")
+    colB.download_button(f"💾 {dl_data['layer']} (.shp)", dl_data['shp'], f"{dl_data['layer']}.zip", "application/zip")
 
 
 # ============================

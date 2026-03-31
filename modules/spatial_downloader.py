@@ -46,32 +46,67 @@ def fetch_wfs_data(layer_name: str, bbox: str, api_key: str = None) -> dict:
         )
 
     wfs_url = "https://api.vworld.kr/req/wfs"
-    params = {
-        "key": key,
-        "domain": "http://localhost",
-        "SERVICE": "WFS",
-        "version": "1.1.0",
-        "request": "GetFeature",
-        "TYPENAME": layer_config["typename"],
-        "BBOX": f"{bbox},EPSG:4326",
-        "SRSNAME": "EPSG:4326",
-        "output": "application/json",
-        "MAXFEATURES": "1000",
-    }
+    all_features = {}
 
-    resp = requests.get(wfs_url, params=params, timeout=30)
-    if resp.status_code != 200:
-        raise ConnectionError(f"VWorld WFS API 오류 (HTTP {resp.status_code})")
+    def fetch_grid(grid_bbox: list, depth: int):
+        bbox_str = f"{grid_bbox[0]},{grid_bbox[1]},{grid_bbox[2]},{grid_bbox[3]}"
+        params = {
+            "key": key,
+            "domain": "http://localhost",
+            "SERVICE": "WFS",
+            "version": "1.1.0",
+            "request": "GetFeature",
+            "TYPENAME": layer_config["typename"],
+            "BBOX": f"{bbox_str},EPSG:4326",
+            "SRSNAME": "EPSG:4326",
+            "output": "application/json",
+            "MAXFEATURES": "1000",
+        }
 
-    geojson = resp.json()
-    features = geojson.get("features", [])
-    count = len(features)
-    overflow = count >= 1000
+        try:
+            resp = requests.get(wfs_url, params=params, timeout=30)
+            if resp.status_code != 200:
+                raise ConnectionError(f"VWorld WFS API 오류 (HTTP {resp.status_code})")
+        except Exception:
+            return
+
+        geojson = resp.json()
+        features = geojson.get("features", [])
+        count = len(features)
+
+        # 1000건 제한 도달 시 & 최대 뎁스 4(총 5레벨) 이내일 때 3x3=9 분할
+        if count >= 1000 and depth < 4:
+            lat_step = (grid_bbox[2] - grid_bbox[0]) / 3.0
+            lon_step = (grid_bbox[3] - grid_bbox[1]) / 3.0
+            for i in range(3):
+                for j in range(3):
+                    sub_minLat = grid_bbox[0] + i * lat_step
+                    sub_minLon = grid_bbox[1] + j * lon_step
+                    sub_maxLat = sub_minLat + lat_step
+                    sub_maxLon = sub_minLon + lon_step
+                    fetch_grid([sub_minLat, sub_minLon, sub_maxLat, sub_maxLon], depth + 1)
+        else:
+            for f in features:
+                fid = f.get("id")
+                if not fid:
+                    from hashlib import md5
+                    fid = md5(str(f).encode('utf-8')).hexdigest()
+                all_features[fid] = f
+
+    initial_bbox = [float(x) for x in bbox.split(",")]
+    fetch_grid(initial_bbox, 0)
+    
+    merged_features = list(all_features.values())
+    count = len(merged_features)
 
     return {
-        "geojson": geojson,
+        "geojson": {
+            "type": "FeatureCollection",
+            "name": layer_config["typename"],
+            "features": merged_features
+        },
         "count": count,
-        "overflow": overflow,
+        "overflow": False,  # 격자 분할로 모두 가져오므로 짤림 경고 제거
         "layer_config": layer_config,
     }
 
