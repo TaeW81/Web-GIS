@@ -96,10 +96,10 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
         border-radius: 3px !important;
     }
     .accordion-layer-item {
-        display: none;
+        display: none !important;
     }
     .accordion-layer-item.open {
-        display: block;
+        display: block !important;
     }
     .btn-accordion-wrap {
         text-align: center;
@@ -130,7 +130,11 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
     js_lines = []
     js_lines.append("var _at=setInterval(function(){")
     js_lines.append("var gs=document.querySelectorAll('.leaflet-control-layers-group');")
-    js_lines.append("if(gs.length===0)return;clearInterval(_at);")
+    js_lines.append("var chks=document.querySelectorAll('.leaflet-control-layers-selector');")
+    js_lines.append("if(gs.length===0 || chks.length<10) return;")
+    js_lines.append("clearInterval(_at);")
+    # 중복 실행 방지
+    js_lines.append("if(document.querySelector('.btn-accordion-wrap')) return;")
     # 아코디언
     js_lines.append("gs.forEach(function(g){")
     js_lines.append("var tl=g.querySelector('.leaflet-control-layers-group-label');")

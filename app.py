@@ -3,6 +3,7 @@
 메인 Streamlit 애플리케이션
 """
 import streamlit as st
+import streamlit.components.v1 as components
 from streamlit_folium import st_folium
 import folium
 import tempfile
@@ -216,8 +217,8 @@ if st.session_state.get("search_marker"):
         tooltip=marker_data['name'],
         icon=folium.Icon(color="blue", icon="info-sign")
     ).add_to(vworld_map)
-# ⭐️ 해상도를 1200x750으로 못을 박고, 무한 렌더링(리로드 루프)을 일으키던 returned_objects 완전 무시 ⭐️
-st_folium(vworld_map, width=1200, height=750, key="vworld_map_main_fixed")
+# ⭐️ 해상도를 1200x750으로 유지하며 아코디언 메뉴 등 커스텀 자바스크립트가 작동하도록 순수 HTML 렌더링 ⭐️
+components.html(vworld_map._repr_html_(), width=1200, height=750)
 
 if dxf_result['num_vertices'] > 0:
     st.success(f"✅ 구역계 {dxf_result['num_vertices']}개의 꼭짓점이 지도 위에 빨간선으로 매핑되었습니다.")
