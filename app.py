@@ -19,9 +19,9 @@ from modules.vworld_search import search_place
 from analyzers import get_all_analyzers
 
 # ============================
-st.set_page_config(page_title="현황분석 자동화 시스템", layout="wide")
-st.title("🗺️ Web-GIS 기반 현황분석 플랫폼")
-st.caption("캐드 구역계(DXF) 파일을 업로드하면, 자동으로 토지/건축물 분석 및 도면 다운로드를 실행합니다.")
+st.set_page_config(page_title="KH-GIS LandScan | 통합 현황분석 솔루션", layout="wide", page_icon="📡")
+st.title("📡 KH-GIS LandScan: Smart Analysis Platform")
+st.caption("건화(KH)의 공간정보 정밀 스캔 기술이 집약된 GIS 기반 토지·건축물 현황분석 자동화 솔루션")
 
 # ============================
 # 데이터 변수 및 상태 초기화
