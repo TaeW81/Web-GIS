@@ -125,58 +125,67 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
     m.get_root().header.add_child(folium.Element(custom_css))
 
     # 6. JS: 아코디언 + 전체 열기/닫기 버튼 + 마우스 휠 줌 전파 차단
-    #    root.script 에 삽입 → Leaflet <script> 블록 끝에 추가되어 DOM 준비 후 실행됨
-    #    <script> 태그 없이 순수 JS만 넣어야 한다
+    # JS를 folium 메인 <script> 블록 안에 삽입 (Leaflet 초기화 직후 실행됨)
     js_lines = []
     js_lines.append("var _at=setInterval(function(){")
     js_lines.append("var gs=document.querySelectorAll('.leaflet-control-layers-group');")
     js_lines.append("var chks=document.querySelectorAll('.leaflet-control-layers-selector');")
-    js_lines.append("if(gs.length===0 || chks.length<10) return;")
+    js_lines.append("if(gs.length===0 || chks.length<5) return;")
     js_lines.append("clearInterval(_at);")
-    # 중복 실행 방지
-    js_lines.append("if(document.querySelector('.btn-accordion-wrap')) return;")
-    # 아코디언
+    
+    # 아코디언 로직
     js_lines.append("gs.forEach(function(g){")
     js_lines.append("var tl=g.querySelector('.leaflet-control-layers-group-label');")
     js_lines.append("var ns=tl?tl.querySelector('.leaflet-control-layers-group-name'):null;")
     js_lines.append("if(!ns)return;")
+    js_lines.append("if(ns.textContent.indexOf('\u25b6')===-1 && ns.textContent.indexOf('\u25bc')===-1){")
     js_lines.append("ns.setAttribute('data-orig',ns.textContent);")
     js_lines.append("ns.textContent='\u25b6 '+ns.textContent;")
+    js_lines.append("}")
     js_lines.append("var cls=g.querySelectorAll('label:not(.leaflet-control-layers-group-label)');")
     js_lines.append("cls.forEach(function(c){c.classList.add('accordion-layer-item');});")
-    js_lines.append("tl.addEventListener('click',function(e){")
+    js_lines.append("tl.onclick=function(e){")
     js_lines.append("if(e.target.tagName==='INPUT')return;")
     js_lines.append("var op=cls[0]&&cls[0].classList.contains('open');")
     js_lines.append("cls.forEach(function(c){op?c.classList.remove('open'):c.classList.add('open');});")
     js_lines.append("ns.textContent=(op?'\u25b6 ':'\u25bc ')+ns.getAttribute('data-orig');")
+    js_lines.append("};")
     js_lines.append("});")
-    js_lines.append("});")
-    # 전체 열기/닫기
+    
+    # 버튼 생성 (기존 버튼이 있으면 제거 후 신규 생성)
     js_lines.append("var ol=document.querySelector('.leaflet-control-layers-overlays');")
     js_lines.append("if(!ol)ol=document.querySelector('.leaflet-control-layers-list');")
     js_lines.append("if(ol){")
+    # 기존에 혹시 있을지 모르는 버튼 베이스 제거 (확실한 업데이트 위해)
+    js_lines.append("var ex=document.querySelector('.btn-accordion-wrap'); if(ex) ex.remove();")
+    
     js_lines.append("var w=document.createElement('div');w.className='btn-accordion-wrap';")
-    # 1. 전체 열기 버튼
-    js_lines.append("var ob=document.createElement('button');ob.textContent='\uc804\uccb4 \uc5f4\uae30';")
+    # 레이아웃을 위해 버튼들에 동일한 스타일 부여
+    js_lines.append("var btnStyle='width:45%; margin:2px; padding:5px; font-size:11px; cursor:pointer;';")
+    
+    # 1. 전체 열기
+    js_lines.append("var ob=document.createElement('button');ob.textContent='\uc804\uccb4 \uc5f4\uae30'; ob.style=btnStyle;")
     js_lines.append("ob.onclick=function(e){e.preventDefault();e.stopPropagation();")
     js_lines.append("document.querySelectorAll('.accordion-layer-item').forEach(function(x){x.classList.add('open');});")
     js_lines.append("document.querySelectorAll('.leaflet-control-layers-group-name').forEach(function(x){")
-    js_lines.append("x.textContent=x.textContent.replace('\u25b6','\u25bc');});};")
-    # 2. 전체 닫기 버튼
-    js_lines.append("var cb=document.createElement('button');cb.textContent='\uc804\uccb4 \ub2eb\uae30';")
+    js_lines.append("x.textContent=(x.getAttribute('data-orig')?'\u25bc '+x.getAttribute('data-orig'):x.textContent);});};")
+    
+    # 2. 전체 닫기
+    js_lines.append("var cb=document.createElement('button');cb.textContent='\uc804\uccb4 \ub2eb\uae30'; cb.style=btnStyle;")
     js_lines.append("cb.onclick=function(e){e.preventDefault();e.stopPropagation();")
     js_lines.append("document.querySelectorAll('.accordion-layer-item').forEach(function(x){x.classList.remove('open');});")
     js_lines.append("document.querySelectorAll('.leaflet-control-layers-group-name').forEach(function(x){")
-    js_lines.append("x.textContent=x.textContent.replace('\u25bc','\u25b6');});};")
-    # 3. 전체 해제 버튼 (New!)
+    js_lines.append("x.textContent=(x.getAttribute('data-orig')?'\u25b6 '+x.getAttribute('data-orig'):x.textContent);});};")
+    
+    # 3. 전체 해제
     js_lines.append("var ub=document.createElement('button');ub.textContent='\uc804\uccb4 \ud574\uc81c';")
-    js_lines.append("ub.style.marginTop='5px';ub.style.width='90%';") # 버튼이 3개라 아래로 배치하거나 스타일 조정
+    js_lines.append("ub.style='width:93%; margin-top:5px; padding:6px; font-size:12px; font-weight:bold; background:#fff1f1; border:1px solid #ffcccc; color:#d32f2f; cursor:pointer;';")
     js_lines.append("ub.onclick=function(e){e.preventDefault();e.stopPropagation();")
-    js_lines.append("document.querySelectorAll('.leaflet-control-layers-selector:checked').forEach(function(x){")
-    js_lines.append("if(x.type==='checkbox') x.click();});};")
+    js_lines.append("document.querySelectorAll('.leaflet-control-layers-selector:checked').forEach(function(x){x.click();});};")
     
     js_lines.append("w.appendChild(ob);w.appendChild(cb);w.appendChild(ub);ol.appendChild(w);")
     js_lines.append("}")
+    
     # 마우스 휠 줌 전파 차단
     js_lines.append("var p=document.querySelector('.leaflet-control-layers');")
     js_lines.append("if(p){L.DomEvent.disableScrollPropagation(p);}")

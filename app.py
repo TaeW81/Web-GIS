@@ -39,6 +39,13 @@ dxf_result = {"center": st.session_state.map_center, "gps_points": [], "num_vert
 # 사이드바 (모든 조작 기능 통합)
 # ============================
 with st.sidebar:
+    # 📡 건화(KH) 공식 브랜딩 섹션
+    st.image("assets/kunhwa_logo.png", use_container_width=True)
+    st.markdown("#### 📡 KH-GIS LandScan")
+    st.markdown("<p style='font-size: 0.8rem; color: gray; margin-bottom: 20px;'>Smart Analysis Platform</p>", unsafe_allow_html=True)
+    
+    st.divider() # 시각적 구분선 추가
+    
     st.header("⚙️ 설정")
     
     st.subheader("🔍 지도 이동 (장소 검색)")
@@ -191,7 +198,7 @@ if st.session_state.get("dl_result_bytes"):
 st.subheader("📍 대상지 위치도")
 
 base_map_options = list(VWORLD_TILE_URLS.keys())
-base_map = st.radio("맵 레이아웃(배경)", options=base_map_options, horizontal=True)
+base_map = st.radio("맵 레이아웃(배경)", options=base_map_options, horizontal=True, label_visibility="collapsed")
 
 if base_map != st.session_state.last_base_map:
     st.session_state.last_base_map = base_map
