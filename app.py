@@ -205,7 +205,7 @@ if base_map != st.session_state.last_base_map:
     st.session_state.render_center = st.session_state.map_center
     st.session_state.render_zoom = st.session_state.map_zoom
 
-# 지도 빌드 — DXF 미업로드 + 검색 미사용 상태에서만 현위치 자동 찾기-
+# 지도 빌드 — DXF 미업로드 + 검색 미사용 상태에서만 현위치 자동 찾기
 _locate_auto = (not uploaded_file) and (not st.session_state.get("search_marker"))
 vworld_map = create_map(
     center=st.session_state.render_center,
