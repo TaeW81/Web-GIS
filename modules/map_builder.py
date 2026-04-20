@@ -1,14 +1,12 @@
 import folium
 from folium.plugins import GroupedLayerControl, LocateControl
-from config import VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_URL, VWORLD_WMS_CATEGORIES
+from config import VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_URL, VWORLD_WMS_CATEGORIES, VWORLD_LEGEND_URL
 
 
-def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locate_on_start=False):
+def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locate_on_start=False, visible_layers=None, legend_layer_name=None, force_center_id=1):
     """
     VWorld 배경지도 위에 구역계 및 여러 레이어를 표시하는 지도를 만듭니다.
-    - 아코디언(접기/펴기) 그룹 메뉴
-    - 전체 열기/닫기 버튼
-    - 메뉴 조작 시 마우스 휠 줌 전파 차단
+    - 사이드바 설정값에 동기화되어 필요한 WMS 항목만 렌더링
     - 사용자 현위치 자동 탐색(locate_on_start=True 일 때만)
     """
     # 1. 최하단 기본 베이스 지도
@@ -41,14 +39,15 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
         locateOptions={"enableHighAccuracy": True, "maxZoom": 16}
     ).add_to(m)
 
-    # 3. 브이월드 WMS 주제도 레이어를 그룹별로 묶어서 추가
-    grouped_overlays = {}
-
+    # 3. 브이월드 WMS 주제도 레이어 추가 (선택된 것만 보이도록 처리)
     for cat_name, layers in VWORLD_WMS_CATEGORIES.items():
-        grouped_overlays[cat_name] = []
         for layer_name, code in layers.items():
-            is_show = (layer_name == "연속지적도") or (layer_name == "지적도")
+            if visible_layers is not None:
+                is_show = layer_name in visible_layers
+            else:
+                is_show = (layer_name == "연속지적도") or (layer_name == "지적도")
 
+            # 선택되지 않은 레이어도 맵 DOM에는 존재하지만 show=False로 감춰둡니다.
             wms_layer = folium.WmsTileLayer(
                 url=f"{VWORLD_WMS_URL}?key={VWORLD_KEY}&domain=http://localhost",
                 layers=code.lower(),
@@ -58,143 +57,66 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
                 name=f"{layer_name}",
                 show=is_show,
                 overlay=True,
-                control=False
+                control=False # Streamlit 사이드바에서 제어하므로 맵 자체 컨트롤러에는 숨김
             )
             wms_layer.add_to(m)
-            grouped_overlays[cat_name].append(wms_layer)
 
-    # 4. 지도 우측 상단에 폴더형(Grouped) 레이어 컨트롤러 렌더링
-    GroupedLayerControl(
-        groups=grouped_overlays,
-        exclusive_groups=False,
-        collapsed=False,
-        position='topright'
-    ).add_to(m)
-
-    # 5. CSS: 스크롤, 아코디언 스타일, 버튼 스타일
-    custom_css = """
-    <style>
-    .leaflet-control-layers-expanded {
-        max-height: 680px !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        min-width: 220px !important;
-    }
-    .leaflet-control-layers-group-label {
-        cursor: pointer !important;
-        user-select: none;
-    }
-    .leaflet-control-layers-group-name {
-        font-weight: bold !important;
-        font-size: 13px !important;
-        color: #1e293b !important;
-        padding: 4px 2px !important;
-        display: inline-block !important;
-    }
-    .leaflet-control-layers-group-label:hover .leaflet-control-layers-group-name {
-        background-color: #e2e8f0 !important;
-        border-radius: 3px !important;
-    }
-    .accordion-layer-item {
-        display: none !important;
-    }
-    .accordion-layer-item.open {
-        display: block !important;
-    }
-    .btn-accordion-wrap {
-        text-align: center;
-        padding: 8px 4px 4px 4px;
-        border-top: 1px solid #e2e8f0;
-        margin-top: 8px;
-    }
-    .btn-accordion-wrap button {
-        padding: 4px 14px;
-        margin: 0 3px;
-        cursor: pointer;
-        background: #f8fafc;
-        border: 1px solid #cbd5e1;
-        border-radius: 4px;
-        font-size: 12px;
-        color: #334155;
-    }
-    .btn-accordion-wrap button:hover {
-        background: #e2e8f0;
-    }
-    </style>
-    """
-    m.get_root().header.add_child(folium.Element(custom_css))
-
-    # 6. JS: 아코디언 + 전체 열기/닫기 버튼 + 마우스 휠 줌 전파 차단
-    # JS를 folium 메인 <script> 블록 안에 삽입 (Leaflet 초기화 직후 실행됨)
-    js_lines = []
-    js_lines.append("var _at=setInterval(function(){")
-    js_lines.append("var gs=document.querySelectorAll('.leaflet-control-layers-group');")
-    js_lines.append("var chks=document.querySelectorAll('.leaflet-control-layers-selector');")
-    js_lines.append("if(gs.length===0 || chks.length<5) return;")
-    js_lines.append("clearInterval(_at);")
-    
-    # 아코디언 로직
-    js_lines.append("gs.forEach(function(g){")
-    js_lines.append("var tl=g.querySelector('.leaflet-control-layers-group-label');")
-    js_lines.append("var ns=tl?tl.querySelector('.leaflet-control-layers-group-name'):null;")
-    js_lines.append("if(!ns)return;")
-    js_lines.append("if(ns.textContent.indexOf('\u25b6')===-1 && ns.textContent.indexOf('\u25bc')===-1){")
-    js_lines.append("ns.setAttribute('data-orig',ns.textContent);")
-    js_lines.append("ns.textContent='\u25b6 '+ns.textContent;")
-    js_lines.append("}")
-    js_lines.append("var cls=g.querySelectorAll('label:not(.leaflet-control-layers-group-label)');")
-    js_lines.append("cls.forEach(function(c){c.classList.add('accordion-layer-item');});")
-    js_lines.append("tl.onclick=function(e){")
-    js_lines.append("if(e.target.tagName==='INPUT')return;")
-    js_lines.append("var op=cls[0]&&cls[0].classList.contains('open');")
-    js_lines.append("cls.forEach(function(c){op?c.classList.remove('open'):c.classList.add('open');});")
-    js_lines.append("ns.textContent=(op?'\u25b6 ':'\u25bc ')+ns.getAttribute('data-orig');")
-    js_lines.append("};")
-    js_lines.append("});")
-    
-    # 버튼 생성 (기존 버튼이 있으면 제거 후 신규 생성)
-    js_lines.append("var ol=document.querySelector('.leaflet-control-layers-overlays');")
-    js_lines.append("if(!ol)ol=document.querySelector('.leaflet-control-layers-list');")
-    js_lines.append("if(ol){")
-    # 기존에 혹시 있을지 모르는 버튼 베이스 제거 (확실한 업데이트 위해)
-    js_lines.append("var ex=document.querySelector('.btn-accordion-wrap'); if(ex) ex.remove();")
-    
-    js_lines.append("var w=document.createElement('div');w.className='btn-accordion-wrap';")
-    # 레이아웃을 위해 버튼들에 동일한 스타일 부여
-    js_lines.append("var btnStyle='width:45%; margin:2px; padding:5px; font-size:11px; cursor:pointer;';")
-    
-    # 1. 전체 열기
-    js_lines.append("var ob=document.createElement('button');ob.textContent='\uc804\uccb4 \uc5f4\uae30'; ob.style=btnStyle;")
-    js_lines.append("ob.onclick=function(e){e.preventDefault();e.stopPropagation();")
-    js_lines.append("document.querySelectorAll('.accordion-layer-item').forEach(function(x){x.classList.add('open');});")
-    js_lines.append("document.querySelectorAll('.leaflet-control-layers-group-name').forEach(function(x){")
-    js_lines.append("x.textContent=(x.getAttribute('data-orig')?'\u25bc '+x.getAttribute('data-orig'):x.textContent);});};")
-    
-    # 2. 전체 닫기
-    js_lines.append("var cb=document.createElement('button');cb.textContent='\uc804\uccb4 \ub2eb\uae30'; cb.style=btnStyle;")
-    js_lines.append("cb.onclick=function(e){e.preventDefault();e.stopPropagation();")
-    js_lines.append("document.querySelectorAll('.accordion-layer-item').forEach(function(x){x.classList.remove('open');});")
-    js_lines.append("document.querySelectorAll('.leaflet-control-layers-group-name').forEach(function(x){")
-    js_lines.append("x.textContent=(x.getAttribute('data-orig')?'\u25b6 '+x.getAttribute('data-orig'):x.textContent);});};")
-    
-    # 3. 전체 해제
-    js_lines.append("var ub=document.createElement('button');ub.textContent='\uc804\uccb4 \ud574\uc81c';")
-    js_lines.append("ub.style='width:93%; margin-top:5px; padding:6px; font-size:12px; font-weight:bold; background:#fff1f1; border:1px solid #ffcccc; color:#d32f2f; cursor:pointer;';")
-    js_lines.append("ub.onclick=function(e){e.preventDefault();e.stopPropagation();")
-    js_lines.append("document.querySelectorAll('.leaflet-control-layers-selector:checked').forEach(function(x){x.click();});};")
-    
-    js_lines.append("w.appendChild(ob);w.appendChild(cb);w.appendChild(ub);ol.appendChild(w);")
-    js_lines.append("}")
-    
-    # 마우스 휠 줌 전파 차단
-    js_lines.append("var p=document.querySelector('.leaflet-control-layers');")
-    js_lines.append("if(p){L.DomEvent.disableScrollPropagation(p);}")
-    js_lines.append("},150);")
-
-    accordion_js_code = "\n".join(js_lines)
-    m.get_root().script.add_child(folium.Element(accordion_js_code))
+    # 마지막으로 선택한 레이어가 있다면 우측 하단에 범례 플로팅 UI 추가
+    if legend_layer_name:
+        legend_code = None
+        for cat_name, layers in VWORLD_WMS_CATEGORIES.items():
+            if legend_layer_name in layers:
+                legend_code = layers[legend_layer_name]
+                break
+                
+        if legend_code:
+            legend_url = VWORLD_LEGEND_URL.format(key=VWORLD_KEY, layer=legend_code.lower())
+            legend_html = f"""
+            <div style="position: absolute; bottom: 30px; right: 10px; z-index: 9999; background: rgba(255, 255, 255, 0.95); padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); max-height: 400px; overflow-y: auto;">
+                <p style="margin: 0 0 8px 0; font-weight: bold; font-size: 13px; text-align: center; color: #333;">{legend_layer_name} 범례</p>
+                <img src="{legend_url}" alt="범례 이미지" style="max-width: 250px;">
+            </div>
+            """
+            m.get_root().html.add_child(folium.Element(legend_html))
 
     # 기본 베이스맵(배경)용 컨트롤러
     folium.LayerControl(position='bottomright', collapsed=True).add_to(m)
+
+    # ⭐️ 브라우저 localStorage를 활용한 완벽한 상태유지 스크립트 ⭐️
+    sync_js = f"""
+    <script>
+    window.addEventListener('load', function() {{
+        setTimeout(function() {{
+            var mapId = Object.keys(window).find(key => key.startsWith('map_') && window[key] instanceof L.Map);
+            if(mapId) {{
+                var map = window[mapId];
+                var move_id = "{force_center_id}";
+                var last_move_id = localStorage.getItem('khgis_move_id');
+                
+                if (move_id !== last_move_id) {{
+                    // 파이썬 측에서 새 위치(검색, 파일업로드)로 갱신 명령을 내림
+                    localStorage.setItem('khgis_move_id', move_id);
+                    localStorage.removeItem('khgis_center');
+                    localStorage.removeItem('khgis_zoom');
+                }} else {{
+                    // 사용자의 이전 위치 복원 (단순 레이어 변경 등으로 iframe 리로드 시)
+                    var sc = localStorage.getItem('khgis_center');
+                    var sz = localStorage.getItem('khgis_zoom');
+                    if (sc && sz) {{
+                        map.setView(JSON.parse(sc), parseInt(sz), {{animate: false}});
+                    }}
+                }}
+
+                // 지도가 움직일 때마다 백그라운드 저장
+                map.on('moveend', function() {{
+                    localStorage.setItem('khgis_center', JSON.stringify(map.getCenter()));
+                    localStorage.setItem('khgis_zoom', map.getZoom());
+                }});
+            }}
+        }}, 50); // 안전하게 L.Map 인스턴스가 윈도우에 바인딩 될 시간 확보
+    }});
+    </script>
+    """
+    m.get_root().html.add_child(folium.Element(sync_js))
 
     return m

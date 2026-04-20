@@ -395,7 +395,24 @@ def export_to_shp(
         bytes: ZIP 파일 바이너리 (shp, shx, dbf, prj 포함)
     """
     layer_config = VWORLD_WFS_LAYERS.get(layer_name, {})
-    fields_map = layer_config.get("fields", {})
+    fields_map = layer_config.get("fields", {}).copy()
+
+    features = geojson_data.get("features", [])
+    # 동적 매핑 등 필드가 부족한 경우 첫 번째 피처의 속성으로 자동 구성 (Shapefile 필드명 10자 제한 고려)
+    if features and len(fields_map) <= 1:
+        props = features[0].get("properties", {})
+        if props:
+            fields_map = {}
+            for k in props.keys():
+                safe_name = str(k).strip()[:10]
+                if not safe_name: safe_name = "FIELD"
+                # 중복 필드명 방지
+                base_name = safe_name
+                idx = 1
+                while safe_name in fields_map.values():
+                    safe_name = f"{base_name[:8]}{idx}"
+                    idx += 1
+                fields_map[k] = safe_name
 
     # 좌표 변환
     transformed = _transform_geojson_coords(geojson_data, target_epsg)

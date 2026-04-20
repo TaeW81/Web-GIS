@@ -72,7 +72,7 @@ VWORLD_TILE_URLS = {
 
 # ===== VWorld WMS 오버레이 레이어 카테고리 및 범례 URL 설정 =====
 VWORLD_WMS_URL = "http://api.vworld.kr/req/wms"
-VWORLD_LEGEND_URL = "http://api.vworld.kr/req/image?key={key}&service=image&request=GetLegendGraphic&format=png&type=ALL&layer={layer}&style={layer}"
+VWORLD_LEGEND_URL = "http://api.vworld.kr/req/image?key={key}&service=image&request=GetLegendGraphic&format=png&type=ALL&layer={layer}&style={layer}&LEGEND_OPTIONS=forceTitle:off"
 
 VWORLD_WMS_CATEGORIES = {
     "기본 및 지적": {
@@ -303,3 +303,21 @@ VWORLD_WFS_LAYERS = {
         },
     },
 }
+
+# --- 동적 WFS 레이어 매핑 ---
+# VWORLD_WFS_LAYERS에 하드코딩되지 않은 WMS 항목들도 일괄 추출 대상이 되도록 자동 추가합니다.
+for cat_name, layers in VWORLD_WMS_CATEGORIES.items():
+    for layer_name, code in layers.items():
+        if layer_name not in VWORLD_WFS_LAYERS:
+            # 쉼표로 여러 코드가 연결된 경우 첫 번째 코드 사용
+            primary_code = code.split(',')[0].strip()
+            VWORLD_WFS_LAYERS[layer_name] = {
+                "typename": primary_code.lower(),
+                "fields": {"gid": "GID"}, # 기본 범용 필드
+                "geometry_type": "Unknown",
+                "label_field": "",
+                "dxf_layers": {
+                    "boundary": f"{primary_code.upper()}_LINE",
+                    "text": f"{primary_code.upper()}_TEXT",
+                },
+            }

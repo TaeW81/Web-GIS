@@ -29,7 +29,8 @@ st.caption("건화(KH)의 공간정보 정밀 스캔 기술이 집약된 GIS 기
 DEFAULT_CENTER = [37.39293, 126.97286]  # 성지스타위드
 for k, v in [('map_center', DEFAULT_CENTER), ('map_zoom', 16), ('last_uploaded_file', None), 
              ('last_crs_origin', "중부"), ('last_crs_cat', "GRS80(현행)"), ('last_epsg', ""),
-             ('render_center', DEFAULT_CENTER), ('render_zoom', 16), ('last_base_map', "일반지도")]:
+             ('map_force_center_id', 1), ('last_base_map', "일반지도"),
+             ('map_layers', ["지적도", "연속지적도"])]: # 기본 렌더링 레이어
     if k not in st.session_state:
         st.session_state[k] = v
 
@@ -40,17 +41,23 @@ dxf_result = {"center": st.session_state.map_center, "gps_points": [], "num_vert
 # ============================
 with st.sidebar:
     # 📡 건화(KH) 공식 브랜딩 섹션
-    st.image("assets/kunhwa_logo.png", use_container_width=True)
-    st.markdown("#### 📡 KH-GIS LandScan")
-    st.markdown("<p style='font-size: 0.8rem; color: gray; margin-bottom: 20px;'>Smart Analysis Platform</p>", unsafe_allow_html=True)
-    
-    st.divider() # 시각적 구분선 추가
-    
-    st.header("⚙️ 설정")
-    
-    st.subheader("🔍 지도 이동 (장소 검색)")
+    logo_col, text_col = st.columns([1, 3.5], gap="small")
+    with logo_col:
+        st.image("assets/kunhwa_logo.png", use_container_width=True)
+    with text_col:
+        st.markdown(
+            "<div style='margin-top: 5px; line-height: 1.3;'>"
+            "<strong style='font-size: 1.1rem; color: #1e293b;'>📡 KH-GIS LandScan</strong><br>"
+            "<span style='font-size: 0.8rem; color: gray;'>Smart Analysis Platform</span>"
+            "</div>", 
+            unsafe_allow_html=True
+        )
+    # ----------------------------------------
+    # * 지도 이동 (장소 검색)
+    # ----------------------------------------
+    # 지도 이동은 공간 절약을 위해 상단에 바로 배치
     col1, col2 = st.columns([3, 1])
-    search_query = col1.text_input("검색어 입력", label_visibility="collapsed", placeholder="예: 평촌역")
+    search_query = col1.text_input("검색어 입력", label_visibility="collapsed", placeholder="장소검색 (예: 평촌역)")
     if col2.button("이동", use_container_width=True):
         if search_query:
             with st.spinner("검색 중..."):
@@ -58,23 +65,23 @@ with st.sidebar:
                 if place_result:
                     st.session_state.map_center = [place_result['lat'], place_result['lon']]
                     st.session_state.map_zoom = 15
-                    st.session_state.render_center = [place_result['lat'], place_result['lon']]
-                    st.session_state.render_zoom = 15
-                    st.session_state.search_marker = place_result  # 마커 정보 저장
+                    st.session_state.map_force_center_id += 1
+                    st.session_state.search_marker = place_result
                     st.success(f"✅ '{place_result['name']}'(으)로 이동했습니다.")
                 else:
                     st.error("❌ 검색 결과를 찾을 수 없습니다.")
 
-    st.markdown("---")
-    
-    st.subheader("1️⃣ 구역계 범위 업로드")
-    uploaded_file = st.file_uploader("구역계 파일(.dxf)을 올려주세요", type=["dxf"])
+    # ----------------------------------------
+    # 1. 구역계 범위 업로드
+    # ----------------------------------------
+    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 10px 0 5px 0;'>1. 구역계 범위 업로드</p>", unsafe_allow_html=True)
+    uploaded_file = st.file_uploader("구역계 파일(.dxf)", type=["dxf"], label_visibility="collapsed")
     is_new_file = False
     if uploaded_file and st.session_state.get('last_uploaded_file') != uploaded_file.name:
         is_new_file = True
         st.session_state.last_uploaded_file = uploaded_file.name
     
-    st.subheader("🌐 도면 좌표계")
+    st.markdown("<p style='font-size:13px; font-weight:bold; margin: 0;'>도면 좌표계</p>", unsafe_allow_html=True)
     crs_cat = st.radio("분류", options=list(KOREA_CRS.keys()), horizontal=True, label_visibility="collapsed")
     crs_origin = st.radio("원점", options=list(KOREA_CRS[crs_cat].keys()), horizontal=True)
     selected_epsg = st.text_input("EPSG 코드 (직접 입력 가능)", value=KOREA_CRS[crs_cat][crs_origin])
@@ -90,38 +97,85 @@ with st.sidebar:
         if not uploaded_file and crs_origin in KOREA_CRS_ORIGINS:
             lon, lat = KOREA_CRS_ORIGINS[crs_origin]
             st.session_state.map_center = [lat, lon]
-            st.session_state.render_center = [lat, lon]
             st.session_state.map_zoom = 10 
-            st.session_state.render_zoom = 10
+            st.session_state.map_force_center_id += 1
             dxf_result["center"] = [lat, lon]
 
-    st.subheader("📊 현황 조서 분석 항목")
-    all_analyzers = get_all_analyzers()
-    selected_analyzers = [a for a in all_analyzers if st.checkbox(a.name, value=True, help=a.description)]
-
-    st.markdown("---")
-    st.subheader("📥 배경 공간정보(SHP/DXF) 추출")
+    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>2. 지도 및 기초데이터 설정</p>", unsafe_allow_html=True)
     
     dl_crs_options = {
         "GRS80 중부 (EPSG:5186)": "EPSG:5186", "GRS80 서부 (EPSG:5185)": "EPSG:5185",
         "GRS80 동부 (EPSG:5187)": "EPSG:5187", "GRS80 동해 (EPSG:5188)": "EPSG:5188",
-        "UTMK (EPSG:5179)": "EPSG:5179", "Bessel 중부 (EPSG:5174)": "EPSG:5174", "WGS84 (EPSG:4326)": "EPSG:4326",
+        "UTMK (EPSG:5179)": "EPSG:5179", 
+        "Bessel 서부 (EPSG:5173)": "EPSG:5173", "Bessel 중부 (EPSG:5174)": "EPSG:5174",
+        "Bessel 동부 (EPSG:5176)": "EPSG:5176", "Bessel 동해 (EPSG:5177)": "EPSG:5177",
+        "Bessel 제주 (EPSG:5175)": "EPSG:5175", "WGS84 (EPSG:4326)": "EPSG:4326",
     }
-    dl_crs_label = st.selectbox("다운로드 좌표계", options=list(dl_crs_options.keys()), index=0)
+    dl_crs_label = st.selectbox("다운로드 좌표계", options=list(dl_crs_options.keys()), index=0, label_visibility="collapsed")
     st.session_state.dl_target_epsg = dl_crs_options[dl_crs_label]
     
-    dl_layer_name = st.selectbox("추출 대상 레이어 (WFS)", options=list(VWORLD_WFS_LAYERS.keys()), index=0)
+    layer_title_col, layer_btn_col = st.columns([3, 1])
+    with layer_title_col:
+        st.markdown("<p style='font-size:13px; font-weight:bold; margin: 0; padding-top: 5px;'>지도 레이어 설정 <span style='font-weight:normal; font-size:11px;'>(체크시 지도 직접 반영)</span></p>", unsafe_allow_html=True)
+    with layer_btn_col:
+        if st.button("초기화", use_container_width=True):
+            for layers in VWORLD_WMS_CATEGORIES.values():
+                for layer_name in layers.keys():
+                    st.session_state[f"chk_{layer_name}"] = False
+    selected_dl_layers = []
+    for cat_name, layers in VWORLD_WMS_CATEGORIES.items():
+        with st.expander(cat_name):
+            for layer_name in layers.keys():
+                check_key = f"chk_{layer_name}"
+                is_default = (layer_name == "연속지적도" or layer_name == "지적도")
+                if check_key not in st.session_state:
+                    st.session_state[check_key] = is_default
+                if st.checkbox(layer_name, key=check_key):
+                    selected_dl_layers.append(layer_name)
+                    
+    # 마지막 클릭한 레이어 추적 방어 로직
+    old_layers = st.session_state.get('map_layers', [])
+    newly_checked = [x for x in selected_dl_layers if x not in old_layers]
+    if newly_checked:
+        st.session_state.last_checked_layer = newly_checked[-1]
+    elif st.session_state.get('last_checked_layer') not in selected_dl_layers:
+        st.session_state.last_checked_layer = selected_dl_layers[-1] if selected_dl_layers else None
+        
+    st.session_state.map_layers = selected_dl_layers
+    submit_layer_btn = st.button("🚀 위 데이터 일괄 추출하기", type="primary", use_container_width=True)
 
-    # 버튼 하나로 일괄 처리 (JS 개입 X)
-    if st.button("🚀 선택 구역 도면 추출하기", type="primary", use_container_width=True):
+    if submit_layer_btn:
         if not uploaded_file:
-            st.warning("⚠️ 왼쪽 위에서 DXF 구역계를 먼저 업로드해야 해당 위치를 추출할 수 있습니다.")
+            st.warning("⚠️ 구역계(DXF) 파일이 없어 추출할 수 없습니다. 상단에서 구역계를 업로드해주세요.")
         else:
             st.session_state.do_wfs_download = True
-            st.session_state.dl_req_layer = dl_layer_name
-            # 새로운 추출 시 기존 로드된 다운로드 버튼 클리어
-            if "dl_result_bytes" in st.session_state:
-                del st.session_state["dl_result_bytes"]
+            if "dl_result_bytes_list" in st.session_state:
+                del st.session_state["dl_result_bytes_list"]
+
+    # ----------------------------------------
+    # 3. 수치지도추출(추후개발)
+    # ----------------------------------------
+    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>3. 수치지도추출 <span style='font-size:12px; color:gray;'>(추후개발)</span></p>", unsafe_allow_html=True)
+    
+    # ----------------------------------------
+    # 4. 현황 조서 분석 항목(추후개발)
+    # ----------------------------------------
+    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>4. 현황 조서 분석 항목 <span style='font-size:12px; color:gray;'>(추후개발)</span></p>", unsafe_allow_html=True)
+    # 기존에 있던 analyzer 로직은 현재 개발 진행중인 것으로 편입
+    all_analyzers = get_all_analyzers()
+    selected_analyzers = [a for a in all_analyzers if st.checkbox(a.name, value=True, help=a.description)]
+    
+    # 추후 개발 시각적 표시
+    st.checkbox("토지대장 추출 (예정)", disabled=True, value=False)
+    st.checkbox("토지조서 작성 (excel조서) (예정)", disabled=True, value=False)
+    st.checkbox("산지전용 조서 작성 (excel조서) (예정)", disabled=True, value=False)
+    st.checkbox("농지전용 조서 작성 (excel조서) (예정)", disabled=True, value=False)
+
+    # ----------------------------------------
+    # 5. 대상지 현황 분석_보고서(추후개발)
+    # ----------------------------------------
+    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>5. 대상지 현황 분석 보고서 <span style='font-size:12px; color:gray;'>(추후개발)</span></p>", unsafe_allow_html=True)
+    st.checkbox("위치도 작성 (예정)", disabled=True, value=False)
 
 # ============================
 # DXF 해석 파트
@@ -139,8 +193,7 @@ if uploaded_file:
             if is_new_file or crs_changed:
                 st.session_state.map_center = dxf_result["center"]
                 st.session_state.map_zoom = 16
-                st.session_state.render_center = dxf_result["center"]
-                st.session_state.render_zoom = 16
+                st.session_state.map_force_center_id += 1
         except Exception as e:
             st.error(f"❌ DXF 파일 오류: {e}")
             st.stop()
@@ -152,44 +205,78 @@ else:
 # ============================
 if st.session_state.get("do_wfs_download") and dxf_result.get("gps_points"):
     st.session_state.do_wfs_download = False # 1회성 플래그 (리런 방지용)
-    req_layer = st.session_state.dl_req_layer
+    req_layers = st.session_state.map_layers
     
     # BBOX를 앱 내에서 직접 계산 (VWorld WFS 1.1.0은 BBOX로 minLat, minLon, maxLat, maxLon 순서를 요구함)
     lons = [p[1] for p in dxf_result["gps_points"]]
     lats = [p[0] for p in dxf_result["gps_points"]]
     dl_bbox = f"{min(lats)-0.003},{min(lons)-0.005},{max(lats)+0.003},{max(lons)+0.005}"
     
-    with st.spinner(f"📥 '{req_layer}' 대용량 데이터를 격자 분할 병합 방식으로 가져오는 중입니다. 다소 시간이 걸릴 수 있습니다..."):
+    with st.spinner(f"📥 선택된 {len(req_layers)}개 레이어의 공간 데이터를 추출하는 중입니다..."):
+        dl_result_bytes_list = []
+        total_count = 0
         try:
-            result = fetch_wfs_data(req_layer, dl_bbox, VWORLD_KEY)
-            geojson_data = result["geojson"]
-            feat_count = result["count"]
+            for req_layer in req_layers:
+                try:
+                    result = fetch_wfs_data(req_layer, dl_bbox, VWORLD_KEY)
+                    if not result: continue
+                    geojson_data = result["geojson"]
+                    feat_count = result["count"]
+                    
+                    if feat_count > 0:
+                        total_count += feat_count
+                        dl_target_epsg = st.session_state.dl_target_epsg
+                        boundary_pts = dxf_result.get("lonlat_points", None)
+                        
+                        dl_result_bytes_list.append({
+                            "layer": req_layer,
+                            "count": feat_count,
+                            "dxf": export_to_dxf(geojson_data, req_layer, dl_target_epsg, boundary_pts),
+                            "shp": export_to_shp(geojson_data, req_layer, dl_target_epsg, boundary_pts)
+                        })
+                except Exception as ex:
+                    # 개별 레이어 에러 시 패스 (VWorld 측에서 해당 레이어 WFS 미제공 등)
+                    pass
             
-            if feat_count == 0:
-                st.warning(f"⚠️ 현재 대상지 반경에 '{req_layer}' 대상물이 존재하지 않습니다.")
-                if "dl_result_bytes" in st.session_state:
-                    del st.session_state["dl_result_bytes"]
+            if total_count == 0:
+                st.warning(f"⚠️ 현재 대상지 반경에 추출할 대상물이 존재하지 않습니다.")
+                if "dl_result_bytes_list" in st.session_state:
+                    del st.session_state["dl_result_bytes_list"]
             else:
-                dl_target_epsg = st.session_state.dl_target_epsg
-                boundary_pts = dxf_result.get("lonlat_points", None)
-                
-                # 메모리에 산출물 생성 후 세션에 물리적으로 저장 (리런 시에도 유지되게 만듦)
-                st.session_state.dl_result_bytes = {
-                    "layer": req_layer,
-                    "count": feat_count,
-                    "dxf": export_to_dxf(geojson_data, req_layer, dl_target_epsg, boundary_pts),
-                    "shp": export_to_shp(geojson_data, req_layer, dl_target_epsg, boundary_pts)
-                }
+                st.session_state.dl_result_bytes_list = dl_result_bytes_list
+                st.session_state.dl_total_count = total_count
         except Exception as e:
-            st.error(f"❌ 추출 실패: {e}")
+            st.error(f"❌ 전체 추출 실패: {e}")
 
-# 캐시된 다운로드 파일이 세션에 존재하면, 리런 되어도 다운로드 버튼이 계속 떠 있도록 보장
-if st.session_state.get("dl_result_bytes"):
-    dl_data = st.session_state.dl_result_bytes
-    st.success(f"🎉 성공적으로 모든 데이터({dl_data['count']}건)를 추출 및 병합 완료했습니다!")
+# 캐시된 다운로드 파일이 세션에 존재하면 일괄 다운로드 압축 파일 생성
+if st.session_state.get("dl_result_bytes_list"):
+    dl_list = st.session_state.dl_result_bytes_list
+    st.success(f"🎉 성공적으로 선택된 도면 데이터(총 {st.session_state.get('dl_total_count', 0)}건)를 추출 병합 완료했습니다!")
+    
+    import zipfile
+    import io
+
+    # DXF 묶음 생성
+    dxf_zip_buf = io.BytesIO()
+    with zipfile.ZipFile(dxf_zip_buf, "w", zipfile.ZIP_DEFLATED) as master_zf:
+        for item in dl_list:
+            safe_layer = str(item['layer']).replace('/', '_').replace('\\', '')
+            master_zf.writestr(f"{safe_layer}.dxf", item['dxf'])
+            
+    # 종합 통합 패키지 (DXF + SHP 폴더 구조)
+    master_zip_buf = io.BytesIO()
+    with zipfile.ZipFile(master_zip_buf, "w", zipfile.ZIP_DEFLATED) as master_zf:
+        for item in dl_list:
+            safe_layer = str(item['layer']).replace('/', '_').replace('\\', '')
+            master_zf.writestr(f"DXF/{safe_layer}.dxf", item['dxf'])
+            # SHP 압축해제 후 재압축
+            with zipfile.ZipFile(io.BytesIO(item['shp']), "r") as shp_zf:
+                for shp_filename in shp_zf.namelist():
+                    master_zf.writestr(f"SHP/{shp_filename}", shp_zf.read(shp_filename))
+                    
     colA, colB = st.columns(2)
-    colA.download_button(f"💾 {dl_data['layer']} (.dxf)", dl_data['dxf'], f"{dl_data['layer']}.dxf", "application/dxf")
-    colB.download_button(f"💾 {dl_data['layer']} (.shp)", dl_data['shp'], f"{dl_data['layer']}.zip", "application/zip")
+    colA.download_button(f"💾 전체 도면 일괄 다운로드 (.dxf 압축)", dxf_zip_buf.getvalue(), f"도면추출_DXF.zip", "application/zip", use_container_width=True)
+    colB.download_button(f"💾 전체 공간정보 풀패키지 (DXF+SHP 통합압축)", master_zip_buf.getvalue(), f"도면추출_통합팩.zip", "application/zip", type="primary", use_container_width=True)
 
 
 # ============================
@@ -202,17 +289,18 @@ base_map = st.radio("맵 레이아웃(배경)", options=base_map_options, horizo
 
 if base_map != st.session_state.last_base_map:
     st.session_state.last_base_map = base_map
-    st.session_state.render_center = st.session_state.map_center
-    st.session_state.render_zoom = st.session_state.map_zoom
 
-# 지도 빌드 — DXF 미업로드 + 검색 미사용 상태에서만 현위치 자동 찾기
+# 지도 빌드 — 앱에서 관리하는 선택된 렌더링 레이어 배열 전달
 _locate_auto = (not uploaded_file) and (not st.session_state.get("search_marker"))
 vworld_map = create_map(
-    center=st.session_state.render_center,
+    center=st.session_state.map_center,
     gps_points=dxf_result["gps_points"],
     base_map=base_map if base_map else "일반지도",
-    zoom_start=st.session_state.render_zoom,
-    locate_on_start=_locate_auto
+    zoom_start=st.session_state.map_zoom,
+    locate_on_start=_locate_auto,
+    visible_layers=st.session_state.map_layers,
+    legend_layer_name=st.session_state.get("last_checked_layer"),
+    force_center_id=st.session_state.map_force_center_id
 )
 
 # 검색 마커가 있다면 지도에 표시 (아이콘 핀)
@@ -224,7 +312,7 @@ if st.session_state.get("search_marker"):
         tooltip=marker_data['name'],
         icon=folium.Icon(color="blue", icon="info-sign")
     ).add_to(vworld_map)
-# ⭐️ 해상도를 1200x750으로 유지하며 아코디언 메뉴 등 커스텀 자바스크립트가 작동하도록 순수 HTML 렌더링 ⭐️
+# ⭐️ 브라우저 localStorage를 활용한 완벽한 상태유지 지도 렌더링 (깜빡임/튕김 원천차단) ⭐️
 components.html(vworld_map._repr_html_(), width=1200, height=750)
 
 if dxf_result['num_vertices'] > 0:
