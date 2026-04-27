@@ -6,7 +6,7 @@ analyzers 패키지 초기화 — 분석기 자동 로딩 레지스트리
   - app.py에서는 get_all_analyzers()만 호출하면 됩니다.
 """
 from analyzers.base_analyzer import BaseAnalyzer
-from analyzers.land_attribute import LandAttributeAnalyzer
+from analyzers.land_ledger import LandLedgerAnalyzer
 from analyzers.zoning_region import ZoningRegionAnalyzer
 
 
@@ -19,7 +19,7 @@ def get_all_analyzers():
         list[BaseAnalyzer]: 사용 가능한 분석기 인스턴스 리스트
     """
     return [
-        LandAttributeAnalyzer(),
+        LandLedgerAnalyzer(),
         ZoningRegionAnalyzer(),
         # ===== 여기에 새 분석기를 추가하세요 =====
         # LandUseAnalyzer(),

@@ -7,6 +7,8 @@ PNU(필지고유번호) 추출 모듈
 """
 import requests
 from shapely.geometry import shape
+from shapely.ops import transform
+from pyproj import Transformer
 from config import VWORLD_DATA_URL, VWORLD_DOMAIN, CADASTRAL_LAYER
 
 
@@ -26,6 +28,14 @@ def extract_pnu_list(boundary_polygon, api_key):
     min_x, min_y, max_x, max_y = boundary_polygon.bounds
     box_filter = f"BOX({min_x},{min_y},{max_x},{max_y})"
     
+    # 1-1. 면적 계산을 위한 좌표 변환기 (EPSG:4326 -> EPSG:5179 UTM-K 미터 좌표계)
+    project_to_meter = Transformer.from_crs("EPSG:4326", "EPSG:5179", always_xy=True).transform
+    try:
+        boundary_polygon_m = transform(project_to_meter, boundary_polygon)
+    except Exception as e:
+        print(f"좌표 변환 실패: {e}")
+        boundary_polygon_m = boundary_polygon # 실패 시 원본 사용(단, 면적 계산은 부정확해짐)
+
     # 2. 브이월드 지적도 API 호출
     params = {
         "service": "data",
@@ -68,10 +78,22 @@ def extract_pnu_list(boundary_polygon, api_key):
             
             # 구역계와 교차 여부 판정
             if boundary_polygon.intersects(parcel_shape):
+                # 미터 좌표계로 변환하여 구적 면적(CAD 면적) 계산
+                try:
+                    parcel_shape_m = transform(project_to_meter, parcel_shape)
+                    intersection_m = boundary_polygon_m.intersection(parcel_shape_m)
+                    cad_area = intersection_m.area
+                    parcel_area_cad = parcel_shape_m.area
+                except Exception:
+                    cad_area = 0.0
+                    parcel_area_cad = 0.0
+
                 included.append({
                     "PNU": props.get("pnu", ""),
                     "주소": props.get("addr", ""),
                     "지번": props.get("jibun", ""),
+                    "구적상면적": cad_area,
+                    "전체구적면적": parcel_area_cad
                 })
         
         return included

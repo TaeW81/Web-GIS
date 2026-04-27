@@ -1,6 +1,6 @@
 import folium
 from folium.plugins import GroupedLayerControl, LocateControl
-from config import VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_URL, VWORLD_WMS_CATEGORIES, VWORLD_LEGEND_URL
+from config import VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_URL, VWORLD_WMS_CATEGORIES, VWORLD_LEGEND_URL, MAP_SOURCES, NIE_KEY, NIE_WMS_URL, NIE_LEGEND_URL
 
 
 def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locate_on_start=False, visible_layers=None, legend_layer_name=None, force_center_id=1):
@@ -39,38 +39,61 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
         locateOptions={"enableHighAccuracy": True, "maxZoom": 16}
     ).add_to(m)
 
-    # 3. 브이월드 WMS 주제도 레이어 추가 (선택된 것만 보이도록 처리)
-    for cat_name, layers in VWORLD_WMS_CATEGORIES.items():
-        for layer_name, code in layers.items():
-            if visible_layers is not None:
-                is_show = layer_name in visible_layers
-            else:
-                is_show = (layer_name == "연속지적도") or (layer_name == "지적도")
+    # 3. 기관별 WMS 주제도 레이어 추가 (선택된 것만 보이도록 처리)
+    for source_name, categories in MAP_SOURCES.items():
+        # 소스별 WMS 기본 설정
+        if source_name == "국립생태원 (NIE)":
+            base_url = NIE_WMS_URL
+            # srs/crs는 Folium(Leaflet)이 지도의 좌표계에 맞춰 자동으로 추가하므로 생략합니다.
+            extra_params = f"?ServiceKey={NIE_KEY}"
+        else: # 브이월드 기본
+            base_url = VWORLD_WMS_URL
+            extra_params = f"?key={VWORLD_KEY}&domain=http://localhost"
 
-            # 선택되지 않은 레이어도 맵 DOM에는 존재하지만 show=False로 감춰둡니다.
-            wms_layer = folium.WmsTileLayer(
-                url=f"{VWORLD_WMS_URL}?key={VWORLD_KEY}&domain=http://localhost",
-                layers=code.lower(),
-                fmt='image/png',
-                transparent=True,
-                version='1.3.0',
-                name=f"{layer_name}",
-                show=is_show,
-                overlay=True,
-                control=False # Streamlit 사이드바에서 제어하므로 맵 자체 컨트롤러에는 숨김
-            )
-            wms_layer.add_to(m)
+        for cat_name, layers in categories.items():
+            for layer_name, code in layers.items():
+                if visible_layers is not None:
+                    is_show = layer_name in visible_layers
+                else:
+                    is_show = (layer_name == "연속지적도") or (layer_name == "지적도")
 
-    # 마지막으로 선택한 레이어가 있다면 우측 하단에 범례 플로팅 UI 추가
+                # "READY" 가 포함된 준비중인 레이어는 스킵
+                if "READY" in str(code):
+                    continue
+
+                wms_layer = folium.WmsTileLayer(
+                    url=f"{base_url}{extra_params}",
+                    layers=code.lower() if source_name != "국립생태원 (NIE)" else code,
+                    fmt='image/png',
+                    transparent=True,
+                    version='1.3.0' if source_name != "국립생태원 (NIE)" else '1.1.1',
+                    name=f"{layer_name}",
+                    show=is_show,
+                    overlay=True,
+                    control=False
+                )
+                wms_layer.add_to(m)
+
+    # 마지막 선택한 레이어가 있다면 우측 하단에 범례 플로팅 UI 추가
     if legend_layer_name:
         legend_code = None
-        for cat_name, layers in VWORLD_WMS_CATEGORIES.items():
-            if legend_layer_name in layers:
-                legend_code = layers[legend_layer_name]
-                break
+        source_found = None
+        
+        # MAP_SOURCES에서 해당 레이어의 출처와 코드 찾기
+        for s_name, categories in MAP_SOURCES.items():
+            for cat_name, layers in categories.items():
+                if legend_layer_name in layers:
+                    legend_code = layers[legend_layer_name]
+                    source_found = s_name
+                    break
+            if source_found: break
                 
-        if legend_code:
-            legend_url = VWORLD_LEGEND_URL.format(key=VWORLD_KEY, layer=legend_code.lower())
+        if legend_code and not "READY" in str(legend_code):
+            if source_found == "국립생태원 (NIE)":
+                legend_url = NIE_LEGEND_URL.format(base_url=NIE_WMS_URL, key=NIE_KEY, layer=legend_code)
+            else:
+                legend_url = VWORLD_LEGEND_URL.format(key=VWORLD_KEY, layer=legend_code.lower())
+                
             legend_html = f"""
             <div style="position: absolute; bottom: 30px; right: 10px; z-index: 9999; background: rgba(255, 255, 255, 0.95); padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.3); max-height: 400px; overflow-y: auto;">
                 <p style="margin: 0 0 8px 0; font-weight: bold; font-size: 13px; text-align: center; color: #333;">{legend_layer_name} 범례</p>

@@ -11,6 +11,7 @@ load_dotenv()
 
 # ===== API 키 =====
 VWORLD_KEY = os.getenv("VWORLD_KEY", "F9BD8BC9-6646-3DD4-AA3C-C80E6D45BFB1")
+NIE_KEY = os.getenv("NIE_KEY", "0b1a73c4402f5cc749ca03709d2850131f4c1e62b27c87ea7bdbe8dd19299bd7")
 
 # ===== 좌표계 설정 =====
 SOURCE_CRS = "EPSG:5186"   # 기본 캐드 도면 좌표계 (GRS80 중부원점)
@@ -57,11 +58,13 @@ KOREA_CRS_ORIGINS = {
     "GoogleTM": (127.0, 38.0),
 }
 
-# ===== VWorld API 기본 설정 =====
+# ===== API End Points =====
 VWORLD_DOMAIN = "http://localhost"
 VWORLD_DATA_URL = "https://api.vworld.kr/req/data"
 VWORLD_SEARCH_URL = "https://api.vworld.kr/req/search"
 VWORLD_WMS_URL = "https://api.vworld.kr/req/wms"
+NIE_ECO_URL = "https://apis.data.go.kr/B553084/ecoapi/EcologyzmpService"
+NIE_WMS_URL = "https://apis.data.go.kr/B553084/ecoapi/EcologyzmpService/wms/getEcologyzmpWMS"
 
 # ===== VWorld WMTS 배경지도 타일 URL =====
 VWORLD_TILE_URLS = {
@@ -71,8 +74,9 @@ VWORLD_TILE_URLS = {
 }
 
 # ===== VWorld WMS 오버레이 레이어 카테고리 및 범례 URL 설정 =====
-VWORLD_WMS_URL = "http://api.vworld.kr/req/wms"
+# ===== WMS 범례 URL 설정 =====
 VWORLD_LEGEND_URL = "http://api.vworld.kr/req/image?key={key}&service=image&request=GetLegendGraphic&format=png&type=ALL&layer={layer}&style={layer}&LEGEND_OPTIONS=forceTitle:off"
+NIE_LEGEND_URL = "{base_url}?ServiceKey={key}&service=WMS&request=GetLegendGraphic&format=image/png&layer={layer}"
 
 VWORLD_WMS_CATEGORIES = {
     "기본 및 지적": {
@@ -205,13 +209,31 @@ VWORLD_WMS_CATEGORIES = {
     }
 }
 
+# ===== 소유자별 주제도 그룹화 (UI 표시용) =====
+MAP_SOURCES = {
+    "브이월드 (VWorld)": VWORLD_WMS_CATEGORIES,
+    "국립생태원 (NIE)": {
+        "환경 주제도": {
+            "생태자연도": "tbl_opn_eczm",
+        }
+    },
+    "추후 추가 예정": {
+        "환경/산림 (준비중)": {
+            "국토환경성평가": "ENV_EVAL_READY",
+            "임상도": "FOREST_MAP_READY",
+        }
+    }
+}
+
 # 하위 호환성을 위해 기존 변수 생성 (모든 레이어 플래튼)
 VWORLD_WMS_LAYERS = {}
 for category, layers in VWORLD_WMS_CATEGORIES.items():
     VWORLD_WMS_LAYERS.update(layers)
 
+# 국립생태원 레이어도 포함
+VWORLD_WMS_LAYERS.update({"생태자연도": "LT_C_AS001"})
+
 # ===== VWorld Data API 레이어 코드 =====
-# PNU 추출용
 CADASTRAL_LAYER = "LP_PA_CBND_BUBUN"
 
 # 용도지역 레이어 (4대 용도지역)
@@ -223,101 +245,75 @@ ZONING_LAYERS = {
 }
 
 # ===== VWorld WFS 다운로드 가능 레이어 정의 =====
-# key: WMS UI 레이어 이름
-# value: { typename(WFS 레이어코드), fields(속성 필드 매핑), geometry_type, label_field(DXF 텍스트용) }
 VWORLD_WFS_LAYERS = {
     "지적도": {
         "typename": "lp_pa_cbnd_bubun",
-        "fields": {
-            "pnu": "PNU",
-            "jibun": "지번",
-            "jimok": "지목",
-            "bonbeon": "본번",
-            "bubeon": "부번",
-        },
+        "fields": {"pnu": "PNU", "jibun": "지번", "jimok": "지목", "bonbeon": "본번", "bubeon": "부번"},
         "geometry_type": "Polygon",
         "label_field": "jibun",
-        "dxf_layers": {
-            "boundary": "CADASTRAL_LINE",
-            "text": "JIBEON_TEXT",
-        },
+        "dxf_layers": {"boundary": "CADASTRAL_LINE", "text": "JIBEON_TEXT"},
     },
     "도시지역": {
         "typename": "lt_c_uq111",
         "fields": {"gid": "GID", "uname": "용도명"},
         "geometry_type": "Polygon",
         "label_field": "uname",
-        "dxf_layers": {
-            "boundary": "URBAN_AREA_LINE",
-            "text": "URBAN_AREA_TEXT",
-        },
+        "dxf_layers": {"boundary": "URBAN_AREA_LINE", "text": "URBAN_AREA_TEXT"},
     },
     "관리지역": {
         "typename": "lt_c_uq112",
         "fields": {"gid": "GID", "uname": "용도명"},
         "geometry_type": "Polygon",
         "label_field": "uname",
-        "dxf_layers": {
-            "boundary": "MANAGE_AREA_LINE",
-            "text": "MANAGE_AREA_TEXT",
-        },
+        "dxf_layers": {"boundary": "MANAGE_AREA_LINE", "text": "MANAGE_AREA_TEXT"},
     },
     "농림지역": {
         "typename": "lt_c_uq113",
         "fields": {"gid": "GID", "uname": "용도명"},
         "geometry_type": "Polygon",
         "label_field": "uname",
-        "dxf_layers": {
-            "boundary": "AGRI_AREA_LINE",
-            "text": "AGRI_AREA_TEXT",
-        },
+        "dxf_layers": {"boundary": "AGRI_AREA_LINE", "text": "AGRI_AREA_TEXT"},
     },
     "자연환경보전지역": {
         "typename": "lt_c_uq114",
         "fields": {"gid": "GID", "uname": "용도명"},
         "geometry_type": "Polygon",
         "label_field": "uname",
-        "dxf_layers": {
-            "boundary": "NATURE_AREA_LINE",
-            "text": "NATURE_AREA_TEXT",
-        },
+        "dxf_layers": {"boundary": "NATURE_AREA_LINE", "text": "NATURE_AREA_TEXT"},
     },
     "사업지구경계도": {
         "typename": "lt_c_lhzone",
         "fields": {"gid": "GID", "name": "명칭"},
         "geometry_type": "Polygon",
         "label_field": "name",
-        "dxf_layers": {
-            "boundary": "PROJECT_ZONE_LINE",
-            "text": "PROJECT_ZONE_TEXT",
-        },
+        "dxf_layers": {"boundary": "PROJECT_ZONE_LINE", "text": "PROJECT_ZONE_TEXT"},
     },
     "개발제한구역": {
         "typename": "lt_c_ud801",
         "fields": {"gid": "GID", "name": "명칭"},
         "geometry_type": "Polygon",
         "label_field": "name",
-        "dxf_layers": {
-            "boundary": "GREEN_BELT_LINE",
-            "text": "GREEN_BELT_TEXT",
-        },
+        "dxf_layers": {"boundary": "GREEN_BELT_LINE", "text": "GREEN_BELT_TEXT"},
+    },
+    "생태자연도": {
+        "source": "NIE",
+        "typename": "tbl_opn_eczm",
+        "fields": {"eczm_grad": "등급", "plnt_cln_ttle": "식생명"},
+        "geometry_type": "Polygon",
+        "label_field": "eczm_grad",
+        "dxf_layers": {"boundary": "ECOLOGY_LINE", "text": "ECOLOGY_TEXT"},
     },
 }
 
 # --- 동적 WFS 레이어 매핑 ---
-# VWORLD_WFS_LAYERS에 하드코딩되지 않은 WMS 항목들도 일괄 추출 대상이 되도록 자동 추가합니다.
 for cat_name, layers in VWORLD_WMS_CATEGORIES.items():
     for layer_name, code in layers.items():
         if layer_name not in VWORLD_WFS_LAYERS:
-            # 쉼표로 여러 코드가 연결된 경우 첫 번째 코드 사용
             primary_code = code.split(',')[0].strip()
             VWORLD_WFS_LAYERS[layer_name] = {
                 "typename": primary_code.lower(),
-                "fields": {"gid": "GID"}, # 기본 범용 필드
+                "fields": {"gid": "GID"},
                 "geometry_type": "Unknown",
                 "label_field": "",
-                "dxf_layers": {
-                    "boundary": f"{primary_code.upper()}_LINE",
-                    "text": f"{primary_code.upper()}_TEXT",
-                },
+                "dxf_layers": {"boundary": f"{primary_code.upper()}_LINE", "text": f"{primary_code.upper()}_TEXT"},
             }

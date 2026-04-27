@@ -9,7 +9,7 @@ import folium
 import tempfile
 import os
 
-from config import VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_CATEGORIES, KOREA_CRS, KOREA_CRS_ORIGINS, VWORLD_WFS_LAYERS
+from config import VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_CATEGORIES, MAP_SOURCES, KOREA_CRS, KOREA_CRS_ORIGINS, VWORLD_WFS_LAYERS
 from modules.dxf_parser import parse_dxf
 from modules.pnu_extractor import extract_pnu_list
 from modules.map_builder import create_map
@@ -22,6 +22,48 @@ from analyzers import get_all_analyzers
 st.set_page_config(page_title="KH-GIS LandScan | 통합 현황분석 솔루션", layout="wide", page_icon="📡")
 st.title("📡 KH-GIS LandScan: Smart Analysis Platform")
 st.caption("건화(KH)의 공간정보 정밀 스캔 기술이 집약된 GIS 기반 토지·건축물 현황분석 자동화 솔루션")
+
+# 사이드바 UI 콤팩트화를 위한 CSS 주입
+st.markdown("""
+    <style>
+    /* 체크박스 줄간격 및 내부 여백 축소 */
+    div[data-testid="stSidebar"] div[data-testid="stCheckbox"] {
+        margin-bottom: -15px !important;
+    }
+    div[data-testid="stSidebar"] div[data-testid="stCheckbox"] label {
+        font-size: 13px !important;
+        padding-top: 1px !important;
+        padding-bottom: 1px !important;
+    }
+    /* expander 헤더와 내용물 사이 여백 축소 */
+    div[data-testid="stExpander"] div[data-testid="stVerticalBlock"] {
+        gap: 0.1rem !important;
+    }
+    /* 박스(Expander) 사이의 외부 간격 축소 */
+    div[data-testid="stExpander"] {
+        margin-bottom: -10px !important;
+    }
+    /* 박스 내부(Details) 여백 축소 */
+    div[data-testid="stExpanderDetails"] {
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+        padding-left: 0.7rem !important;
+        padding-right: 0.7rem !important;
+    }
+    /* 박스 제목줄(Summary) 높이 축소 */
+    div[data-testid="stExpanderSummary"] {
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+        min-height: 2.2rem !important;
+    }
+    /* 탭 간격 축소 */
+    div[data-testid="stSidebar"] button[data-baseweb="tab"] {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+        font-size: 12px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # ============================
 # 데이터 변수 및 상태 초기화
@@ -101,8 +143,7 @@ with st.sidebar:
             st.session_state.map_force_center_id += 1
             dxf_result["center"] = [lat, lon]
 
-    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>2. 지도 및 기초데이터 설정</p>", unsafe_allow_html=True)
-    
+    # 좌표계 목록 및 동기화 인덱스 계산
     dl_crs_options = {
         "GRS80 중부 (EPSG:5186)": "EPSG:5186", "GRS80 서부 (EPSG:5185)": "EPSG:5185",
         "GRS80 동부 (EPSG:5187)": "EPSG:5187", "GRS80 동해 (EPSG:5188)": "EPSG:5188",
@@ -111,27 +152,51 @@ with st.sidebar:
         "Bessel 동부 (EPSG:5176)": "EPSG:5176", "Bessel 동해 (EPSG:5177)": "EPSG:5177",
         "Bessel 제주 (EPSG:5175)": "EPSG:5175", "WGS84 (EPSG:4326)": "EPSG:4326",
     }
-    dl_crs_label = st.selectbox("다운로드 좌표계", options=list(dl_crs_options.keys()), index=0, label_visibility="collapsed")
-    st.session_state.dl_target_epsg = dl_crs_options[dl_crs_label]
+    dl_crs_values = list(dl_crs_options.values())
+    try:
+        sync_index = dl_crs_values.index(selected_epsg)
+    except ValueError:
+        sync_index = 0
+
+    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>2. 지도 및 기초데이터 설정</p>", unsafe_allow_html=True)
+    
     
     layer_title_col, layer_btn_col = st.columns([3, 1])
     with layer_title_col:
         st.markdown("<p style='font-size:13px; font-weight:bold; margin: 0; padding-top: 5px;'>지도 레이어 설정 <span style='font-weight:normal; font-size:11px;'>(체크시 지도 직접 반영)</span></p>", unsafe_allow_html=True)
     with layer_btn_col:
         if st.button("초기화", use_container_width=True):
-            for layers in VWORLD_WMS_CATEGORIES.values():
-                for layer_name in layers.keys():
-                    st.session_state[f"chk_{layer_name}"] = False
+            for source_dict in MAP_SOURCES.values():
+                for layers in source_dict.values():
+                    for layer_name in layers.keys():
+                        st.session_state[f"chk_{layer_name}"] = False
+                        
     selected_dl_layers = []
-    for cat_name, layers in VWORLD_WMS_CATEGORIES.items():
-        with st.expander(cat_name):
-            for layer_name in layers.keys():
-                check_key = f"chk_{layer_name}"
-                is_default = (layer_name == "연속지적도" or layer_name == "지적도")
-                if check_key not in st.session_state:
-                    st.session_state[check_key] = is_default
-                if st.checkbox(layer_name, key=check_key):
-                    selected_dl_layers.append(layer_name)
+    
+    # 소속 기관별 탭 구성 (가로 공간 활용)
+    source_tabs = st.tabs(list(MAP_SOURCES.keys()))
+    
+    for i, (source_name, categories) in enumerate(MAP_SOURCES.items()):
+        with source_tabs[i]:
+            for cat_name, layers in categories.items():
+                with st.expander(f"📁 {cat_name}", expanded=(cat_name == "기본 및 지적")):
+                    # 2단 컬럼으로 배치하여 세로 길이 단축
+                    cols = st.columns(2)
+                    for idx, (layer_name, code) in enumerate(layers.items()):
+                        target_col = cols[idx % 2]
+                        check_key = f"chk_{layer_name}"
+                        is_default = (layer_name == "연속지적도" or layer_name == "지적도")
+                        
+                        if check_key not in st.session_state:
+                            st.session_state[check_key] = is_default
+                        
+                        # 추후 추가 예정 항목은 비활성화 표시
+                        if "READY" in str(code):
+                            target_col.checkbox(f"🚫 {layer_name}", value=False, disabled=True, help="준비 중인 레이어입니다.")
+                        else:
+                            if target_col.checkbox(layer_name, key=check_key):
+                                selected_dl_layers.append(layer_name)
+    st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
                     
     # 마지막 클릭한 레이어 추적 방어 로직
     old_layers = st.session_state.get('map_layers', [])
@@ -142,7 +207,14 @@ with st.sidebar:
         st.session_state.last_checked_layer = selected_dl_layers[-1] if selected_dl_layers else None
         
     st.session_state.map_layers = selected_dl_layers
-    submit_layer_btn = st.button("🚀 위 데이터 일괄 추출하기", type="primary", use_container_width=True)
+    # 다운로드 좌표계 및 추출 버튼 배치
+    btn_col1, btn_col2 = st.columns([1.2, 1])
+    with btn_col1:
+        dl_crs_label = st.selectbox("다운로드 좌표계", options=list(dl_crs_options.keys()), index=sync_index, label_visibility="collapsed")
+        st.session_state.dl_target_epsg = dl_crs_options[dl_crs_label]
+    
+    with btn_col2:
+        submit_layer_btn = st.button("🚀 일괄 추출하기", type="primary", use_container_width=True)
 
     if submit_layer_btn:
         if not uploaded_file:
@@ -158,18 +230,27 @@ with st.sidebar:
     st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>3. 수치지도추출 <span style='font-size:12px; color:gray;'>(추후개발)</span></p>", unsafe_allow_html=True)
     
     # ----------------------------------------
-    # 4. 현황 조서 분석 항목(추후개발)
+    # 4. 현황 조서 분석 항목
     # ----------------------------------------
-    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>4. 현황 조서 분석 항목 <span style='font-size:12px; color:gray;'>(추후개발)</span></p>", unsafe_allow_html=True)
-    # 기존에 있던 analyzer 로직은 현재 개발 진행중인 것으로 편입
+    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>4. 현황 조서 분석 항목</p>", unsafe_allow_html=True)
     all_analyzers = get_all_analyzers()
     selected_analyzers = [a for a in all_analyzers if st.checkbox(a.name, value=True, help=a.description)]
     
     # 추후 개발 시각적 표시
-    st.checkbox("토지대장 추출 (예정)", disabled=True, value=False)
-    st.checkbox("토지조서 작성 (excel조서) (예정)", disabled=True, value=False)
     st.checkbox("산지전용 조서 작성 (excel조서) (예정)", disabled=True, value=False)
     st.checkbox("농지전용 조서 작성 (excel조서) (예정)", disabled=True, value=False)
+
+    start_analysis_btn = st.button("🚀 분석하기", type="primary", use_container_width=True)
+    if start_analysis_btn:
+        if not uploaded_file:
+            st.warning("⚠️ 구역계(DXF) 파일이 없어 분석을 시작할 수 없습니다.")
+        elif not selected_analyzers:
+            st.warning("⚠️ 분석할 항목을 하나 이상 선택해주세요.")
+        else:
+            st.session_state.do_status_analysis = True
+            # 기존 결과 초기화
+            st.session_state.pnu_list = None
+            st.session_state.all_sheets = None
 
     # ----------------------------------------
     # 5. 대상지 현황 분석_보고서(추후개발)
@@ -324,40 +405,45 @@ if dxf_result['num_vertices'] > 0:
 if not uploaded_file:
     st.stop()
 
-st.subheader("📋 대상지 조서/면적 분석 (Pnu 추출)")
-with st.spinner("🔍 대상지 내 편입 필지를 찾는 중..."):
-    try:
-        pnu_list = extract_pnu_list(dxf_result["polygon"], VWORLD_KEY)
-    except Exception as e:
-        st.error(f"❌ PNU 오류: {e}")
-        st.stop()
-
-if not pnu_list:
-    st.warning("⚠️ 편입되는 필지를 찾지 못했습니다.")
-    st.stop()
-
-with st.expander(f"편입 필지 구조 ({len(pnu_list)}건)", expanded=False):
-    st.dataframe(pnu_list, use_container_width=True)
-
-if not selected_analyzers:
-    st.stop()
-
-st.subheader("📊 자동 현황 분석 결과")
-all_sheets = {}
-
-for analyzer in selected_analyzers:
-    with st.spinner(f"🔄 [{analyzer.name}] 통계/산출 중... ({len(pnu_list)}건)"):
+if st.session_state.get("do_status_analysis"):
+    st.session_state.do_status_analysis = False # 1회성 플래그 (리런 방지용)
+    
+    st.subheader("📋 대상지 조서/면적 분석 (Pnu 추출)")
+    with st.spinner("🔍 대상지 내 편입 필지를 찾는 중..."):
         try:
-            results = analyzer.analyze(pnu_list, VWORLD_KEY)
-            all_sheets[analyzer.name] = results
-            with st.expander(f"✅ {analyzer.name}", expanded=False):
-                st.dataframe(results, use_container_width=True)
+            pnu_list = extract_pnu_list(dxf_result["polygon"], VWORLD_KEY)
+            st.session_state.pnu_list = pnu_list
         except Exception as e:
-            st.error(f"❌ [{analyzer.name}] 실패: {e}")
+            st.error(f"❌ PNU 오류: {e}")
 
-if all_sheets:
+    if pnu_list:
+        st.subheader("📊 자동 현황 분석 결과")
+        all_sheets = {}
+        
+        for analyzer in selected_analyzers:
+            with st.spinner(f"🔄 [{analyzer.name}] 통계/산출 중... ({len(pnu_list)}건)"):
+                try:
+                    results = analyzer.analyze(pnu_list, VWORLD_KEY)
+                    all_sheets[analyzer.name] = results
+                except Exception as e:
+                    st.error(f"❌ [{analyzer.name}] 실패: {e}")
+        
+        st.session_state.all_sheets = all_sheets
+
+# 결과 렌더링
+if st.session_state.get("pnu_list"):
+    st.subheader("📋 대상지 조서/면적 분석 (Pnu 추출)")
+    with st.expander(f"편입 필지 구조 ({len(st.session_state.pnu_list)}건)", expanded=False):
+        st.dataframe(st.session_state.pnu_list, use_container_width=True)
+
+if st.session_state.get("all_sheets"):
+    st.subheader("📊 자동 현황 분석 결과")
+    for sheet_name, results in st.session_state.all_sheets.items():
+        with st.expander(f"✅ {sheet_name}", expanded=False):
+            st.dataframe(results, use_container_width=True)
+
     st.divider()
-    excel_bytes = create_multi_sheet_excel(all_sheets)
+    excel_bytes = create_multi_sheet_excel(st.session_state.all_sheets)
     st.download_button(
         "📥 [최종 산출물] 현황분석 엑셀 리포트 일괄 다운로드",
         data=excel_bytes,

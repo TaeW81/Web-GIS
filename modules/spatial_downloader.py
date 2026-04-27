@@ -14,7 +14,7 @@ import zipfile
 from io import BytesIO, StringIO
 from pyproj import Transformer
 from shapely.geometry import shape, Polygon, MultiPolygon
-from config import VWORLD_KEY, VWORLD_WFS_LAYERS
+from config import VWORLD_KEY, VWORLD_WFS_LAYERS, NIE_KEY, NIE_WMS_URL
 
 
 # ========================================================
@@ -37,31 +37,50 @@ def fetch_wfs_data(layer_name: str, bbox: str, api_key: str = None) -> dict:
         ConnectionError: API 호출 실패 시
     """
     key = api_key or VWORLD_KEY
-
     layer_config = VWORLD_WFS_LAYERS.get(layer_name)
     if not layer_config:
-        raise ValueError(
-            f"'{layer_name}' 레이어는 WFS 다운로드를 지원하지 않습니다.\n"
-            f"지원 레이어: {', '.join(VWORLD_WFS_LAYERS.keys())}"
-        )
+        raise ValueError(f"'{layer_name}' 레이어는 WFS 다운로드를 지원하지 않습니다.")
 
-    wfs_url = "https://api.vworld.kr/req/wfs"
+    source = layer_config.get("source", "VWORLD")
+    
+    if source == "NIE":
+        wfs_url = NIE_WMS_URL
+        api_key_param = "ServiceKey"
+        key_val = NIE_KEY
+        version = "1.1.0"
+        output_param = "OUTPUTFORMAT"
+        output_val = "json"
+    else:
+        wfs_url = "https://api.vworld.kr/req/wfs"
+        api_key_param = "key"
+        key_val = key
+        version = "1.1.0"
+        output_param = "output"
+        output_val = "application/json"
+
     all_features = {}
 
     def fetch_grid(grid_bbox: list, depth: int):
-        bbox_str = f"{grid_bbox[0]},{grid_bbox[1]},{grid_bbox[2]},{grid_bbox[3]}"
+        # VWorld WFS 1.1.0 (EPSG:4326)은 Lat, Lon 순서의 BBOX를 요구함
+        # 국립생태원 등 표준 GeoServer 기반은 Lon, Lat 순서의 BBOX를 요구함
+        if source == "NIE":
+            bbox_str = f"{grid_bbox[1]},{grid_bbox[0]},{grid_bbox[3]},{grid_bbox[2]}"
+        else:
+            bbox_str = f"{grid_bbox[0]},{grid_bbox[1]},{grid_bbox[2]},{grid_bbox[3]}"
+            
         params = {
-            "key": key,
-            "domain": "http://localhost",
+            api_key_param: key_val,
             "SERVICE": "WFS",
-            "version": "1.1.0",
+            "version": version,
             "request": "GetFeature",
             "TYPENAME": layer_config["typename"],
             "BBOX": f"{bbox_str},EPSG:4326",
             "SRSNAME": "EPSG:4326",
-            "output": "application/json",
+            output_param: output_val,
             "MAXFEATURES": "1000",
         }
+        if source != "NIE":
+            params["domain"] = "http://localhost"
 
         try:
             resp = requests.get(wfs_url, params=params, timeout=30)
