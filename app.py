@@ -17,6 +17,7 @@ from modules.excel_exporter import create_multi_sheet_excel
 from modules.spatial_downloader import fetch_wfs_data, export_to_dxf, export_to_shp
 from modules.vworld_search import search_place
 from analyzers import get_all_analyzers
+from report.word_report import LandReportGenerator
 
 # ============================
 st.set_page_config(page_title="KH-GIS LandScan | 통합 현황분석 솔루션", layout="wide", page_icon="📡")
@@ -409,6 +410,7 @@ if st.session_state.get("do_status_analysis"):
     st.session_state.do_status_analysis = False # 1회성 플래그 (리런 방지용)
     
     st.subheader("📋 대상지 조서/면적 분석 (Pnu 추출)")
+    pnu_list = []
     with st.spinner("🔍 대상지 내 편입 필지를 찾는 중..."):
         try:
             pnu_list = extract_pnu_list(dxf_result["polygon"], VWORLD_KEY)
@@ -444,11 +446,60 @@ if st.session_state.get("all_sheets"):
 
     st.divider()
     excel_bytes = create_multi_sheet_excel(st.session_state.all_sheets)
-    st.download_button(
-        "📥 [최종 산출물] 현황분석 엑셀 리포트 일괄 다운로드",
-        data=excel_bytes,
-        file_name="현황분석조서.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        type="primary",
-        use_container_width=True,
-    )
+    
+    # 📝 워드 보고서 생성 (추가)
+    with st.spinner("📄 고품질 워드 보고서 생성 중..."):
+        try:
+            # 보고서에 들어갈 속성 맵핑
+            # analyzers의 결과는 리스트[딕셔너리] 형태
+            land_data = []
+            for p in st.session_state.pnu_list:
+                p_copy = p.copy()
+                # 토지조서 결과에서 해당 PNU의 상세 속성 매칭
+                if "토지조서 (편입면적/공시지가 등)" in st.session_state.all_sheets:
+                    for row in st.session_state.all_sheets["토지조서 (편입면적/공시지가 등)"]:
+                        if row["PNU"] == p["PNU"]:
+                            p_copy["analysis_attr"] = row
+                            break
+                land_data.append(p_copy)
+            
+            # 🎨 테마 지도 생성 (추가)
+            owner_img, jimok_img = None, None
+            try:
+                from modules.map_builder import create_thematic_map
+                owner_img = create_thematic_map(dxf_result["polygon"], land_data, "소유자")
+                jimok_img = create_thematic_map(dxf_result["polygon"], land_data, "지목")
+            except Exception as me:
+                st.warning(f"테마 지도 생성 건너뜀: {me}")
+
+            # 보고서 생성기 실행
+            report_gen = LandReportGenerator(
+                analysis_data=land_data,
+                boundary_polygon=dxf_result["polygon"],
+                owner_map_bytes=owner_img,
+                jimok_map_bytes=jimok_img
+            )
+            report_bytes = report_gen.generate()
+        except Exception as re:
+            st.error(f"보고서 생성 중 오류: {re}")
+            report_bytes = None
+
+    col_ex, col_doc = st.columns(2)
+    with col_ex:
+        st.download_button(
+            "📥 [Excel] 현황분석 엑셀 리포트 다운로드",
+            data=excel_bytes,
+            file_name="현황분석조서.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    with col_doc:
+        if report_bytes:
+            st.download_button(
+                "📥 [Word] 고품질 현황분석 보고서 다운로드",
+                data=report_bytes,
+                file_name="현황분석보고서.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                type="primary",
+                use_container_width=True,
+            )

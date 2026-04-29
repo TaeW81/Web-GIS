@@ -143,3 +143,87 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
     m.get_root().html.add_child(folium.Element(sync_js))
 
     return m
+
+def create_thematic_map(boundary_polygon, land_data, category="소유자"):
+    """보고서 삽입용 테마 지도 생성 (WMS 위성배경 + 필지 테마)"""
+    import matplotlib.pyplot as plt
+    import io
+    import requests
+    from PIL import Image
+    from matplotlib.font_manager import FontProperties
+    from matplotlib.patches import Patch
+    from config import VWORLD_KEY, VWORLD_DOMAIN
+    
+    try:
+        plt.rcParams['font.family'] = 'Malgun Gothic'
+        plt.rcParams['axes.unicode_minus'] = False
+        font_prop = FontProperties(fname="C:/Windows/Fonts/malgun.ttf")
+        
+        # 1. 지도 영역 계산 (WGS84)
+        min_x, min_y, max_x, max_y = boundary_polygon.bounds
+        width = max_x - min_x
+        height = max_y - min_y
+        # 여백 추가 (15%)
+        exp_min_x = min_x - width * 0.15
+        exp_max_x = max_x + width * 0.15
+        exp_min_y = min_y - height * 0.15
+        exp_max_y = max_y + height * 0.15
+        
+        # 2. WMS 위성배경지도 가져오기 (정밀도 보장)
+        wms_url = "http://api.vworld.kr/req/wms"
+        params = {
+            "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
+            "service": "WMS", "request": "GetMap", "layers": "Satellite",
+            "crs": "EPSG:4326", "format": "image/png", "width": "1000", "height": "1000",
+            "bbox": f"{exp_min_x},{exp_min_y},{exp_max_x},{exp_max_y}"
+        }
+        res = requests.get(wms_url, params=params, timeout=15)
+        bg_img = Image.open(io.BytesIO(res.content))
+        
+        # 3. 플롯 설정
+        fig, ax = plt.subplots(figsize=(10, 10))
+        
+        # 배경 이미지 표시
+        ax.imshow(bg_img, extent=[exp_min_x, exp_max_x, exp_min_y, exp_max_y], origin='upper')
+        
+        # 4. 색상 맵 설정
+        unique_cats = sorted(list(set([str(p.get("analysis_attr", {}).get(category, "기타")) for p in land_data])))
+        colors = plt.cm.get_cmap('Set3' if len(unique_cats) <= 12 else 'tab20').colors
+        cat_color_map = {cat: colors[i % len(colors)] for i, cat in enumerate(unique_cats)}
+
+        # 5. 필지 그리기 (WGS84 기준 그대로 사용)
+        for p in land_data:
+            poly = p.get("지적도형")
+            if not poly: continue
+            cat_val = str(p.get("analysis_attr", {}).get(category, "기타"))
+            color = cat_color_map.get(cat_val, "gray")
+            
+            for sub_poly in ([poly] if poly.geom_type == 'Polygon' else poly.geoms):
+                x, y = sub_poly.exterior.xy
+                ax.fill(x, y, color=color, alpha=0.5, edgecolor='white', lw=0.5, zorder=5)
+
+        # 6. 구역계 강조
+        for sub_poly in ([boundary_polygon] if boundary_polygon.geom_type == 'Polygon' else boundary_polygon.geoms):
+            bx, by = sub_poly.exterior.xy
+            ax.plot(bx, by, color='red', lw=2.5, zorder=10)
+
+        # 7. 범례 (디자인 개선)
+        legend_elements = [Patch(facecolor=cat_color_map[cat], label=cat, alpha=0.8) for cat in unique_cats]
+        leg = ax.legend(handles=legend_elements, loc='lower right', prop=font_prop, fontsize=10, 
+                        frameon=True, facecolor='white', framealpha=0.9, edgecolor='gray')
+        leg.set_title(f"[{category}별 현황]", prop=font_prop)
+        
+        ax.set_xlim(exp_min_x, exp_max_x)
+        ax.set_ylim(exp_min_y, exp_max_y)
+        ax.set_aspect('equal')
+        ax.axis('off')
+        
+        # 8. 최종 결과 반환
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=200, bbox_inches='tight', pad_inches=0.05)
+        plt.close(fig)
+        buf.seek(0)
+        return buf
+    except Exception as e:
+        print(f"테마 지도 생성 오류: {e}")
+        return None

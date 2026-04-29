@@ -1,127 +1,83 @@
 """
-용도지역 분석기 — 4대 용도지역 조회
+용도지역 분석기 — 4대 용도지역 조회 (대규모 필지 무제한 지원 버전)
 
-데이터 소스: 브이월드 Data API
-  - LT_C_UQ111: 도시지역
-  - LT_C_UQ112: 관리지역
-  - LT_C_UQ113: 농림지역
-  - LT_C_UQ114: 자연환경보전지역
-
-방식: 주소 → 좌표 검색(Search API) → 좌표로 4개 용도지역 레이어 공간 검색
+데이터 소스: 브이월드 Data API (LT_C_UQ111~114)
+최적화: 
+  - 구역 전체 레이어 사전 로딩 (무제한 페이지네이션 적용)
+  - 병렬 처리 및 공간 연산 기반 고속 조회
 """
 import requests
+import concurrent.futures
 from analyzers.base_analyzer import BaseAnalyzer
-from config import (
-    VWORLD_DATA_URL,
-    VWORLD_SEARCH_URL,
-    VWORLD_DOMAIN,
-    ZONING_LAYERS,
-)
-
+from config import VWORLD_DATA_URL, VWORLD_DOMAIN
+from shapely.geometry import shape
 
 class ZoningRegionAnalyzer(BaseAnalyzer):
     name = "용도지역"
-    description = "4대 용도지역(도시/관리/농림/자연환경보전)을 조회합니다."
+    description = "4대 용도지역(도시/관리/농림/자연환경보전)을 조회합니다. (고속 모드)"
 
     def analyze(self, pnu_list, api_key):
-        """
-        PNU 리스트의 각 필지에 대해 용도지역을 조회합니다.
+        self.session = requests.Session()
         
-        Returns:
-            list[dict]: [{"PNU": ..., "주소": ..., "용도지역": ...}, ...]
-        """
+        # 1. 구역 전체의 용도지역 데이터 사전 로딩 (페이지네이션 적용)
+        self.prefetched_features = self._prefetch_all_zones(pnu_list, api_key)
+        
         results = []
-        
-        for parcel in pnu_list:
-            pnu = parcel["PNU"]
-            address = parcel["주소"]
-            
-            # 1단계: 주소로 좌표(X, Y) 검색
-            point = self._get_point_by_address(address, api_key)
-            
-            if not point:
-                results.append({
-                    "PNU": pnu,
-                    "주소": address,
-                    "용도지역": "좌표조회실패",
-                })
-                continue
-            
-            # 2단계: 좌표로 4개 용도지역 레이어 검색
-            zones = self._query_zoning_layers(point, api_key)
-            
-            results.append({
-                "PNU": pnu,
-                "주소": address,
-                "용도지역": ", ".join(zones) if zones else "해당없음",
-            })
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+            future_to_pnu = {executor.submit(self._analyze_single_zoning, parcel, api_key): parcel for parcel in pnu_list}
+            for future in concurrent.futures.as_completed(future_to_pnu):
+                try:
+                    res = future.result()
+                    if res: results.append(res)
+                except: pass
         
         return results
 
-    def _get_point_by_address(self, address, api_key):
-        """주소 검색 API를 통해 좌표(x, y) 반환"""
-        params = {
-            "service": "search",
-            "request": "search",
-            "type": "ADDRESS",
-            "category": "parcel",
-            "query": address,
-            "key": api_key,
-            "domain": VWORLD_DOMAIN,
-            "size": "1",
-        }
-        
+    def _prefetch_all_zones(self, pnu_list, api_key):
+        """구역 내 모든 용도지역 레이어 데이터를 한 번에 가져옴 (무제한 페이지네이션)"""
+        all_features = []
         try:
-            res = requests.get(VWORLD_SEARCH_URL, params=params, timeout=10)
-            data = res.json()
+            from shapely.geometry import MultiPoint
+            points = [p["지적도형"].centroid for p in pnu_list if p.get("지적도형")]
+            if not points: return []
+            bounds = MultiPoint(points).bounds
+            bbox = f"{bounds[0]},{bounds[1]},{bounds[2]},{bounds[3]}"
             
-            if data.get("response", {}).get("status") == "OK":
-                items = data["response"]["result"]["items"]
-                if items:
-                    point = items[0].get("point", {})
-                    x, y = point.get("x"), point.get("y")
-                    if x and y:
-                        return {"x": x, "y": y}
-        except Exception:
-            pass
-        
-        return None
-
-    def _query_zoning_layers(self, point, api_key):
-        """좌표(POINT)로 4개 용도지역 레이어 공간 검색"""
-        geom_filter = f"POINT({point['x']} {point['y']})"
-        found_zones = []
-        
-        for layer_code, layer_name in ZONING_LAYERS.items():
-            params = {
-                "service": "data",
-                "request": "GetFeature",
-                "data": layer_code,
-                "key": api_key,
-                "domain": VWORLD_DOMAIN,
-                "geomFilter": geom_filter,
-                "geometry": "false",
-                "size": "10",
-            }
-            
-            try:
-                res = requests.get(VWORLD_DATA_URL, params=params, timeout=10)
-                if res.status_code == 200:
+            for layer in ["LT_C_UQ111", "LT_C_UQ112", "LT_C_UQ113", "LT_C_UQ114"]:
+                page = 1
+                page_size = 1000
+                while True:
+                    params = {
+                        "service": "data", "request": "GetFeature", "data": layer,
+                        "key": api_key, "domain": VWORLD_DOMAIN, "geomFilter": f"BOX({bbox})",
+                        "size": str(page_size), "page": str(page), "geometry": "true"
+                    }
+                    res = self.session.get(VWORLD_DATA_URL, params=params, timeout=15)
                     data = res.json()
-                    features = (
-                        data.get("response", {})
-                        .get("result", {})
-                        .get("featureCollection", {})
-                        .get("features", [])
-                    )
-                    for feat in features:
-                        uname = feat["properties"].get("uname")
-                        if uname:
-                            found_zones.append(f"{layer_name}({uname})")
-            except Exception:
-                continue
-        
-        return sorted(set(found_zones))
+                    if data.get("response", {}).get("status") != "OK": break
+                    
+                    feats = data.get("response", {}).get("result", {}).get("featureCollection", {}).get("features", [])
+                    if not feats: break
+                    
+                    all_features.extend(feats)
+                    total = int(data.get("response", {}).get("record", {}).get("total", 0))
+                    if len(all_features) >= total or len(feats) < page_size: break
+                    page += 1
+                    if page > 100: break
+        except: pass
+        return all_features
 
-    def get_columns(self):
-        return ["PNU", "주소", "용도지역"]
+    def _analyze_single_zoning(self, parcel, api_key):
+        pnu = parcel["PNU"]
+        address = parcel["주소"]
+        poly = parcel.get("지적도형")
+        
+        zoning_name = "해당없음"
+        if poly and self.prefetched_features:
+            centroid = poly.centroid
+            for feat in self.prefetched_features:
+                if shape(feat["geometry"]).intersects(centroid):
+                    zoning_name = feat["properties"].get("uname", zoning_info)
+                    break
+        
+        return {"PNU": pnu, "주소": address, "용도지역": zoning_name}

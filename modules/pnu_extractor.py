@@ -2,7 +2,7 @@
 PNU(필지고유번호) 추출 모듈
 
 역할:
-  - 구역계 Polygon의 Bounding Box로 브이월드에서 지적도를 가져옴
+  - 구역계 Polygon의 Bounding Box로 브이월드에서 지적도를 가져옴 (무제한 페이지네이션)
   - shapely intersects()로 구역계에 편입되는 PNU만 정밀 필터링
 """
 import requests
@@ -11,92 +11,81 @@ from shapely.ops import transform
 from pyproj import Transformer
 from config import VWORLD_DATA_URL, VWORLD_DOMAIN, CADASTRAL_LAYER
 
-
 def extract_pnu_list(boundary_polygon, api_key):
     """
-    구역계 폴리곤과 교차하는 모든 필지의 PNU 리스트를 추출합니다.
-    
-    Args:
-        boundary_polygon (shapely.Polygon): 구역계 폴리곤 (lon, lat 순서)
-        api_key (str): 브이월드 API 인증키
-    
-    Returns:
-        list[dict]: [{"PNU": str, "주소": str, "지번": str}, ...]
-        실패 시 빈 리스트
+    구역계 폴리곤과 교차하는 모든 필지의 PNU 리스트를 추출합니다. (대규모 대응)
     """
-    # 1. Bounding Box 계산 (콤마 구분, 띄어쓰기 없이!)
+    # 1. Bounding Box 계산 (검색 누락 방지를 위해 0.0001도 버퍼 추가)
+    buffer = 0.0001
     min_x, min_y, max_x, max_y = boundary_polygon.bounds
-    box_filter = f"BOX({min_x},{min_y},{max_x},{max_y})"
+    box_filter = f"BOX({min_x-buffer},{min_y-buffer},{max_x+buffer},{max_y+buffer})"
     
-    # 1-1. 면적 계산을 위한 좌표 변환기 (EPSG:4326 -> EPSG:5179 UTM-K 미터 좌표계)
     project_to_meter = Transformer.from_crs("EPSG:4326", "EPSG:5179", always_xy=True).transform
     try:
         boundary_polygon_m = transform(project_to_meter, boundary_polygon)
-    except Exception as e:
-        print(f"좌표 변환 실패: {e}")
-        boundary_polygon_m = boundary_polygon # 실패 시 원본 사용(단, 면적 계산은 부정확해짐)
+    except:
+        boundary_polygon_m = boundary_polygon
 
-    # 2. 브이월드 지적도 API 호출
-    params = {
-        "service": "data",
-        "request": "GetFeature",
-        "data": CADASTRAL_LAYER,
-        "key": api_key,
-        "domain": VWORLD_DOMAIN,
-        "geomFilter": box_filter,
-        "geometry": "true",     # 지적도 폴리곤 모양도 같이 가져오기
-        "size": "1000",
-    }
+    # 2. 브이월드 지적도 API 호출 (페이지네이션 적용)
+    all_features = []
+    page = 1
+    page_size = 1000
     
-    try:
-        res = requests.get(VWORLD_DATA_URL, params=params, timeout=30)
-        data = res.json()
+    while True:
+        params = {
+            "service": "data", "request": "GetFeature", "data": CADASTRAL_LAYER,
+            "key": api_key, "domain": VWORLD_DOMAIN, "geomFilter": box_filter,
+            "geometry": "true", "size": str(page_size), "page": str(page)
+        }
         
-        # 응답 상태 확인
-        status = data.get("response", {}).get("status")
-        if status != "OK":
-            error_text = data.get("response", {}).get("error", {}).get("text", "알 수 없음")
-            raise RuntimeError(f"브이월드 응답 오류: {status} - {error_text}")
-        
-        features = (
-            data.get("response", {})
-            .get("result", {})
-            .get("featureCollection", {})
-            .get("features", [])
-        )
-        
-        # 3. 구역계와 교차하는 필지만 정밀 필터링
-        included = []
-        for feat in features:
-            props = feat.get("properties", {})
-            geom = feat.get("geometry")
-            if not geom:
-                continue
+        try:
+            res = requests.get(VWORLD_DATA_URL, params=params, timeout=30)
+            data = res.json()
+            status = data.get("response", {}).get("status")
+            if status != "OK":
+                if page == 1:
+                    error_text = data.get("response", {}).get("error", {}).get("text", "알 수 없음")
+                    raise RuntimeError(f"브이월드 응답 오류: {status} - {error_text}")
+                else: break
             
-            # 지적도 도형을 shapely 객체로 변환
-            parcel_shape = shape(geom)
+            features = data.get("response", {}).get("result", {}).get("featureCollection", {}).get("features", [])
+            if not features: break
+            all_features.extend(features)
             
-            # 구역계와 교차 여부 판정
-            if boundary_polygon.intersects(parcel_shape):
-                # 미터 좌표계로 변환하여 구적 면적(CAD 면적) 계산
-                try:
-                    parcel_shape_m = transform(project_to_meter, parcel_shape)
-                    intersection_m = boundary_polygon_m.intersection(parcel_shape_m)
-                    cad_area = intersection_m.area
-                    parcel_area_cad = parcel_shape_m.area
-                except Exception:
-                    cad_area = 0.0
-                    parcel_area_cad = 0.0
+            record_info = data.get("response", {}).get("record", {})
+            total_count = int(record_info.get("total", 0))
+            if len(all_features) >= total_count or len(features) < page_size:
+                break
+            page += 1
+            if page > 100: break # 최대 10만 필지
+        except: break
 
-                included.append({
-                    "PNU": props.get("pnu", ""),
-                    "주소": props.get("addr", ""),
-                    "지번": props.get("jibun", ""),
-                    "구적상면적": cad_area,
-                    "전체구적면적": parcel_area_cad
-                })
+    # 3. 정밀 필터링 및 중복 제거
+    included = []
+    seen_pnu = set()
+    for feat in all_features:
+        props = feat.get("properties", {})
+        pnu = props.get("pnu", "")
+        if not pnu or pnu in seen_pnu: continue
         
-        return included
+        geom = feat.get("geometry")
+        if not geom: continue
+        
+        parcel_shape = shape(geom)
+        if boundary_polygon.intersects(parcel_shape):
+            try:
+                parcel_shape_m = transform(project_to_meter, parcel_shape)
+                intersection_m = boundary_polygon_m.intersection(parcel_shape_m)
+                cad_area = intersection_m.area
+                total_cad_area = parcel_shape_m.area
+            except:
+                cad_area = 0.0
+                total_cad_area = 0.0
+
+            included.append({
+                "PNU": pnu, "주소": props.get("addr", ""), "지번": props.get("jibun", ""),
+                "구적상면적": cad_area, "전체구적면적": total_cad_area, "지적도형": parcel_shape
+            })
+            seen_pnu.add(pnu)
     
-    except requests.RequestException as e:
-        raise RuntimeError(f"API 통신 오류: {e}")
+    return included
