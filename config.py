@@ -310,7 +310,7 @@ VWORLD_WFS_LAYERS = {
         "fields": {"eczm_grad": "등급", "plnt_cln_ttle": "식생명"},
         "geometry_type": "Polygon",
         "label_field": "eczm_grad",
-        "dxf_layers": {"boundary": "ECOLOGY_LINE", "text": "ECOLOGY_TEXT"},
+        "dxf_layers": {"boundary": "ECOLOGY_LINE", "text": "ECOLOGY_TEXT", "hatch": "ECOLOGY_HATCH"},
     },
 }
 
@@ -324,5 +324,5 @@ for cat_name, layers in VWORLD_WMS_CATEGORIES.items():
                 "fields": {"gid": "GID"},
                 "geometry_type": "Unknown",
                 "label_field": "",
-                "dxf_layers": {"boundary": f"{primary_code.upper()}_LINE", "text": f"{primary_code.upper()}_TEXT"},
+                "dxf_layers": {"boundary": f"{primary_code.upper()}_LINE", "text": f"{primary_code.upper()}_TEXT", "hatch": f"{primary_code.upper()}_HATCH"},
             }

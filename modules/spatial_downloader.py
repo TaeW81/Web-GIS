@@ -229,7 +229,20 @@ def export_to_dxf(
     # DXF 레이어 생성
     doc.layers.add(dxf_layers["boundary"], color=2)   # 2: 노란색
     doc.layers.add(dxf_layers["text"], color=7)        # 7: 흰색
+    if "hatch" in dxf_layers:
+        doc.layers.add(dxf_layers["hatch"], color=7)
     doc.layers.add("0_PROJECT_BOUNDARY", color=1)      # 1: 빨간색
+
+    # 생태자연도 등급별 정보 매핑 (코드 9: 별도관리지역 포함)
+    ECOLOGY_GRAD_MAP = {
+        "1": {"label": "1등급", "color": 3},
+        "2": {"label": "2등급", "color": 121}, # 연한 녹색
+        "3": {"label": "3등급", "color": 8},   # 회색
+        "4": {"label": "별도관리지역", "color": 1}, # 빨간색
+        "9": {"label": "별도관리지역", "color": 1}, # 빨간색 (표준 코드)
+        "관리지역": {"label": "별도관리지역", "color": 1},
+        "보완": {"label": "보완지역", "color": 5},
+    }
 
     # 피처 처리
     for feature in transformed.get("features", []):
@@ -284,16 +297,72 @@ def export_to_dxf(
             except Exception:
                 pass  # 텍스트 생성 실패 시 무시
 
+        def _add_hatch(rings, layer_name_dxf, color_index=None):
+            """폴리곤에 해치 추가"""
+            if not rings or not rings[0] or not layer_name_dxf:
+                return
+            try:
+                hatch = msp.add_hatch(
+                    dxfattribs={
+                        "layer": layer_name_dxf,
+                    }
+                )
+                # Solid fill 설정 (색상 지정)
+                if color_index is not None:
+                    hatch.set_solid_fill(color=color_index)
+                else:
+                    hatch.set_solid_fill(color=256) # 256: ByLayer
+                
+                # 바깥선
+                hatch.paths.add_polyline_path(
+                    [(pt[0], pt[1]) for pt in rings[0]],
+                    is_closed=True
+                )
+                # 구멍(Holes) 처리
+                for hole in rings[1:]:
+                    if len(hole) >= 3:
+                        hatch.paths.add_polyline_path(
+                            [(pt[0], pt[1]) for pt in hole],
+                            is_closed=True
+                        )
+            except Exception:
+                pass
+
+        # 레이어 및 색상 결정 로직 (생태자연도 특화)
+        current_boundary_layer = dxf_layers["boundary"]
+        current_hatch_layer = dxf_layers.get("hatch")
+        hatch_color = None
+
+        if layer_name == "생태자연도" and "eczm_grad" in props:
+            grad = str(props["eczm_grad"])
+            grad_info = ECOLOGY_GRAD_MAP.get(grad, {"label": grad, "color": 7})
+            hatch_color = grad_info["color"]
+            grad_label = grad_info["label"]
+            
+            # 등급별 전용 레이어 이름 생성 (예: 생태자연도_1등급_선 / 생태자연도_별도관리지역_선)
+            current_boundary_layer = f"생태자연도_{grad_label}_선"
+            current_hatch_layer = f"생태자연도_{grad_label}_해치"
+            
+            # 레이어 자동 생성 및 색상 부여
+            if current_boundary_layer not in doc.layers:
+                doc.layers.add(current_boundary_layer, color=hatch_color)
+            if current_hatch_layer not in doc.layers:
+                doc.layers.add(current_hatch_layer, color=hatch_color)
+
         if gtype == "Polygon":
             for ring in coords:
-                _add_polygon_ring(ring, dxf_layers["boundary"])
+                _add_polygon_ring(ring, current_boundary_layer)
             _add_label(coords, label_text, dxf_layers["text"])
+            if current_hatch_layer:
+                _add_hatch(coords, current_hatch_layer, hatch_color)
 
         elif gtype == "MultiPolygon":
             for poly_coords in coords:
                 for ring in poly_coords:
-                    _add_polygon_ring(ring, dxf_layers["boundary"])
+                    _add_polygon_ring(ring, current_boundary_layer)
                 _add_label(poly_coords, label_text, dxf_layers["text"])
+                if current_hatch_layer:
+                    _add_hatch(poly_coords, current_hatch_layer, hatch_color)
 
     # 구역계 추가
     if boundary_points:

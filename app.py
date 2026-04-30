@@ -436,7 +436,9 @@ if st.session_state.get("do_status_analysis"):
 if st.session_state.get("pnu_list"):
     st.subheader("📋 대상지 조서/면적 분석 (Pnu 추출)")
     with st.expander(f"편입 필지 구조 ({len(st.session_state.pnu_list)}건)", expanded=False):
-        st.dataframe(st.session_state.pnu_list, use_container_width=True)
+        # Shapely 객체인 '지적도형' 컬럼을 제외하고 출력 (Arrow 오류 방지)
+        display_df = [ {k: v for k, v in p.items() if k != "지적도형"} for p in st.session_state.pnu_list ]
+        st.dataframe(display_df, use_container_width=True)
 
 if st.session_state.get("all_sheets"):
     st.subheader("📊 자동 현황 분석 결과")

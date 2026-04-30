@@ -31,7 +31,7 @@ class LandAttributeAnalyzer(BaseAnalyzer):
                 "data": CADASTRAL_LAYER,
                 "key": api_key,
                 "domain": VWORLD_DOMAIN,
-                "attrFilter": f"pnu:like:{pnu}",
+                "attrFilter": f"pnu:eq:{pnu}",
             }
             
             try:

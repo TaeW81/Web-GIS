@@ -83,8 +83,15 @@ def extract_pnu_list(boundary_polygon, api_key):
                 total_cad_area = 0.0
 
             included.append({
-                "PNU": pnu, "주소": props.get("addr", ""), "지번": props.get("jibun", ""),
-                "구적상면적": cad_area, "전체구적면적": total_cad_area, "지적도형": parcel_shape
+                "PNU": pnu, 
+                "주소": props.get("addr", ""), 
+                "지번": props.get("jibun", ""),
+                "지목": props.get("jimok", "-"),
+                "대장면적": float(props.get("parea", 0.0)),
+                "공시지가": str(props.get("pnilp", "0")).strip(),
+                "구적상면적": cad_area, 
+                "전체구적면적": total_cad_area, 
+                "지적도형": parcel_shape
             })
             seen_pnu.add(pnu)
     

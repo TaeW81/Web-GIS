@@ -19,6 +19,16 @@ def clean_address(addr):
     if not addr: return ""
     return re.sub(r'\s+[\d-]+$', '', str(addr)).strip()
 
+JIMOK_MAP = {
+    "01": "전", "02": "답", "03": "과", "04": "목", "05": "임", "06": "광", "07": "염", "08": "대",
+    "09": "장", "10": "학", "11": "주", "12": "창", "13": "도", "14": "철", "15": "제", "16": "구",
+    "17": "유", "18": "수", "19": "공", "20": "체", "21": "원", "22": "종", "23": "사", "24": "묘",
+    "25": "잡", "26": "주", "27": "양", "28": "공",
+    "전": "전", "답": "답", "과": "과", "목": "목", "임": "임", "광": "광", "염": "염", "대": "대",
+    "장": "장", "학": "학", "주": "주", "창": "창", "도": "도", "철": "철", "제": "제", "구": "구",
+    "유": "유", "수": "수", "공": "공", "체": "체", "원": "원", "종": "종", "사": "사", "묘": "묘", "잡": "잡"
+}
+
 class LandLedgerAnalyzer(BaseAnalyzer):
     name = "토지조서 (편입면적/공시지가 등)"
     description = "지적 속성 및 소유자, 편입 면적을 정밀 분석합니다."
@@ -26,25 +36,23 @@ class LandLedgerAnalyzer(BaseAnalyzer):
     def analyze(self, pnu_list, api_key):
         self.session = requests.Session()
 
-        # ① WFS 벌크 조회 (50개 묶음 attrFilter)
-        print(">>> [1단계] 지적도 전산DB 벌크 수집 중...")
-        self.cad_attr_map = self._bulk_fetch_cadastral(pnu_list, api_key)
-        wfs_hit = len(self.cad_attr_map)
-        wfs_miss = len(pnu_list) - wfs_hit
-        print(f">>> [1단계] 완료: {wfs_hit}건 수집 / {wfs_miss}건 누락 (NED API에서 보완 예정)")
+        # ① WFS 벌크 조희 대신 필지별 정밀 조희로 변경 (지속적 누락 방지)
+        # bulk_fetch는 _analyze_single_parcel 내부에서 개별적으로 수행하도록 통합
+        self.cad_attr_map = {} 
 
         # ② 용도지역
         print(">>> [2단계] 용도지역 수집 중...")
         self.prefetched_zones = self._prefetch_zoning_data(pnu_list, api_key)
 
-        # ③ NED API (소유자 + WFS 누락 보완) — 300개 배치 + 25 워커
-        print(">>> [3단계] 토지대장 정밀 조회 시작...")
+        # ③ NED API + 공간 검색 보완 — 3개 워커로 안정성 집중
+        print(">>> [3단계] 토지대장 및 공간 검색 시작...")
         results = []
-        batch_size = 300
+        batch_size = 200
         for i in range(0, len(pnu_list), batch_size):
             batch = pnu_list[i:i + batch_size]
-            print(f"    처리 중: {i+1} ~ {min(i+batch_size, len(pnu_list))} / 전체 {len(pnu_list)} 필지")
-            with concurrent.futures.ThreadPoolExecutor(max_workers=25) as executor:
+            
+            # 워커 수를 3개로 더 줄여서 서버 차단 원천 차단 (안정성 최우선)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
                 futures = {
                     executor.submit(self._analyze_single_parcel, i + j + 1, parcel, api_key): parcel
                     for j, parcel in enumerate(batch)
@@ -54,51 +62,13 @@ class LandLedgerAnalyzer(BaseAnalyzer):
                         res = future.result()
                         if res: results.append(res)
                     except: pass
+            
             if i + batch_size < len(pnu_list):
-                time.sleep(0.5)
+                time.sleep(1.0) 
 
         return sorted(results, key=lambda x: x["일련번호"])
 
-    # ------------------------------------------------------------------ #
-    #  WFS 벌크 조회 (attrFilter pnu:IN 방식)
-    # ------------------------------------------------------------------ #
-    def _bulk_fetch_cadastral(self, pnu_list, api_key):
-        attr_map = {}
-        pnu_codes = [p["PNU"] for p in pnu_list]
-        chunk_size = 50
-
-        for i in range(0, len(pnu_codes), chunk_size):
-            chunk = pnu_codes[i:i + chunk_size]
-            # VWorld attrFilter 정확한 문법: pnu:IN:(v1,v2,...)
-            pnu_filter = "pnu:IN:({})".format(",".join(chunk))
-            params = {
-                "service": "data", "request": "GetFeature",
-                "data": CADASTRAL_LAYER, "key": api_key, "domain": VWORLD_DOMAIN,
-                "attrFilter": pnu_filter,
-                "size": str(len(chunk) + 5)
-            }
-            try:
-                res = self.session.get(VWORLD_DATA_URL, params=params, timeout=15)
-                data = res.json()
-                status = data.get("response", {}).get("status", "")
-                if status == "OK":
-                    feats = data["response"]["result"]["featureCollection"]["features"]
-                    for f in feats:
-                        p = f["properties"]
-                        pnu = p.get("pnu")
-                        if pnu:
-                            attr_map[pnu] = {
-                                "jimok": p.get("jimok", "-"),
-                                "pnilp": str(p.get("pnilp", "0")).strip(),
-                                "parea": float(p.get("parea", 0.0))
-                            }
-                # else: 이 청크는 누락됨 → NED API 단계에서 자동 보완
-            except: pass
-
-            if i + chunk_size < len(pnu_codes):
-                time.sleep(0.2)
-
-        return attr_map
+    # (기존 벌크 조회 제거 — 개별 조회로 통합됨)
 
     # ------------------------------------------------------------------ #
     #  용도지역 사전 로딩
@@ -129,59 +99,115 @@ class LandLedgerAnalyzer(BaseAnalyzer):
         pnu = parcel["PNU"]
         cad_area = parcel.get("구적상면적", 0.0)
         total_cad_area = parcel.get("전체구적면적", 0.0)
+        poly = parcel.get("지적도형")
 
-        # WFS에서 확보한 1차 데이터
-        pre = self.cad_attr_map.get(pnu, {})
-        jimok = pre.get("jimok", "-")
-        pnilp = pre.get("pnilp", "0")
-        parea = pre.get("parea", 0.0)
+        # [최적화] 이미 pnu_extractor에서 가져온 속성 우선 활용
+        jimok = parcel.get("지목", "-")
+        parea = parcel.get("대장면적", 0.0)
+        pnilp = parcel.get("공시지가", "0")
+        sojaeji = parcel.get("주소", "")
+        
+        owner_type, owner_count, land_use = "개인", "1", "미조회"
 
-        owner_type, owner_count, sojaeji, land_use = "개인", "1", parcel["주소"], "미조회"
+        import random
+        time.sleep(random.uniform(0.1, 0.3))
 
-        # ② NED API: 소유자 정보 조회 + WFS 누락 필지 면적 의무 보완
-        try:
-            params = {"key": api_key, "domain": VWORLD_DOMAIN, "pnu": pnu, "format": "json"}
-            for attempt in range(3):  # 최대 3회 재시도
-                try:
-                    res = self.session.get("https://api.vworld.kr/ned/data/ladfrlList",
-                                           params=params, timeout=12)
-                    ned = res.json()
-                    break
-                except:
-                    if attempt < 2: time.sleep(0.3)
-                    ned = None
-
-            if ned and "ladfrlVOList" in ned and "ladfrlVOList" in ned["ladfrlVOList"]:
-                info = ned["ladfrlVOList"]["ladfrlVOList"][0]
-                owner_type = info.get("posesnSeCodeNm", "개인")
-                sojaeji = info.get("ldCodeNm", sojaeji)
-                land_use = info.get("lnduseNm", "미조회")
-                owner_count = str(int(info.get("cnrsPsnCo", 0)) + 1)
-                if jimok == "-": jimok = info.get("lndcgrCodeNm", "-")
-
-                # ★★ WFS 누락(parea=0)이면 NED에서 반드시 가져옴 ★★
-                if parea <= 0:
-                    try: parea = float(info.get("lndpclAr", 0.0))
-                    except: parea = 0.0
-
-            # 공시지가: WFS에 없을 때만 추가 조회
-            if pnilp in ["0", "-", ""]:
-                import datetime
-                for year in [datetime.datetime.now().year, 2023, 2022]:
+        # --- 2단계: NED API (WFS 실패 시 또는 상세 정보 수집) ---
+        if jimok == "-" or parea <= 0 or owner_type == "개인":
+            try:
+                params = {"key": api_key, "domain": VWORLD_DOMAIN, "pnu": pnu, "format": "json"}
+                for attempt in range(4):
                     try:
-                        p_params = params.copy(); p_params["stdrYear"] = str(year)
-                        res2 = self.session.get(
-                            "https://api.vworld.kr/ned/data/getIndvdLandPriceAttr",
-                            params=p_params, timeout=8)
+                        res = self.session.get("https://api.vworld.kr/ned/data/ladfrlList", params=params, timeout=15)
+                        if res.status_code == 200:
+                            ned_data = res.json()
+                            
+                            def find_info(data):
+                                if not data: return None
+                                if isinstance(data, list) and len(data) > 0: return data[0]
+                                if isinstance(data, dict):
+                                    if "ldCodeNm" in data or "lndcgrCodeNm" in data: return data
+                                    for k in ["ladfrlVOList", "ladfrlVO", "item"]:
+                                        if k in data:
+                                            r = find_info(data[k]); 
+                                            if r: return r
+                                return None
+                            
+                            info = find_info(ned_data)
+                            if info:
+                                owner_type = info.get("posesnSeCodeNm", owner_type)
+                                sojaeji = info.get("ldCodeNm", sojaeji)
+                                land_use = info.get("lnduseNm", land_use)
+                                owner_count = str(int(info.get("cnrsPsnCo", 0)) + 1)
+                                if jimok == "-" or len(jimok) > 3 or (not re.search('[가-힣]', jimok)):
+                                    jimok = info.get("lndcgrCodeNm", jimok)
+                                if parea <= 0:
+                                    try: parea = float(info.get("lndpclAr", 0.0))
+                                    except: pass
+                                break
+                    except: pass
+                    time.sleep(0.5)
+            except: pass
+
+        # --- 3단계: WFS 공간 검색 (좌표 기반 필터) ---
+        if (jimok == "-" or parea <= 0) and poly:
+            try:
+                c = poly.centroid
+                geom_filter = f"POINT({c.x} {c.y})"
+                wfs_params = {
+                    "service": "data", "request": "GetFeature", "data": CADASTRAL_LAYER,
+                    "key": api_key, "domain": VWORLD_DOMAIN, "geomFilter": geom_filter, "size": "1"
+                }
+                w_res = self.session.get(VWORLD_DATA_URL, params=wfs_params, timeout=10)
+                if w_res.status_code == 200:
+                    w_data = w_res.json()
+                    if w_data.get("response", {}).get("status") == "OK":
+                        props = w_data["response"]["result"]["featureCollection"]["features"][0]["properties"]
+                        if jimok == "-": jimok = props.get("jimok", jimok)
+                        if parea <= 0: parea = float(props.get("parea", 0.0))
+                        if pnilp == "0": pnilp = str(props.get("pnilp", "0")).strip()
+            except: pass
+
+        # --- 4단계: Search API (최후의 수단) ---
+        if (jimok == "-" or parea <= 0):
+            try:
+                search_params = {
+                    "service": "search", "request": "search", "version": "2.0", "crs": "EPSG:4326",
+                    "size": "1", "type": "DISTRICT", "category": "parcel", "query": pnu, "key": api_key
+                }
+                s_res = self.session.get("https://api.vworld.kr/req/search", params=search_params, timeout=10)
+                if s_res.status_code == 200:
+                    s_data = s_res.json()
+                    if s_data.get("response", {}).get("status") == "OK":
+                        items = s_data["response"]["result"]["items"]
+                        if items:
+                            item = items[0]
+                            # Search API는 지목/면적을 직접 주지 않으므로 주소 확인용으로 주로 사용
+                            if sojaeji == parcel["주소"]:
+                                sojaeji = item.get("title", sojaeji)
+            except: pass
+
+        # 공시지가 추가 보완
+        if pnilp in ["0", "-", ""]:
+            try:
+                p_params = {"key": api_key, "domain": VWORLD_DOMAIN, "pnu": pnu, "format": "json"}
+                for year in [2024, 2023]:
+                    p_params["stdrYear"] = str(year)
+                    res2 = self.session.get("https://api.vworld.kr/ned/data/getIndvdLandPriceAttr", params=p_params, timeout=10)
+                    if res2.status_code == 200:
                         price = res2.json()
                         if "indvdLandPrices" in price and "field" in price["indvdLandPrices"]:
                             val = str(price["indvdLandPrices"]["field"][0].get("pblntfPclnd", "")).strip()
                             if val and val != "0": pnilp = val; break
-                    except: pass
-        except: pass
+            except: pass
 
-        # 최종 보정
-        if jimok in ["-", "", None]: jimok = "기타"
+        # 최종 보정 및 지목 매핑
+        if jimok in ["-", "", None]: 
+            jimok = "기타"
+        else:
+            # 숫자로 오거나 한 글자 코드인 경우 매핑 (예: 01 -> 전)
+            jimok = JIMOK_MAP.get(jimok.strip(), jimok)
+            
         if pnilp in ["0", "-", "", None]: pnilp = "-"
 
         # 편입면적 계산 (공부상 면적 기반)
@@ -205,6 +231,11 @@ class LandLedgerAnalyzer(BaseAnalyzer):
                 if shape(feat["geometry"]).intersects(centroid):
                     zoning = feat["properties"].get("uname", zoning); break
 
+        # 비고 (누락 알림)
+        note = ""
+        if parea <= 0:
+            note = "★대장면적 누락 (재확인 필요)"
+
         return {
             "일련번호": idx, "PNU": pnu, "소재지": clean_address(sojaeji),
             "필지구분": "일반" if pnu[10] == "1" else "산" if pnu[10] == "2" else "기타",
@@ -212,5 +243,5 @@ class LandLedgerAnalyzer(BaseAnalyzer):
             "부번": pnu[15:19].lstrip('0') or "0",
             "지목": jimok, "소유자": owner_type, "소유자수": owner_count,
             "공시지가": pnilp, "대장면적(㎡)": parea, "편입면적(㎡)": included_area,
-            "편입구분": inclusion_type, "용도지역": zoning, "이용상황": land_use, "비고": ""
+            "편입구분": inclusion_type, "용도지역": zoning, "이용상황": land_use, "비고": note
         }
