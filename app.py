@@ -234,16 +234,36 @@ with st.sidebar:
     selected_analyzers = all_analyzers
 
     # ----------------------------------------
-    # 5. 대상지 현황 분석_보고서(추후개발)
+    # 5. 대상지 현황 분석 보고서
     # ----------------------------------------
-    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>5. 대상지 현황 분석 보고서 <span style='font-size:12px; color:gray;'>(추후개발)</span></p>", unsafe_allow_html=True)
-    st.checkbox("위치도 작성 (예정)", disabled=True, value=False)
+    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>5. 대상지 현황 분석 보고서</p>", unsafe_allow_html=True)
+    
+    btn_analysis = st.button("자동현황 분석결과", use_container_width=True)
+    btn_report = st.button("대상지현황 분석결과 보고서", use_container_width=True)
+    btn_qbs = st.button("QBS 위치도 삽도", use_container_width=True)
+
+    if btn_analysis:
+        if not uploaded_file:
+            st.warning("구역계(DXF) 파일을 먼저 업로드해주세요.")
+        else:
+            st.session_state.do_status_analysis = True
+
+    if btn_report:
+        if not uploaded_file:
+            st.warning("구역계(DXF) 파일을 먼저 업로드해주세요.")
+        else:
+            st.session_state.do_word_report = True
+
+    if btn_qbs:
+        if not uploaded_file:
+            st.warning("구역계(DXF) 파일을 먼저 업로드해주세요.")
+        else:
+            st.session_state.do_qbs = True
 
 # ============================
 # DXF 해석 파트
 # ============================
 if uploaded_file:
-    st.sidebar.success("✅ 파일 업로드 장전 완료!")
     with st.spinner("📐 도면 좌표를 분석하는 중..."):
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".dxf") as tmp:
@@ -257,15 +277,18 @@ if uploaded_file:
                 st.session_state.map_zoom = 16
                 st.session_state.map_force_center_id += 1
                 
-                # 파일 업로드 또는 좌표계 변경 시 자동 분석 트리거
-                st.session_state.do_status_analysis = True
+                # 새로운 파일이나 좌표계가 변경되면 이전 분석 결과를 초기화 및 PNU 자동 추출 시작
+                st.session_state.do_pnu_extract = True
+                st.session_state.do_status_analysis = False
+                st.session_state.do_word_report = False
+                st.session_state.do_qbs = False
                 st.session_state.pnu_list = None
                 st.session_state.all_sheets = None
+                if "excel_bytes" in st.session_state: del st.session_state["excel_bytes"]
+                if "report_bytes" in st.session_state: del st.session_state["report_bytes"]
         except Exception as e:
             st.error(f"❌ DXF 파일 오류: {e}")
             st.stop()
-else:
-    st.info("👈 왼쪽 사이드바에서 캐드선(DXF) 파일을 먼저 올려주세요.")
 
 # ============================
 # 다운로드 실행 처리부 (단방향 실행 및 상태 유지)
@@ -315,75 +338,91 @@ if st.session_state.get("do_wfs_download") and dxf_result.get("gps_points"):
         except Exception as e:
             st.error(f"❌ 전체 추출 실패: {e}")
 
-# 캐시된 다운로드 파일이 세션에 존재하면 일괄 다운로드 압축 파일 생성
-if st.session_state.get("dl_result_bytes_list"):
-    dl_list = st.session_state.dl_result_bytes_list
-    st.success(f"🎉 성공적으로 선택된 도면 데이터(총 {st.session_state.get('dl_total_count', 0)}건)를 추출 병합 완료했습니다!")
+
+
+
+# ============================
+# 메인 화면 레이아웃 분할 (지도 / 우측 패널)
+# ============================
+map_col, panel_col = st.columns([2.8, 1.2], gap="small")
+
+with panel_col:
+    # 우측 패널 전체를 시각적으로 감싸는 테두리 박스
+    with st.container(border=True):
+        st.markdown("<h3 style='text-align: center; color: #2C3E50; margin-bottom: 0;'>🛠️ 분석 패널</h3>", unsafe_allow_html=True)
+        st.divider()
+        
+        panel_info_container = st.container()
+        panel_status_container = st.container()
+        panel_result_container = st.container()
+        panel_download_container = st.container()
     
-    import zipfile
-    import io
-
-    # DXF 묶음 생성
-    dxf_zip_buf = io.BytesIO()
-    with zipfile.ZipFile(dxf_zip_buf, "w", zipfile.ZIP_DEFLATED) as master_zf:
-        for item in dl_list:
-            safe_layer = str(item['layer']).replace('/', '_').replace('\\', '')
-            master_zf.writestr(f"{safe_layer}.dxf", item['dxf'])
+        with panel_info_container:
+            if uploaded_file:
+                st.success("✅ 파일 업로드 완료")
+                if dxf_result.get('num_vertices', 0) > 0:
+                    st.success(f"✅ 구역계 {dxf_result['num_vertices']}개 꼭짓점 매핑됨")
+            else:
+                st.info("👈 왼쪽 사이드바에서 캐드선(DXF) 파일을 먼저 올려주세요.")
             
-    # 종합 통합 패키지 (DXF + SHP 폴더 구조)
-    master_zip_buf = io.BytesIO()
-    with zipfile.ZipFile(master_zip_buf, "w", zipfile.ZIP_DEFLATED) as master_zf:
-        for item in dl_list:
-            safe_layer = str(item['layer']).replace('/', '_').replace('\\', '')
-            master_zf.writestr(f"DXF/{safe_layer}.dxf", item['dxf'])
-            # SHP 압축해제 후 재압축
-            with zipfile.ZipFile(io.BytesIO(item['shp']), "r") as shp_zf:
-                for shp_filename in shp_zf.namelist():
-                    master_zf.writestr(f"SHP/{shp_filename}", shp_zf.read(shp_filename))
-                    
-    colA, colB = st.columns(2)
-    colA.download_button(f"💾 전체 도면 일괄 다운로드 (.dxf 압축)", dxf_zip_buf.getvalue(), f"도면추출_DXF.zip", "application/zip", use_container_width=True)
-    colB.download_button(f"💾 전체 공간정보 풀패키지 (DXF+SHP 통합압축)", master_zip_buf.getvalue(), f"도면추출_통합팩.zip", "application/zip", type="primary", use_container_width=True)
+            if st.session_state.get("dl_result_bytes_list"):
+                dl_list = st.session_state.dl_result_bytes_list
+                st.success(f"🎉 도면 데이터 병합 완료! ({st.session_state.get('dl_total_count', 0)}건)")
+                
+                import zipfile
+                import io
+    
+                dxf_zip_buf = io.BytesIO()
+                with zipfile.ZipFile(dxf_zip_buf, "w", zipfile.ZIP_DEFLATED) as master_zf:
+                    for item in dl_list:
+                        safe_layer = str(item['layer']).replace('/', '_').replace('\\', '')
+                        master_zf.writestr(f"{safe_layer}.dxf", item['dxf'])
+                        
+                master_zip_buf = io.BytesIO()
+                with zipfile.ZipFile(master_zip_buf, "w", zipfile.ZIP_DEFLATED) as master_zf:
+                    for item in dl_list:
+                        safe_layer = str(item['layer']).replace('/', '_').replace('\\', '')
+                        master_zf.writestr(f"DXF/{safe_layer}.dxf", item['dxf'])
+                        with zipfile.ZipFile(io.BytesIO(item['shp']), "r") as shp_zf:
+                            for shp_filename in shp_zf.namelist():
+                                master_zf.writestr(f"SHP/{shp_filename}", shp_zf.read(shp_filename))
+                                
+                st.download_button(f"💾 도면 일괄 다운로드 (.dxf)", dxf_zip_buf.getvalue(), f"도면추출_DXF.zip", "application/zip", use_container_width=True)
+                st.download_button(f"💾 도면 풀패키지 (통합압축)", master_zip_buf.getvalue(), f"도면추출_통합팩.zip", "application/zip", type="primary", use_container_width=True)
 
-
-# ============================
-# VWorld 지도 렌더링 
-# ============================
-st.subheader("📍 대상지 위치도")
-
-base_map_options = list(VWORLD_TILE_URLS.keys())
-base_map = st.radio("맵 레이아웃(배경)", options=base_map_options, horizontal=True, label_visibility="collapsed")
-
-if base_map != st.session_state.last_base_map:
-    st.session_state.last_base_map = base_map
-
-# 지도 빌드 — 앱에서 관리하는 선택된 렌더링 레이어 배열 전달
-_locate_auto = (not uploaded_file) and (not st.session_state.get("search_marker"))
-vworld_map = create_map(
-    center=st.session_state.map_center,
-    gps_points=dxf_result["gps_points"],
-    base_map=base_map if base_map else "일반지도",
-    zoom_start=st.session_state.map_zoom,
-    locate_on_start=_locate_auto,
-    visible_layers=st.session_state.map_layers,
-    legend_layer_name=st.session_state.get("last_checked_layer"),
-    force_center_id=st.session_state.map_force_center_id
-)
-
-# 검색 마커가 있다면 지도에 표시 (아이콘 핀)
-if st.session_state.get("search_marker"):
-    marker_data = st.session_state.search_marker
-    folium.Marker(
-        location=[marker_data['lat'], marker_data['lon']],
-        popup=f"<b>{marker_data['name']}</b>",
-        tooltip=marker_data['name'],
-        icon=folium.Icon(color="blue", icon="info-sign")
-    ).add_to(vworld_map)
-# ⭐️ 브라우저 localStorage를 활용한 완벽한 상태유지 지도 렌더링 (깜빡임/튕김 원천차단) ⭐️
-components.html(vworld_map._repr_html_(), width=1200, height=750)
-
-if dxf_result['num_vertices'] > 0:
-    st.success(f"✅ 구역계 {dxf_result['num_vertices']}개의 꼭짓점이 지도 위에 빨간선으로 매핑되었습니다.")
+with map_col:
+    st.subheader("📍 대상지 위치도")
+    base_map_options = list(VWORLD_TILE_URLS.keys())
+    base_map = st.radio("맵 레이아웃(배경)", options=base_map_options, horizontal=True, label_visibility="collapsed")
+    
+    if base_map != st.session_state.last_base_map:
+        st.session_state.last_base_map = base_map
+    
+    # 지도 빌드 — 앱에서 관리하는 선택된 렌더링 레이어 배열 전달
+    _locate_auto = (not uploaded_file) and (not st.session_state.get("search_marker"))
+    vworld_map = create_map(
+        center=st.session_state.map_center,
+        gps_points=dxf_result["gps_points"],
+        base_map=base_map if base_map else "일반지도",
+        zoom_start=st.session_state.map_zoom,
+        locate_on_start=_locate_auto,
+        visible_layers=st.session_state.map_layers,
+        legend_layer_name=st.session_state.get("last_checked_layer"),
+        force_center_id=st.session_state.map_force_center_id
+    )
+    
+    # 검색 마커가 있다면 지도에 표시 (아이콘 핀)
+    if st.session_state.get("search_marker"):
+        marker_data = st.session_state.search_marker
+        folium.Marker(
+            location=[marker_data['lat'], marker_data['lon']],
+            popup=f"<b>{marker_data['name']}</b>",
+            tooltip=marker_data['name'],
+            icon=folium.Icon(color="blue", icon="info-sign")
+        ).add_to(vworld_map)
+        
+    # ⭐️ 브라우저 localStorage를 활용한 완벽한 상태유지 지도 렌더링 (깜빡임/튕김 원천차단) ⭐️
+    components.html(vworld_map._repr_html_(), width=1200, height=750)
 
 # ============================
 # 분석(편입 필지 및 속성 조서) 실행부
@@ -391,102 +430,123 @@ if dxf_result['num_vertices'] > 0:
 if not uploaded_file:
     st.stop()
 
-if st.session_state.get("do_status_analysis"):
-    st.session_state.do_status_analysis = False # 1회성 플래그 (리런 방지용)
+# 1. PNU 자동 추출 (파일 업로드 시)
+if st.session_state.get("do_pnu_extract"):
+    st.session_state.do_pnu_extract = False
     
-    st.subheader("📋 대상지 조서/면적 분석 (Pnu 추출)")
-    pnu_list = []
-    with st.spinner("🔍 대상지 내 편입 필지를 찾는 중..."):
-        try:
-            pnu_list = extract_pnu_list(dxf_result["polygon"], VWORLD_KEY)
-            st.session_state.pnu_list = pnu_list
-        except Exception as e:
-            st.error(f"❌ PNU 오류: {e}")
+    with panel_status_container:
+        with st.status("🔍 편입 필지 추출 중...", expanded=True) as status:
+            try:
+                pnu_list = extract_pnu_list(dxf_result["polygon"], VWORLD_KEY)
+                st.session_state.pnu_list = pnu_list
+                status.update(label=f"✅ PNU {len(pnu_list)}필지 추출 완료", state="complete", expanded=False)
+            except Exception as e:
+                status.update(label=f"❌ PNU 오류 발생", state="error", expanded=True)
+                st.error(str(e))
 
-    if pnu_list:
-        st.subheader("📊 자동 현황 분석 결과")
-        all_sheets = {}
-        
-        for analyzer in selected_analyzers:
-            with st.spinner(f"🔄 [{analyzer.name}] 통계/산출 중... ({len(pnu_list)}건)"):
-                try:
-                    results = analyzer.analyze(pnu_list, VWORLD_KEY)
-                    all_sheets[analyzer.name] = results
-                except Exception as e:
-                    st.error(f"❌ [{analyzer.name}] 실패: {e}")
-        
-        st.session_state.all_sheets = all_sheets
+# 2. 토지대장 현황 분석 
+if st.session_state.get("do_status_analysis"):
+    st.session_state.do_status_analysis = False 
+    
+    if not st.session_state.get("pnu_list"):
+        st.warning("⚠️ 먼저 PNU 추출이 완료되어야 합니다.")
+    else:
+        pnu_list = st.session_state.pnu_list
+        with panel_status_container:
+            with st.status("📊 현황 데이터 분석 중...", expanded=True) as status:
+                all_sheets = {}
+                for analyzer in selected_analyzers:
+                    try:
+                        results = analyzer.analyze(pnu_list, VWORLD_KEY)
+                        all_sheets[analyzer.name] = results
+                    except Exception as e:
+                        st.error(f"❌ 실패: {e}")
+                
+                st.session_state.all_sheets = all_sheets
+                st.session_state.excel_bytes = create_multi_sheet_excel(all_sheets)
+                status.update(label="✅ 분석 및 엑셀 생성 성공!", state="complete", expanded=False)
 
-# 결과 렌더링
+# 결과 렌더링 (패널 안쪽)
 if st.session_state.get("pnu_list"):
-    st.subheader("📋 대상지 조서/면적 분석 (Pnu 추출)")
-    with st.expander(f"편입 필지 구조 ({len(st.session_state.pnu_list)}건)", expanded=False):
-        # Shapely 객체인 '지적도형' 컬럼을 제외하고 출력 (Arrow 오류 방지)
-        display_df = [ {k: v for k, v in p.items() if k != "지적도형"} for p in st.session_state.pnu_list ]
-        st.dataframe(display_df, use_container_width=True)
+    with panel_result_container:
+        st.markdown("**📋 편입 필지 (Pnu)**")
+        with st.expander(f"편입 필지 구조 ({len(st.session_state.pnu_list)}건)", expanded=False):
+            display_df = [ {k: v for k, v in p.items() if k != "지적도형"} for p in st.session_state.pnu_list ]
+            st.dataframe(display_df, use_container_width=True)
 
 if st.session_state.get("all_sheets"):
-    st.subheader("📊 자동 현황 분석 결과")
-    for sheet_name, results in st.session_state.all_sheets.items():
-        with st.expander(f"✅ {sheet_name}", expanded=False):
-            st.dataframe(results, use_container_width=True)
-
-    st.divider()
-    excel_bytes = create_multi_sheet_excel(st.session_state.all_sheets)
+    with panel_result_container:
+        st.markdown("**📊 분석 결과**")
+        for sheet_name, results in st.session_state.all_sheets.items():
+            with st.expander(f"✅ {sheet_name}", expanded=False):
+                st.dataframe(results, use_container_width=True)
     
-    # 📝 워드 보고서 생성 (추가)
-    with st.spinner("📄 고품질 워드 보고서 생성 중..."):
-        try:
-            # 보고서에 들어갈 속성 맵핑
-            # analyzers의 결과는 리스트[딕셔너리] 형태
-            land_data = []
-            for p in st.session_state.pnu_list:
-                p_copy = p.copy()
-                # 토지조서 결과에서 해당 PNU의 상세 속성 매칭
-                if "토지조서 (편입면적/공시지가 등)" in st.session_state.all_sheets:
-                    for row in st.session_state.all_sheets["토지조서 (편입면적/공시지가 등)"]:
-                        if row["PNU"] == p["PNU"]:
-                            p_copy["analysis_attr"] = row
-                            break
-                land_data.append(p_copy)
-            
-            # 🎨 테마 지도 생성 (추가)
-            owner_img, jimok_img = None, None
-            try:
-                from modules.map_builder import create_thematic_map
-                owner_img = create_thematic_map(dxf_result["polygon"], land_data, "소유자")
-                jimok_img = create_thematic_map(dxf_result["polygon"], land_data, "지목")
-            except Exception as me:
-                st.warning(f"테마 지도 생성 건너뜀: {me}")
-
-            # 보고서 생성기 실행
-            report_gen = LandReportGenerator(
-                analysis_data=land_data,
-                boundary_polygon=dxf_result["polygon"],
-                owner_map_bytes=owner_img,
-                jimok_map_bytes=jimok_img
-            )
-            report_bytes = report_gen.generate()
-        except Exception as re:
-            st.error(f"보고서 생성 중 오류: {re}")
-            report_bytes = None
-
-    col_ex, col_doc = st.columns(2)
-    with col_ex:
-        st.download_button(
-            "📥 [Excel] 현황분석 엑셀 리포트 다운로드",
-            data=excel_bytes,
-            file_name="현황분석조서.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
-    with col_doc:
-        if report_bytes:
+    if "excel_bytes" in st.session_state:
+        with panel_download_container:
             st.download_button(
-                "📥 [Word] 고품질 현황분석 보고서 다운로드",
-                data=report_bytes,
-                file_name="현황분석보고서.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                type="primary",
+                "📥 [Excel] 현황분석 엑셀 다운로드",
+                data=st.session_state.excel_bytes,
+                file_name="현황분석조서.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
             )
+
+# 3. 워드 보고서 생성 실행
+if st.session_state.get("do_word_report"):
+    st.session_state.do_word_report = False
+    
+    if not st.session_state.get("pnu_list") or not st.session_state.get("all_sheets"):
+        st.warning("⚠️ 대상지 현황 분석결과 보고서를 생성하려면 먼저 '자동현황 분석결과' 버튼을 눌러 분석을 완료해주세요.")
+    else:
+        with panel_status_container:
+            with st.status("📄 보고서 생성 중...", expanded=True) as status:
+                st.info("🎨 테마 지도 및 표 데이터 병합 중...")
+                try:
+                    land_data = []
+                    for p in st.session_state.pnu_list:
+                        p_copy = p.copy()
+                        if "토지조서 (편입면적/공시지가 등)" in st.session_state.all_sheets:
+                            for row in st.session_state.all_sheets["토지조서 (편입면적/공시지가 등)"]:
+                                if row["PNU"] == p["PNU"]:
+                                    p_copy["analysis_attr"] = row
+                                    break
+                        land_data.append(p_copy)
+                    
+                    st.write("🗺️ 테마 지도 생성 중...")
+                    owner_img, jimok_img = None, None
+                    try:
+                        from modules.map_builder import create_thematic_map
+                        owner_img = create_thematic_map(dxf_result["polygon"], land_data, "소유자")
+                        jimok_img = create_thematic_map(dxf_result["polygon"], land_data, "지목")
+                    except Exception as me:
+                        st.warning(f"테마 지도 건너뜀: {me}")
+    
+                    st.write("✍️ 문서 렌더링 중...")
+                    report_gen = LandReportGenerator(
+                        analysis_data=land_data,
+                        boundary_polygon=dxf_result["polygon"],
+                        owner_map_bytes=owner_img,
+                        jimok_map_bytes=jimok_img
+                    )
+                    st.session_state.report_bytes = report_gen.generate()
+                    status.update(label="✅ 보고서 생성 완료!", state="complete", expanded=False)
+                except Exception as re:
+                    status.update(label="❌ 오류 발생", state="error", expanded=True)
+                    st.error(str(re))
+                    st.session_state.report_bytes = None
+
+if st.session_state.get("report_bytes"):
+    with panel_download_container:
+        st.download_button(
+            "📥 [Word] 현황분석 보고서 다운로드",
+            data=st.session_state.report_bytes,
+            file_name="현황분석보고서.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            type="primary",
+            use_container_width=True,
+        )
+
+# 3. QBS 위치도 삽도 실행
+if st.session_state.get("do_qbs"):
+    st.session_state.do_qbs = False
+    st.info("🚧 'QBS 위치도 삽도' 기능은 현재 준비 중입니다.")
