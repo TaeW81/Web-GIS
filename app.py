@@ -230,28 +230,8 @@ with st.sidebar:
     # ----------------------------------------
     st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>3. 수치지도추출 <span style='font-size:12px; color:gray;'>(추후개발)</span></p>", unsafe_allow_html=True)
     
-    # ----------------------------------------
-    # 4. 현황 조서 분석 항목
-    # ----------------------------------------
-    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>4. 현황 조서 분석 항목</p>", unsafe_allow_html=True)
     all_analyzers = get_all_analyzers()
-    selected_analyzers = [a for a in all_analyzers if st.checkbox(a.name, value=True, help=a.description)]
-    
-    # 추후 개발 시각적 표시
-    st.checkbox("산지전용 조서 작성 (excel조서) (예정)", disabled=True, value=False)
-    st.checkbox("농지전용 조서 작성 (excel조서) (예정)", disabled=True, value=False)
-
-    start_analysis_btn = st.button("🚀 분석하기", type="primary", use_container_width=True)
-    if start_analysis_btn:
-        if not uploaded_file:
-            st.warning("⚠️ 구역계(DXF) 파일이 없어 분석을 시작할 수 없습니다.")
-        elif not selected_analyzers:
-            st.warning("⚠️ 분석할 항목을 하나 이상 선택해주세요.")
-        else:
-            st.session_state.do_status_analysis = True
-            # 기존 결과 초기화
-            st.session_state.pnu_list = None
-            st.session_state.all_sheets = None
+    selected_analyzers = all_analyzers
 
     # ----------------------------------------
     # 5. 대상지 현황 분석_보고서(추후개발)
@@ -276,6 +256,11 @@ if uploaded_file:
                 st.session_state.map_center = dxf_result["center"]
                 st.session_state.map_zoom = 16
                 st.session_state.map_force_center_id += 1
+                
+                # 파일 업로드 또는 좌표계 변경 시 자동 분석 트리거
+                st.session_state.do_status_analysis = True
+                st.session_state.pnu_list = None
+                st.session_state.all_sheets = None
         except Exception as e:
             st.error(f"❌ DXF 파일 오류: {e}")
             st.stop()

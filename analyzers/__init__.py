@@ -20,7 +20,6 @@ def get_all_analyzers():
     """
     return [
         LandLedgerAnalyzer(),
-        ZoningRegionAnalyzer(),
         # ===== 여기에 새 분석기를 추가하세요 =====
         # LandUseAnalyzer(),
         # BuildingInfoAnalyzer(),

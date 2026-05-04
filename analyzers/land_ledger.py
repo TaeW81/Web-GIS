@@ -110,44 +110,46 @@ class LandLedgerAnalyzer(BaseAnalyzer):
         owner_type, owner_count, land_use = "개인", "1", "미조회"
 
         import random
-        time.sleep(random.uniform(0.1, 0.3))
+        # 워커 병렬 실행 시 초기 부하를 분산시키기 위해 난수 대기 시간을 조금 더 넉넉하게 설정
+        time.sleep(random.uniform(0.3, 1.0))
 
         # --- 2단계: NED API (WFS 실패 시 또는 상세 정보 수집) ---
         if jimok == "-" or parea <= 0 or owner_type == "개인":
-            try:
-                params = {"key": api_key, "domain": VWORLD_DOMAIN, "pnu": pnu, "format": "json"}
-                for attempt in range(4):
-                    try:
-                        res = self.session.get("https://api.vworld.kr/ned/data/ladfrlList", params=params, timeout=15)
-                        if res.status_code == 200:
-                            ned_data = res.json()
-                            
-                            def find_info(data):
-                                if not data: return None
-                                if isinstance(data, list) and len(data) > 0: return data[0]
-                                if isinstance(data, dict):
-                                    if "ldCodeNm" in data or "lndcgrCodeNm" in data: return data
-                                    for k in ["ladfrlVOList", "ladfrlVO", "item"]:
-                                        if k in data:
-                                            r = find_info(data[k]); 
-                                            if r: return r
-                                return None
-                            
-                            info = find_info(ned_data)
-                            if info:
-                                owner_type = info.get("posesnSeCodeNm", owner_type)
-                                sojaeji = info.get("ldCodeNm", sojaeji)
-                                land_use = info.get("lnduseNm", land_use)
-                                owner_count = str(int(info.get("cnrsPsnCo", 0)) + 1)
-                                if jimok == "-" or len(jimok) > 3 or (not re.search('[가-힣]', jimok)):
-                                    jimok = info.get("lndcgrCodeNm", jimok)
-                                if parea <= 0:
-                                    try: parea = float(info.get("lndpclAr", 0.0))
-                                    except: pass
-                                break
-                    except: pass
-                    time.sleep(0.5)
-            except: pass
+            params = {"key": api_key, "domain": VWORLD_DOMAIN, "pnu": pnu, "format": "json"}
+            # API 제한으로 인한 누락 방지를 위해 최대 5회, 백오프(Backoff) 적용 재시도
+            for attempt in range(5):
+                try:
+                    res = self.session.get("https://api.vworld.kr/ned/data/ladfrlList", params=params, timeout=15)
+                    if res.status_code == 200:
+                        ned_data = res.json()
+                        
+                        def find_info(data):
+                            if not data: return None
+                            if isinstance(data, list) and len(data) > 0: return data[0]
+                            if isinstance(data, dict):
+                                if "ldCodeNm" in data or "lndcgrCodeNm" in data: return data
+                                for k in ["ladfrlVOList", "ladfrlVO", "item"]:
+                                    if k in data:
+                                        r = find_info(data[k]); 
+                                        if r: return r
+                            return None
+                        
+                        info = find_info(ned_data)
+                        if info:
+                            owner_type = info.get("posesnSeCodeNm", owner_type)
+                            sojaeji = info.get("ldCodeNm", sojaeji)
+                            land_use = info.get("lnduseNm", land_use)
+                            owner_count = str(int(info.get("cnrsPsnCo", 0)) + 1)
+                            if jimok == "-" or len(jimok) > 3 or (not re.search('[가-힣]', jimok)):
+                                jimok = info.get("lndcgrCodeNm", jimok)
+                            if parea <= 0:
+                                try: parea = float(info.get("lndpclAr", 0.0))
+                                except: pass
+                            break # 성공 시 탈출
+                except Exception as e:
+                    pass
+                # 재시도 전 대기 시간 점진적 증가 (0.5, 1.0, 1.5, 2.0초 ...)
+                time.sleep(0.5 * (attempt + 1))
 
         # --- 3단계: WFS 공간 검색 (좌표 기반 필터) ---
         if (jimok == "-" or parea <= 0) and poly:
@@ -158,14 +160,22 @@ class LandLedgerAnalyzer(BaseAnalyzer):
                     "service": "data", "request": "GetFeature", "data": CADASTRAL_LAYER,
                     "key": api_key, "domain": VWORLD_DOMAIN, "geomFilter": geom_filter, "size": "1"
                 }
-                w_res = self.session.get(VWORLD_DATA_URL, params=wfs_params, timeout=10)
-                if w_res.status_code == 200:
-                    w_data = w_res.json()
-                    if w_data.get("response", {}).get("status") == "OK":
-                        props = w_data["response"]["result"]["featureCollection"]["features"][0]["properties"]
-                        if jimok == "-": jimok = props.get("jimok", jimok)
-                        if parea <= 0: parea = float(props.get("parea", 0.0))
-                        if pnilp == "0": pnilp = str(props.get("pnilp", "0")).strip()
+                # WFS 역시 여러번 시도
+                for attempt in range(3):
+                    try:
+                        w_res = self.session.get(VWORLD_DATA_URL, params=wfs_params, timeout=10)
+                        if w_res.status_code == 200:
+                            w_data = w_res.json()
+                            if w_data.get("response", {}).get("status") == "OK":
+                                features = w_data["response"]["result"]["featureCollection"]["features"]
+                                if features:
+                                    props = features[0]["properties"]
+                                    if jimok == "-": jimok = props.get("jimok", jimok)
+                                    if parea <= 0: parea = float(props.get("parea", 0.0))
+                                    if pnilp == "0": pnilp = str(props.get("pnilp", "0")).strip()
+                                break
+                    except: pass
+                    time.sleep(1.0)
             except: pass
 
         # --- 4단계: Search API (최후의 수단) ---
@@ -175,16 +185,20 @@ class LandLedgerAnalyzer(BaseAnalyzer):
                     "service": "search", "request": "search", "version": "2.0", "crs": "EPSG:4326",
                     "size": "1", "type": "DISTRICT", "category": "parcel", "query": pnu, "key": api_key
                 }
-                s_res = self.session.get("https://api.vworld.kr/req/search", params=search_params, timeout=10)
-                if s_res.status_code == 200:
-                    s_data = s_res.json()
-                    if s_data.get("response", {}).get("status") == "OK":
-                        items = s_data["response"]["result"]["items"]
-                        if items:
-                            item = items[0]
-                            # Search API는 지목/면적을 직접 주지 않으므로 주소 확인용으로 주로 사용
-                            if sojaeji == parcel["주소"]:
-                                sojaeji = item.get("title", sojaeji)
+                for attempt in range(3):
+                    try:
+                        s_res = self.session.get("https://api.vworld.kr/req/search", params=search_params, timeout=10)
+                        if s_res.status_code == 200:
+                            s_data = s_res.json()
+                            if s_data.get("response", {}).get("status") == "OK":
+                                items = s_data["response"]["result"]["items"]
+                                if items:
+                                    item = items[0]
+                                    if sojaeji == parcel["주소"]:
+                                        sojaeji = item.get("title", sojaeji)
+                                break
+                    except: pass
+                    time.sleep(1.0)
             except: pass
 
         # 공시지가 추가 보완
@@ -193,12 +207,22 @@ class LandLedgerAnalyzer(BaseAnalyzer):
                 p_params = {"key": api_key, "domain": VWORLD_DOMAIN, "pnu": pnu, "format": "json"}
                 for year in [2024, 2023]:
                     p_params["stdrYear"] = str(year)
-                    res2 = self.session.get("https://api.vworld.kr/ned/data/getIndvdLandPriceAttr", params=p_params, timeout=10)
-                    if res2.status_code == 200:
-                        price = res2.json()
-                        if "indvdLandPrices" in price and "field" in price["indvdLandPrices"]:
-                            val = str(price["indvdLandPrices"]["field"][0].get("pblntfPclnd", "")).strip()
-                            if val and val != "0": pnilp = val; break
+                    success = False
+                    for attempt in range(2):
+                        try:
+                            res2 = self.session.get("https://api.vworld.kr/ned/data/getIndvdLandPriceAttr", params=p_params, timeout=10)
+                            if res2.status_code == 200:
+                                price = res2.json()
+                                if "indvdLandPrices" in price and "field" in price["indvdLandPrices"]:
+                                    val = str(price["indvdLandPrices"]["field"][0].get("pblntfPclnd", "")).strip()
+                                    if val and val != "0": 
+                                        pnilp = val
+                                        success = True
+                                        break
+                        except: pass
+                        if success: break
+                        time.sleep(0.5)
+                    if success: break
             except: pass
 
         # 최종 보정 및 지목 매핑
