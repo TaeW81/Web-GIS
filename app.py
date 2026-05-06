@@ -549,4 +549,31 @@ if st.session_state.get("report_bytes"):
 # 3. QBS 위치도 삽도 실행
 if st.session_state.get("do_qbs"):
     st.session_state.do_qbs = False
-    st.info("🚧 'QBS 위치도 삽도' 기능은 현재 준비 중입니다.")
+    
+    with panel_status_container:
+        with st.status("🗺️ QBS 위치도 생성 중...", expanded=True) as status:
+            try:
+                from report.qbs_generator import QBSGenerator
+                st.write("🌍 배경지도 및 레이어 병합 중 (시간이 소요될 수 있습니다)...")
+                
+                # 사용자가 현재 켜놓은 레이어 목록
+                visible_layers = st.session_state.get("map_layers", [])
+                
+                qbs_gen = QBSGenerator(dxf_result["polygon"], visible_layers)
+                st.session_state.qbs_bytes = qbs_gen.generate()
+                
+                status.update(label="✅ QBS 위치도 생성 완료!", state="complete", expanded=False)
+            except Exception as e:
+                status.update(label="❌ 위치도 생성 실패", state="error", expanded=True)
+                st.error(f"오류: {e}")
+
+if st.session_state.get("qbs_bytes"):
+    with panel_download_container:
+        st.download_button(
+            "📥 [PPT] QBS 위치도 다운로드",
+            data=st.session_state.qbs_bytes,
+            file_name="qbs_위치도.pptx",
+            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            type="primary",
+            use_container_width=True,
+        )

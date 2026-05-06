@@ -37,5 +37,7 @@ Thumbs.db
 # Output directories (but keep the directories themselves if needed)
 data/output/*
 !data/output/.gitkeep
-report/*
+# Output files in report (keep source code)
+report/*.docx
+report/*.pdf
 !report/.gitkeep
