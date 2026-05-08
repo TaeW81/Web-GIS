@@ -238,9 +238,9 @@ with st.sidebar:
     # ----------------------------------------
     st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>5. 대상지 현황 분석 보고서</p>", unsafe_allow_html=True)
     
-    btn_analysis = st.button("자동현황 분석결과", use_container_width=True)
-    btn_report = st.button("대상지현황 분석결과 보고서", use_container_width=True)
-    btn_qbs = st.button("QBS 위치도 삽도", use_container_width=True)
+    btn_analysis = st.button("자동현황 분석결과(Excel)", use_container_width=True)
+    btn_report = st.button("대상지현황 분석결과 보고서(Doc, Hwp)", use_container_width=True)
+    btn_qbs = st.button("QBS 위치도 삽도(PPT)", use_container_width=True)
 
     if btn_analysis:
         if not uploaded_file:
@@ -484,7 +484,7 @@ if st.session_state.get("all_sheets"):
     if "excel_bytes" in st.session_state:
         with panel_download_container:
             st.download_button(
-                "📥 [Excel] 현황분석 엑셀 다운로드",
+                "📥 자동현황 분석결과(Excel)",
                 data=st.session_state.excel_bytes,
                 file_name="현황분석조서.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -538,7 +538,7 @@ if st.session_state.get("do_word_report"):
 if st.session_state.get("report_bytes"):
     with panel_download_container:
         st.download_button(
-            "📥 [Word] 현황분석 보고서 다운로드",
+            "📥 대상지현황 분석결과 보고서(Doc, Hwp)",
             data=st.session_state.report_bytes,
             file_name="현황분석보고서.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -570,10 +570,10 @@ if st.session_state.get("do_qbs"):
 if st.session_state.get("qbs_bytes"):
     with panel_download_container:
         st.download_button(
-            "📥 [PPT] QBS 위치도 다운로드",
+            "📥 QBS 위치도 삽도(PPT)",
             data=st.session_state.qbs_bytes,
             file_name="qbs_위치도.pptx",
             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
             type="primary",
             use_container_width=True,
-        )
+        )
