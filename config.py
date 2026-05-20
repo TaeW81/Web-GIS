@@ -12,6 +12,8 @@ load_dotenv()
 # ===== API 키 =====
 VWORLD_KEY = os.getenv("VWORLD_KEY", "F9BD8BC9-6646-3DD4-AA3C-C80E6D45BFB1")
 NIE_KEY = os.getenv("NIE_KEY", "0b1a73c4402f5cc749ca03709d2850131f4c1e62b27c87ea7bdbe8dd19299bd7")
+NGII_KEY = os.getenv("NGII_KEY", "05A66BC66F48B4624F486A8590E4A98810E0DFB7B3")
+ECVAM_KEY = os.getenv("ECVAM_KEY", "GGDM-AU7W-FRD0-UPSC")
 
 # ===== 분석 및 보고서 설정 =====
 CADASTRAL_LAYER = "LP_PA_CBND_BUBUN"
@@ -74,6 +76,8 @@ VWORLD_SEARCH_URL = "https://api.vworld.kr/req/search"
 VWORLD_WMS_URL = "https://api.vworld.kr/req/wms"
 NIE_ECO_URL = "https://apis.data.go.kr/B553084/ecoapi/EcologyzmpService"
 NIE_WMS_URL = "https://apis.data.go.kr/B553084/ecoapi/EcologyzmpService/wms/getEcologyzmpWMS"
+NIE_WFS_URL = "https://apis.data.go.kr/B553084/ecoapi/EcologyzmpService/wfs/getEcologyzmpWFS"
+ECVAM_WMS_URL = "https://ecvam.neins.go.kr/apicall.do"
 
 # ===== VWorld WMTS 배경지도 타일 URL =====
 VWORLD_TILE_URLS = {
@@ -86,6 +90,7 @@ VWORLD_TILE_URLS = {
 # ===== WMS 범례 URL 설정 =====
 VWORLD_LEGEND_URL = "http://api.vworld.kr/req/image?key={key}&service=image&request=GetLegendGraphic&format=png&type=ALL&layer={layer}&style={layer}&LEGEND_OPTIONS=forceTitle:off"
 NIE_LEGEND_URL = "{base_url}?ServiceKey={key}&service=WMS&request=GetLegendGraphic&format=image/png&layer={layer}"
+ECVAM_LEGEND_URL = "https://ecvam.neins.go.kr/apicall.do?APIKEY={key}&SERVICE=WMS&REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER={layer}&VERSION=1.1.0"
 
 VWORLD_WMS_CATEGORIES = {
     "기본 및 지적": {
@@ -226,9 +231,81 @@ MAP_SOURCES = {
             "생태자연도": "tbl_opn_eczm",
         }
     },
+    "국토정보플랫폼": {
+        "기본지도": {
+            "LX맵(기본지도)": "LT_C_LANDINFOBASEMAP",
+            "도로중심선": "LT_L_N3A0020000",
+            "토지소유공간정보": "DT_D160",
+            "연속지적도형정보": "DT_D002",
+        },
+        "도로시설물": {
+            "차도구간": "LT_C_A3DRIVEWAYSECTION",
+            "보도구간": "LT_C_A4SUBSIDIARYSECTION",
+            "주차면": "LT_C_A5PARKINGLOT",
+            "노면표시": "LT_C_B3SURFACEMARK",
+            "노면선표시": "LT_L_B2SURFACELINEMARK",
+            "안전표지(면)": "LT_C_B1SAFETYSIGN",
+            "안전표지(점)": "LT_P_B1SAFETYSIGN",
+            "신호등": "LT_P_C1TRAFFICLIGHT",
+            "차량방호안전시설": "LT_L_C3VEHICLEPROTECTIONSAFETY",
+            "과속방지턱": "LT_C_C4SPEEDBUMP",
+            "높이장애물": "LT_L_C5HEIGHTBARRIER",
+            "킬로포스트": "LT_P_C2KILOPOST",
+            "지주": "LT_P_C6POSTPOINT",
+        },
+        "지형/지질/토양": {
+            "토양도": "LT_C_GIMSSCS",
+            "지질구조밀도": "LT_C_GIMSLINEA",
+            "지질구조선": "LT_L_GIMSLINEA",
+            "수문지질단위": "LT_C_GIMSHYDRO",
+            "단층": "LT_L_GIMSFAULT",
+            "배수등급": "LT_C_ASITSOILDRA",
+            "유효토심": "LT_C_ASITSOILDEP",
+            "심토토성": "LT_C_ASITDEEPSOIL",
+            "자갈함량": "LT_C_ASITSURSTON",
+            "해안선": "LT_L_TOISDEPCNTAH",
+        },
+    },
+    "국토환경성평가 (ECVAM)": {
+        "환경평가 종합": {
+            "국토환경성평가(종합)": "nem_ecvam",
+        },
+        "환경생태적 평가": {
+            "환경생태적 평가(종합)": "nem_eco",
+            "01_임상도": "nem_eco_01",
+            "02_녹지자연도": "nem_eco_02",
+            "03_풍수해도": "nem_eco_03",
+            "04_경사도": "nem_eco_04",
+            "05_표고": "nem_eco_05",
+            "07_토양": "nem_eco_07",
+            "08_수계": "nem_eco_08",
+        },
+        "법제적 평가": {
+            "법제적 평가(종합)": "nem_law",
+            "01_공원": "nem_law_01",
+            "02_도립공원": "nem_law_02",
+            "03_녹지": "nem_law_03",
+            "04_보호구": "nem_law_04",
+            "05_도립보호구": "nem_law_05",
+            "06_주변": "nem_law_06",
+            "07_경": "nem_law_07",
+            "08_멸종(특정)보호구": "nem_law_08",
+            "09_특정": "nem_law_09",
+            "10_자연": "nem_law_10",
+            "11_자연환경": "nem_law_11",
+            "12_수": "nem_law_12",
+            "13_문화재": "nem_law_13",
+            "14_보호림": "nem_law_14",
+            "15_백두대간보호지": "nem_law_15",
+            "16_산": "nem_law_16",
+            "17_도립": "nem_law_17",
+            "18_홍수": "nem_law_18",
+            "19_도립": "nem_law_19",
+            "20_보호구": "nem_law_20",
+        },
+    },
     "추후 추가 예정": {
-        "환경/산림 (준비중)": {
-            "국토환경성평가": "ENV_EVAL_READY",
+        "산림 (준비중)": {
             "임상도": "FOREST_MAP_READY",
         }
     }
@@ -312,17 +389,54 @@ VWORLD_WFS_LAYERS = {
         "label_field": "eczm_grad",
         "dxf_layers": {"boundary": "ECOLOGY_LINE", "text": "ECOLOGY_TEXT", "hatch": "ECOLOGY_HATCH"},
     },
+    "국토환경성평가(종합)": {
+        "source": "ECVAM",
+        "typename": "nem_ecvam",
+        "fields": {"gid": "GID"},
+        "geometry_type": "Polygon",
+        "label_field": "",
+        "dxf_layers": {"boundary": "ECVAM_LINE", "text": "ECVAM_TEXT", "hatch": "ECVAM_HATCH"},
+    },
+    "환경생태적 평가(종합)": {
+        "source": "ECVAM",
+        "typename": "nem_eco",
+        "fields": {"gid": "GID"},
+        "geometry_type": "Polygon",
+        "label_field": "",
+        "dxf_layers": {"boundary": "ECVAM_ECO_LINE", "text": "ECVAM_ECO_TEXT", "hatch": "ECVAM_ECO_HATCH"},
+    },
+    "법제적 평가(종합)": {
+        "source": "ECVAM",
+        "typename": "nem_law",
+        "fields": {"gid": "GID"},
+        "geometry_type": "Polygon",
+        "label_field": "",
+        "dxf_layers": {"boundary": "ECVAM_LAW_LINE", "text": "ECVAM_LAW_TEXT", "hatch": "ECVAM_LAW_HATCH"},
+    },
 }
 
-# --- 동적 WFS 레이어 매핑 ---
-for cat_name, layers in VWORLD_WMS_CATEGORIES.items():
-    for layer_name, code in layers.items():
-        if layer_name not in VWORLD_WFS_LAYERS:
-            primary_code = code.split(',')[0].strip()
-            VWORLD_WFS_LAYERS[layer_name] = {
-                "typename": primary_code.lower(),
-                "fields": {"gid": "GID"},
-                "geometry_type": "Unknown",
-                "label_field": "",
-                "dxf_layers": {"boundary": f"{primary_code.upper()}_LINE", "text": f"{primary_code.upper()}_TEXT", "hatch": f"{primary_code.upper()}_HATCH"},
-            }
+# --- 동적 WFS 레이어 매핑 (MAP_SOURCES의 모든 레이어) ---
+for source_name, categories in MAP_SOURCES.items():
+    for cat_name, layers in categories.items():
+        for layer_name, code in layers.items():
+            if layer_name not in VWORLD_WFS_LAYERS and "READY" not in str(code):
+                primary_code = code.split(',')[0].strip()
+                # 소스별 WFS 설정
+                if source_name == "국토환경성평가 (ECVAM)":
+                    wfs_source = "ECVAM"
+                    typename = primary_code  # ECVAM은 원본 대소문자 유지
+                elif source_name == "국립생태원 (NIE)":
+                    wfs_source = "NIE"
+                    typename = primary_code
+                else:
+                    wfs_source = "VWORLD"
+                    typename = primary_code.lower()
+                
+                VWORLD_WFS_LAYERS[layer_name] = {
+                    "source": wfs_source,
+                    "typename": typename,
+                    "fields": {"gid": "GID"},
+                    "geometry_type": "Unknown",
+                    "label_field": "",
+                    "dxf_layers": {"boundary": f"{primary_code.upper()}_LINE", "text": f"{primary_code.upper()}_TEXT", "hatch": f"{primary_code.upper()}_HATCH"},
+                }

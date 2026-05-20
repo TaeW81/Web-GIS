@@ -18,6 +18,7 @@ from modules.spatial_downloader import fetch_wfs_data, export_to_dxf, export_to_
 from modules.vworld_search import search_place
 from analyzers import get_all_analyzers
 from report.word_report import LandReportGenerator
+from report.free_transfer_generator import FreeTransferGenerator
 
 # ============================
 st.set_page_config(page_title="KH-GIS LandScan | 통합 현황분석 솔루션", layout="wide", page_icon="📡")
@@ -226,9 +227,9 @@ with st.sidebar:
                 del st.session_state["dl_result_bytes_list"]
 
     # ----------------------------------------
-    # 3. 수치지도추출(추후개발)
+    # 3. 국토정보플랫폼 벡터 추출 (추후: API 직접 연동)
     # ----------------------------------------
-    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>3. 수치지도추출 <span style='font-size:12px; color:gray;'>(추후개발)</span></p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>3. 국토정보플랫폼 벡터 추출 <span style='font-size:12px; color:gray;'>(WMS 오버레이는 위 레이어 탭에서 ✅)</span></p>", unsafe_allow_html=True)
     
     all_analyzers = get_all_analyzers()
     selected_analyzers = all_analyzers
@@ -241,6 +242,7 @@ with st.sidebar:
     btn_analysis = st.button("자동현황 분석결과(Excel)", use_container_width=True)
     btn_report = st.button("대상지현황 분석결과 보고서(Doc, Hwp)", use_container_width=True)
     btn_qbs = st.button("QBS 위치도 삽도(PPT)", use_container_width=True)
+    btn_free_transfer = st.button("소유자 구분도 작성", use_container_width=True)
 
     if btn_analysis:
         if not uploaded_file:
@@ -259,6 +261,155 @@ with st.sidebar:
             st.warning("구역계(DXF) 파일을 먼저 업로드해주세요.")
         else:
             st.session_state.do_qbs = True
+
+    if btn_free_transfer:
+        if not uploaded_file:
+            st.warning("구역계(DXF) 파일을 먼저 업로드해주세요.")
+        else:
+            st.session_state.do_free_transfer = True
+
+    # ----------------------------------------
+    # 6. 기타 프로그램 (웹 변환기 - 가벼운 버전)
+    # ----------------------------------------
+    st.markdown("<p style='font-weight:bold; font-size:15px; margin: 15px 0 5px 0;'>6. 기타 프로그램</p>", unsafe_allow_html=True)
+    
+    with st.expander("🛠️ SHP to DXF 웹 변환기", expanded=False):
+        st.markdown("<p style='font-size:12px; color:gray;'>방법 1: 아래 박스에 <b>폴더를 통째로 드래그</b>하세요.<br>방법 2: [로컬 전용] 버튼을 눌러 내 컴퓨터 폴더를 선택하세요.</p>", unsafe_allow_html=True)
+        
+        # --- [로컬 전용] 폴더 선택 기능 ---
+        col_local1, col_local2 = st.columns([1.8, 1])
+        local_path_input = col_local1.text_input("내 컴퓨터 폴더 경로 직접 입력", value=st.session_state.get("local_selected_path", ""), placeholder="예: D:/GIS_Data", label_visibility="collapsed")
+        btn_local_select = col_local2.button("📁 폴더 선택창", use_container_width=True)
+        
+        selected_path = None
+        if btn_local_select:
+            try:
+                import tkinter as tk
+                from tkinter import filedialog
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes('-topmost', True) # 창을 최상단으로
+                selected_path = filedialog.askdirectory()
+                root.destroy()
+                if selected_path:
+                    st.session_state.local_selected_path = selected_path
+            except Exception as tk_err:
+                st.warning("💡 스레드 제한으로 선택창이 열리지 않을 수 있습니다. 왼쪽 칸에 경로를 직접 입력(복사+붙여넣기)해 주세요.")
+                
+        # 텍스트 입력값 변경 시 세션 상태 동기화
+        if local_path_input and local_path_input != st.session_state.get("local_selected_path"):
+            st.session_state.local_selected_path = local_path_input
+            
+        if st.session_state.get("local_selected_path"):
+            path_to_check = st.session_state.local_selected_path.strip()
+            if os.path.exists(path_to_check) and os.path.isdir(path_to_check):
+                # 폴더 내 shp 파일 찾기
+                shp_files = [f for f in os.listdir(path_to_check) if f.lower().endswith('.shp')]
+                if shp_files:
+                    st.session_state.found_shp_in_local = shp_files
+                else:
+                    st.session_state.found_shp_in_local = []
+                    st.error("❌ 해당 폴더에 SHP 파일이 없습니다.")
+            else:
+                st.session_state.found_shp_in_local = []
+                st.error("❌ 유효하지 않은 폴더 경로입니다.")
+        
+        # 로컬 폴더 선택 결과가 있을 경우 파일 선택 UI
+        target_shp_name = None
+        if st.session_state.get("local_selected_path") and st.session_state.get("found_shp_in_local"):
+            target_shp_name = st.selectbox("변환할 SHP 선택", options=st.session_state.found_shp_in_local)
+            st.info(f"선택된 경로: {st.session_state.local_selected_path}")
+        
+        st.markdown("---")
+        
+        # 기존 파일 업로더 (웹 배포용)
+        uploaded_shp_files = st.file_uploader("또는 여기에 폴더/파일 드래그", type=["shp", "shx", "dbf"], accept_multiple_files=True, key="shp_dxf_uploader_v2", label_visibility="visible")
+        
+        # 데이터 소스 결정 (로컬 폴더 vs 업로드 파일)
+        shp_data, shx_data, dbf_data = None, None, None
+        shp_display_name = ""
+
+        if target_shp_name and st.session_state.get("local_selected_path"):
+            # 로컬 파일 읽기
+            base_p = os.path.join(st.session_state.local_selected_path, os.path.splitext(target_shp_name)[0])
+            try:
+                with open(base_p + ".shp", "rb") as f: shp_data = f.read()
+                with open(base_p + ".shx", "rb") as f: shx_data = f.read()
+                with open(base_p + ".dbf", "rb") as f: dbf_data = f.read()
+                shp_display_name = target_shp_name
+            except:
+                st.error("⚠️ 로컬 파일을 읽는 중 오류가 발생했습니다. (세트 파일 누락 등)")
+        elif uploaded_shp_files:
+            # 업로드 파일에서 찾기
+            f_shp = next((f for f in uploaded_shp_files if f.name.lower().endswith(".shp")), None)
+            f_shx = next((f for f in uploaded_shp_files if f.name.lower().endswith(".shx")), None)
+            f_dbf = next((f for f in uploaded_shp_files if f.name.lower().endswith(".dbf")), None)
+            if f_shp and f_shx and f_dbf:
+                shp_data, shx_data, dbf_data = f_shp.getvalue(), f_shx.getvalue(), f_dbf.getvalue()
+                shp_display_name = f_shp.name
+
+        if shp_data and shx_data and dbf_data:
+            from modules.shp_converter import get_shp_fields_from_io, convert_shp_to_dxf_bytes
+            import io
+            
+            # 필드 정보 읽기
+            fields = get_shp_fields_from_io(io.BytesIO(shp_data), io.BytesIO(shx_data), io.BytesIO(dbf_data))
+            
+            if fields:
+                st.markdown("---")
+                st.markdown("<p style='font-size:13px; font-weight:bold;'>속성 필드 및 소수점 설정</p>", unsafe_allow_html=True)
+                
+                selected_fields = {}
+                cols = st.columns(2)
+                for idx, f_name in enumerate(fields):
+                    with cols[idx % 2]:
+                        f_col1, f_col2 = st.columns([1, 1])
+                        is_sel = f_col1.checkbox(f_name, key=f"shp_f_v2_{f_name}")
+                        if is_sel:
+                            prec = f_col2.number_input("소수점", min_value=0, max_value=10, value=0, step=1, key=f"shp_p_v2_{f_name}", label_visibility="collapsed")
+                            selected_fields[f_name] = prec
+                
+                txt_size = st.slider("텍스트 크기", 0.1, 10.0, 2.0, 0.1, key="shp_txt_size_v2")
+                
+                if st.button("🚀 변환 및 다운로드 준비", type="primary", use_container_width=True):
+                    try:
+                        with st.spinner("DXF 파일 생성 중..."):
+                            dxf_bytes = convert_shp_to_dxf_bytes(
+                                io.BytesIO(shp_data), 
+                                io.BytesIO(shx_data), 
+                                io.BytesIO(dbf_data), 
+                                selected_fields, 
+                                txt_size
+                            )
+                            st.session_state.shp_convert_result = dxf_bytes
+                            st.session_state.shp_convert_name = os.path.splitext(shp_display_name)[0] + ".dxf"
+                            st.success("✅ 변환이 완료되었습니다. 아래 버튼을 눌러 저장하세요.")
+                    except Exception as e:
+                        st.error(f"❌ 변환 오류: {e}")
+                    
+                    if st.session_state.get("shp_convert_result"):
+                        st.download_button(
+                            label="📥 변환된 DXF 파일 다운로드",
+                            data=st.session_state.shp_convert_result,
+                            file_name=st.session_state.shp_convert_name,
+                            mime="application/dxf",
+                            use_container_width=True
+                        )
+                else:
+                    st.warning("⚠️ 필드 정보를 읽을 수 없습니다.")
+            else:
+                st.info("💡 SHP, SHX, DBF 파일 3개를 모두 업로드해 주세요.")
+
+    if st.button("🖥️ [로컬] 기존 프로그램 실행", use_container_width=True):
+        import subprocess
+        import sys
+        program_path = os.path.join(os.getcwd(), "tools", "shp_to_dxf.py")
+        if os.path.exists(program_path):
+            try:
+                subprocess.Popen([sys.executable, program_path], 
+                                 creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0)
+            except Exception as e:
+                st.error(f"❌ 실행 오류: {e}")
 
 # ============================
 # DXF 해석 파트
@@ -282,6 +433,7 @@ if uploaded_file:
                 st.session_state.do_status_analysis = False
                 st.session_state.do_word_report = False
                 st.session_state.do_qbs = False
+                st.session_state.do_free_transfer = False
                 st.session_state.pnu_list = None
                 st.session_state.all_sheets = None
                 if "excel_bytes" in st.session_state: del st.session_state["excel_bytes"]
@@ -574,6 +726,53 @@ if st.session_state.get("qbs_bytes"):
             data=st.session_state.qbs_bytes,
             file_name="qbs_위치도.pptx",
             mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            type="primary",
+            use_container_width=True,
+        )
+
+# 4. 소유자 구분도 작성 실행
+if st.session_state.get("do_free_transfer"):
+    st.session_state.do_free_transfer = False
+    
+    if not st.session_state.get("pnu_list") or not st.session_state.get("all_sheets"):
+        st.warning("⚠️ 소유자 구분도를 작성하려면 먼저 '자동현황 분석결과' 버튼을 눌러 분석을 완료해주세요.")
+    else:
+        with panel_status_container:
+            with st.status("🗺️ 소유자 구분도 생성 중...", expanded=True) as status:
+                try:
+                    st.write("📂 대상 필지 선별 및 렌더링 중...")
+                    
+                    # 분석 데이터(all_sheets)에서 소유자 정보를 land_data에 병합
+                    land_data = []
+                    for p in st.session_state.pnu_list:
+                        p_copy = p.copy()
+                        if "토지조서 (편입면적/공시지가 등)" in st.session_state.all_sheets:
+                            for row in st.session_state.all_sheets["토지조서 (편입면적/공시지가 등)"]:
+                                if row["PNU"] == p["PNU"]:
+                                    p_copy["analysis_attr"] = row
+                                    break
+                        land_data.append(p_copy)
+                    
+                    generator = FreeTransferGenerator(dxf_result["polygon"], land_data)
+                    zip_bytes = generator.generate()
+                    
+                    if not zip_bytes:
+                        status.update(label="⚠️ 분석 가능한 필지가 없습니다.", state="complete", expanded=True)
+                    else:
+                        st.session_state.free_transfer_zip = zip_bytes
+                        status.update(label="✅ 소유자 구분도 생성 완료!", state="complete", expanded=False)
+                        st.session_state.free_transfer_ready = True
+                except Exception as e:
+                    status.update(label="❌ 생성 실패", state="error", expanded=True)
+                    st.error(f"오류: {e}")
+
+if st.session_state.get("free_transfer_ready") and st.session_state.get("free_transfer_zip"):
+    with panel_download_container:
+        st.download_button(
+            "📥 소유자 구분도 다운로드",
+            data=st.session_state.free_transfer_zip,
+            file_name="소유자_구분도_패키지.zip",
+            mime="application/zip",
             type="primary",
             use_container_width=True,
         )

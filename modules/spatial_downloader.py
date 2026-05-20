@@ -1,12 +1,3 @@
-"""
-공간 데이터 다운로드 모듈
-
-역할:
-  - VWorld WFS API로 벡터 데이터 요청
-  - 좌표계 변환 (EPSG:4326 → 사용자 선택 EPSG)
-  - 구역계(Polygon)를 별도 레이어로 포함
-  - SHP(ZIP) 및 DXF 포맷으로 변환/내보내기
-"""
 import requests
 import shapefile
 import ezdxf
@@ -14,7 +5,7 @@ import zipfile
 from io import BytesIO, StringIO
 from pyproj import Transformer
 from shapely.geometry import shape, Polygon, MultiPolygon
-from config import VWORLD_KEY, VWORLD_WFS_LAYERS, NIE_KEY, NIE_WMS_URL
+from config import VWORLD_KEY, VWORLD_WFS_LAYERS, NIE_KEY, NIE_WMS_URL, NIE_WFS_URL, ECVAM_KEY, ECVAM_WMS_URL
 
 
 # ========================================================
@@ -44,12 +35,19 @@ def fetch_wfs_data(layer_name: str, bbox: str, api_key: str = None) -> dict:
     source = layer_config.get("source", "VWORLD")
     
     if source == "NIE":
-        wfs_url = NIE_WMS_URL
+        wfs_url = NIE_WFS_URL
         api_key_param = "ServiceKey"
         key_val = NIE_KEY
         version = "1.1.0"
         output_param = "OUTPUTFORMAT"
         output_val = "json"
+    elif source == "ECVAM":
+        wfs_url = ECVAM_WMS_URL
+        api_key_param = "APIKEY"
+        key_val = ECVAM_KEY
+        version = "1.1.0"
+        output_param = "OUTPUTFORMAT"
+        output_val = "application/json"
     else:
         wfs_url = "https://api.vworld.kr/req/wfs"
         api_key_param = "key"
@@ -61,9 +59,9 @@ def fetch_wfs_data(layer_name: str, bbox: str, api_key: str = None) -> dict:
     all_features = {}
 
     def fetch_grid(grid_bbox: list, depth: int):
-        # VWorld WFS 1.1.0 (EPSG:4326)은 Lat, Lon 순서의 BBOX를 요구함
-        # 국립생태원 등 표준 GeoServer 기반은 Lon, Lat 순서의 BBOX를 요구함
-        if source == "NIE":
+        # VWorld WFS 1.1.0 (EPSG:4326)는 Lat, Lon 순서의 BBOX를 요구함
+        # 국립생태원/ECVAM 등 표준 GeoServer 기반은 Lon, Lat 순서의 BBOX를 요구함
+        if source in ("NIE", "ECVAM"):
             bbox_str = f"{grid_bbox[1]},{grid_bbox[0]},{grid_bbox[3]},{grid_bbox[2]}"
         else:
             bbox_str = f"{grid_bbox[0]},{grid_bbox[1]},{grid_bbox[2]},{grid_bbox[3]}"
@@ -79,7 +77,7 @@ def fetch_wfs_data(layer_name: str, bbox: str, api_key: str = None) -> dict:
             output_param: output_val,
             "MAXFEATURES": "1000",
         }
-        if source != "NIE":
+        if source == "VWORLD":
             params["domain"] = "http://localhost"
 
         try:
