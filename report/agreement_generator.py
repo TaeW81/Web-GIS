@@ -254,9 +254,10 @@ def _strip_page_break_first(page_xml: str) -> str:
 # image3: 23663×27289, image4: 23527×27212 → 평균 0.866
 _PIC_ASPECT = 23663 / 27289  # 가로/세로
 
-# sample image3.jpg와 동일한 픽셀 dimension — 한글이 사이즈로 인한 잘못된 회전 처리 회피
-_TARGET_IMG_WIDTH = 2304
-_TARGET_IMG_HEIGHT = 2656
+# 픽셀 사이즈 — sample image3.jpg(2304×2656)의 절반
+# 한글이 10.27% 비율로 표시하던 것을 ~50%로 키우고 파일 용량 1/4로 축소
+_TARGET_IMG_WIDTH = 1152
+_TARGET_IMG_HEIGHT = 1328
 
 
 def _fetch_vworld_parcels(min_lon, min_lat, max_lon, max_lat, max_features=2000):
@@ -274,20 +275,29 @@ def _fetch_vworld_parcels(min_lon, min_lat, max_lon, max_lat, max_features=2000)
         parcels = []
         page = 1
         while True:
+            params = {
+                "service": "data", "request": "GetFeature",
+                "data": "LP_PA_CBND_BUBUN",
+                "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
+                "geomFilter": f"BOX({bbox})",
+                "size": "1000", "page": str(page),
+                "geometry": "true", "format": "json",
+                "crs": "EPSG:4326",
+            }
+            # 페이지마다 최대 3회 retry — V-World 일시적 실패 대응
+            data = None
+            for attempt in range(3):
+                try:
+                    res = requests.get(VWORLD_DATA_URL, params=params, timeout=20)
+                    data = res.json()
+                    if data.get("response", {}).get("status") == "OK":
+                        break
+                    data = None
+                except Exception:
+                    data = None
+            if data is None:
+                break
             try:
-                params = {
-                    "service": "data", "request": "GetFeature",
-                    "data": "LP_PA_CBND_BUBUN",
-                    "key": VWORLD_KEY, "domain": VWORLD_DOMAIN,
-                    "geomFilter": f"BOX({bbox})",
-                    "size": "1000", "page": str(page),
-                    "geometry": "true", "format": "json",
-                    "crs": "EPSG:4326",
-                }
-                res = requests.get(VWORLD_DATA_URL, params=params, timeout=20)
-                data = res.json()
-                if data.get("response", {}).get("status") != "OK":
-                    break
                 features = data["response"]["result"]["featureCollection"]["features"]
                 for feat in features:
                     geom = feat.get("geometry") or {}
@@ -398,14 +408,17 @@ def _fetch_vworld_satellite_tiles(min_lon, min_lat, max_lon, max_lat,
             lat = math.degrees(math.atan(math.sinh(math.pi * (1.0 - 2.0 * yt / n))))
             return lat, lon
 
-        # 코너 4점의 타일 인덱스
-        x0f, y0f = deg2num(max_lat, min_lon, zoom)  # NW
-        x1f, y1f = deg2num(min_lat, max_lon, zoom)  # SE
-        x0, x1 = int(math.floor(x0f)), int(math.floor(x1f))
-        y0, y1 = int(math.floor(y0f)), int(math.floor(y1f))
-
-        if (x1 - x0 + 1) * (y1 - y0 + 1) > 100:  # 안전: 100타일 초과 시 zoom 줄이기 — 실패 처리
-            return None, None
+        # 코너 4점의 타일 인덱스 + 타일 수 너무 많으면 zoom 자동 축소
+        for _ in range(8):  # 최대 8번 zoom 감소 시도
+            x0f, y0f = deg2num(max_lat, min_lon, zoom)
+            x1f, y1f = deg2num(min_lat, max_lon, zoom)
+            x0, x1 = int(math.floor(x0f)), int(math.floor(x1f))
+            y0, y1 = int(math.floor(y0f)), int(math.floor(y1f))
+            if (x1 - x0 + 1) * (y1 - y0 + 1) <= 64:
+                break
+            zoom = max(zoom - 1, 8)
+            if zoom == 8:
+                break
 
         # 타일 다운로드 — 적은 worker 수(3개)로 병렬 + 재시도 (V-World 부담 회피하며 속도 확보)
         import concurrent.futures
@@ -476,7 +489,7 @@ def _make_placeholder_png(text: str, height_px: int = 2650) -> bytes:
             font_prop = FontProperties(fname="C:/Windows/Fonts/malgun.ttf")
         except Exception:
             font_prop = None
-        fig_dpi = 144
+        fig_dpi = 72
         fig_inches_w = _TARGET_IMG_WIDTH / fig_dpi
         fig_inches_h = _TARGET_IMG_HEIGHT / fig_dpi
         fig = plt.figure(figsize=(fig_inches_w, fig_inches_h), dpi=fig_dpi)
@@ -573,11 +586,11 @@ def _make_parcel_map_image(target_parcel: Dict[str, Any],
         except Exception:
             font_prop = None
 
-        # figure 종횡비 + 픽셀 dimension을 sample image3과 정확히 맞춤 (2304×2656)
-        # 한글이 일부 케이스에서 작은 이미지를 90도/180도 회전하던 현상 회피
-        fig_dpi = 144
-        fig_inches_w = _TARGET_IMG_WIDTH / fig_dpi
-        fig_inches_h = _TARGET_IMG_HEIGHT / fig_dpi
+        # figure inch 크기는 원래대로 (16×18.44 inch) 유지하되 저장 dpi를 낮춰서
+        # 결과 PNG 픽셀을 절반으로 줄임 → fontsize 비율은 원래대로 유지
+        fig_dpi = 72  # figsize 계산용 (= 원래 144의 절반)
+        fig_inches_w = _TARGET_IMG_WIDTH / fig_dpi  # 1152/72 = 16 inch (원래 그대로)
+        fig_inches_h = _TARGET_IMG_HEIGHT / fig_dpi  # 1328/72 = 18.44 inch
         width_px = _TARGET_IMG_WIDTH
         fig = plt.figure(figsize=(fig_inches_w, fig_inches_h), dpi=fig_dpi)
         ax = fig.add_axes([0, 0, 1, 1])  # 여백 0 — figure 전체를 axes로
