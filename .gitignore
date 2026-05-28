@@ -37,5 +37,39 @@ Thumbs.db
 # Output directories (but keep the directories themselves if needed)
 data/output/*
 !data/output/.gitkeep
+data/project_cache/
+data/ngii_shp/
+
+# report/ 폴더는 src 코드인데 이전 규칙으로 ignore 됐었음. 명시적 화이트리스트로 복구.
 report/*
 !report/.gitkeep
+!report/__init__.py
+!report/agreement_generator.py
+!report/free_transfer_generator.py
+!report/generate_owner_report.py
+!report/qbs_generator.py
+!report/word_report.py
+
+# 테스트 / 임시 파일
+scratch/
+test.pkl
+test_async.py
+*.pkl
+*.db
+*.db-shm
+*.db-wal
+
+# MS Office 임시 파일
+~$*
+
+# 50MB 초과 대용량 외부 자료 (GitHub 100MB 제한)
+연습용자료/★양산증산지구 개발계획(안) 미니차트.pptx
+연습용자료/01.무상귀속협의요청서(전체).hwp
+연습용자료/qbs_위치도.pptx
+연습용자료/토지이용현황_보고서 (33).docx
+연습용자료/qbs_위치도 (13).pptx
+연습용자료/*.dxf
+연습용자료/*.dwg
+연습용자료/*.bak
+연습용자료/*.xlsx
+연습용자료/plot.log

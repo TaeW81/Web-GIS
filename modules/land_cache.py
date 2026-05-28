@@ -97,7 +97,15 @@ class LandDataCache:
             # 데이터 완전성 확인 — 불완전한 캐시는 미스로 처리
             jimok = row["jimok"] or "-"
             parea = row["parea"] or 0
+            land_use = row["land_use"] or ""
             if jimok in ["-", "", "기타"] or parea <= 0:
+                with self._stats_lock:
+                    self._stats["misses"] += 1
+                return None
+            # 이용상황 검증: "미조회"만 재페치 트리거.
+            # "" (빈문자열)는 "API 조회했으나 NED에 데이터 없음"을 의미하므로 valid hit.
+            # (None도 같은 의미로 valid 처리 — 일부 컬럼이 NULL일 수 있음)
+            if land_use == "미조회":
                 with self._stats_lock:
                     self._stats["misses"] += 1
                 return None

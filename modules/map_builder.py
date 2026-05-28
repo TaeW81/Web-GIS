@@ -4,12 +4,16 @@ from config import (VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_URL, VWORLD_WMS_CAT
                      MAP_SOURCES, NIE_KEY, NIE_WMS_URL, NIE_LEGEND_URL,
                      ECVAM_KEY, ECVAM_WMS_URL, ECVAM_LEGEND_URL)
 
+# NGII 연속수치지형도(1/5000) 카테고리 — V-World WMS 호출 대신 로컬 SHP 사용
+NGII_TOPO_CATEGORIES = {"교통", "건물", "시설", "식생", "수계", "지형", "경계", "주기", "표고점"}
 
-def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locate_on_start=False, visible_layers=None, legend_layer_name=None, force_center_id=1):
+
+def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locate_on_start=False, visible_layers=None, legend_layer_name=None, force_center_id=1, enable_draw=False):
     """
     VWorld 배경지도 위에 구역계 및 여러 레이어를 표시하는 지도를 만듭니다.
     - 사이드바 설정값에 동기화되어 필요한 WMS 항목만 렌더링
     - 사용자 현위치 자동 탐색(locate_on_start=True 일 때만)
+    - enable_draw=True 시 폴리곤/사각형 직접 그리기 도구 활성화 (st_folium과 함께 사용)
     """
     # 1. 최하단 기본 베이스 지도
     tile_url = VWORLD_TILE_URLS.get(base_map, VWORLD_TILE_URLS["일반지도"])
@@ -41,6 +45,28 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
         locateOptions={"enableHighAccuracy": True, "maxZoom": 16}
     ).add_to(m)
 
+    # ★ 영역 직접 그리기 도구 (폴리곤 + 사각형) — st_folium과 함께 사용
+    if enable_draw:
+        from folium.plugins import Draw
+        Draw(
+            position="topleft",
+            draw_options={
+                "polygon": {
+                    "allowIntersection": False,
+                    "showArea": True,
+                    "shapeOptions": {"color": "#ff5722", "weight": 3, "fillOpacity": 0.2},
+                },
+                "rectangle": {
+                    "shapeOptions": {"color": "#ff5722", "weight": 3, "fillOpacity": 0.2},
+                },
+                "polyline": False,
+                "circle": False,
+                "marker": False,
+                "circlemarker": False,
+            },
+            edit_options={"edit": True, "remove": True},
+        ).add_to(m)
+
     # 3. 기관별 WMS 주제도 레이어 추가 (선택된 것만 보이도록 처리)
     for source_name, categories in MAP_SOURCES.items():
         # 소스별 WMS 기본 설정
@@ -71,6 +97,10 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
                 if "READY" in str(code):
                     continue
 
+                # ★ NGII 연속수치지형도 카테고리는 WMS 대신 로컬 SHP로 처리 (별도 루프에서)
+                if cat_name == "연속수치지형도(1/5000)":
+                    continue
+
                 # 레이어 코드: ECVAM은 원본 유지, NIE도 원본 유지, VWorld는 소문자
                 if source_name in ("국립생태원 (NIE)", "국토환경성평가 (ECVAM)"):
                     layer_code = code
@@ -89,6 +119,10 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
                     control=False
                 )
                 wms_layer.add_to(m)
+
+    # ★ NGII 1/5000 연속수치지형도 — 로컬 SHP 기반 GeoJSON 레이어 추가
+    #   (V-World WMS 한계 우회: data/ngii_shp/<시군구>/ 폴더에서 SHP 자동 로드)
+    _add_ngii_topo_geojson_layers(m, gps_points, visible_layers)
 
     # 선택된 모든 레이어에 대해 범례 수집 (중복 제거 및 유효성 검사)
     legend_items = []
@@ -225,6 +259,85 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
     m.get_root().html.add_child(folium.Element(sync_js))
 
     return m
+
+def _add_ngii_topo_geojson_layers(m, gps_points, visible_layers):
+    """NGII 1/5000 SHP 로컬 데이터를 Folium 지도에 GeoJSON 레이어로 추가.
+
+    - data/ngii_shp/<시군구>/ 폴더에 SHP 있을 때만 동작
+    - 사용자가 체크한 카테고리(visible_layers) 중 NGII 카테고리만 처리
+    - 분석 DXF의 BBOX 영역만 추출 (성능)
+    - 분류별 색상/굵기 자동 적용
+    """
+    if not visible_layers:
+        return
+    ngii_active = [c for c in visible_layers if c in NGII_TOPO_CATEGORIES]
+    if not ngii_active:
+        return
+
+    try:
+        from modules.ngii_shp_loader import (
+            scan_available_regions, load_layer_geojson, get_layer_style, find_region_for_bbox,
+        )
+    except Exception as e:
+        print(f"[NGII] 로더 import 실패: {e}")
+        return
+
+    regions = scan_available_regions()
+    if not regions:
+        # 사용자가 SHP를 아직 안 받음 → 안내 메시지 (지도에 작은 박스로 표시)
+        warning_html = """
+        <div style="position: absolute; top: 70px; right: 10px; z-index: 9999;
+                    background: rgba(255,243,224,0.95); padding: 10px 14px;
+                    border-radius: 8px; border: 1px solid #ff9800;
+                    font-size: 12px; color: #5d4037; max-width: 280px;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+            <b>🗺️ NGII 수치지도 데이터 필요</b><br>
+            <span style="font-size: 11px;">
+            <code>data/ngii_shp/&lt;시군구&gt;/</code> 폴더에 SHP 다운로드 필요.<br>
+            가이드: <code>data/ngii_shp/README.md</code>
+            </span>
+        </div>
+        """
+        m.get_root().html.add_child(folium.Element(warning_html))
+        return
+
+    # BBOX 계산 (gps_points = [(lat, lon), ...])
+    bbox_4326 = None
+    if gps_points:
+        lats = [p[0] for p in gps_points]
+        lons = [p[1] for p in gps_points]
+        # 약간의 여백 (DXF 주변 데이터도 보이게)
+        pad = 0.005  # 약 500m
+        bbox_4326 = (min(lons) - pad, min(lats) - pad, max(lons) + pad, max(lats) + pad)
+
+    # 시군구 자동 추론 (BBOX와 매칭)
+    region_code = find_region_for_bbox(bbox_4326)
+    if not region_code:
+        return
+
+    # 카테고리별 GeoJSON 레이어 추가
+    for category in ngii_active:
+        try:
+            geojson_data = load_layer_geojson(region_code, category, bbox_4326=bbox_4326)
+            if not geojson_data or not geojson_data.get("features"):
+                continue
+            style = get_layer_style(category)
+            folium.GeoJson(
+                geojson_data,
+                name=f"NGII {category}",
+                style_function=lambda x, s=style: s,
+                tooltip=folium.GeoJsonTooltip(
+                    fields=[k for k in (geojson_data["features"][0].get("properties") or {}).keys()][:3],
+                    aliases=None,
+                    sticky=False,
+                ) if geojson_data["features"] else None,
+                show=True,
+                control=False,
+            ).add_to(m)
+        except Exception as e:
+            print(f"[NGII] {category} 레이어 추가 실패: {e}")
+            continue
+
 
 def create_thematic_map(boundary_polygon, land_data, category="소유자"):
     """보고서 삽입용 테마 지도 생성 (WMS 위성배경 + 필지 테마)"""

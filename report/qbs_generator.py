@@ -1,21 +1,56 @@
-import io, os, math, requests
-from pptx.util import Emu
-from PIL import Image, ImageEnhance
+"""
+QBS 위치도 (Site Location Map) 생성기 — 보고서 품질 버전
+
+설계 방침:
+  1. 모든 지리 레이어(배경/도로/철도/하천/사업지)를 matplotlib 단일 figure에서 통합 렌더링
+     → 픽셀 단위 정밀 제어 (선 굵기/색/투명도/zorder)
+  2. 배경 위성지도는 그레이스케일 + 밝기 보정 → 전경(도로/철도/사업지)이 잘 보이도록
+  3. 도로 등급별 색상/굵기 차별화 (고속도로 → 국도 → 지방도)
+  4. 철도는 점선 + 진한 색 (배경과 명확히 구분)
+  5. 사업지: 빨간 음영 폴리곤 + 굵은 테두리 → 한눈에 인식
+  6. 5km/10km 점선 동심원 (점선 회색)
+  7. 결과 고해상도 PNG → PPT 슬라이드에 메인 이미지로 삽입
+  8. PPT 위에 추가 도형: 사업대상지 라벨박스, 방위표, 스케일바
+     (사용자가 PPT에서 위치/텍스트 수정 가능)
+
+데이터 소스:
+  - 배경 타일: V-World WMTS Base
+  - 도로: V-World WFS lt_l_highway (고속도로) / lt_l_natlroad (국도) / lt_l_moctlink (교통링크)
+  - 철도: V-World WFS lt_l_frstrail
+  - 하천: V-World WFS lt_c_wkmstrm
+  - POI: V-World 검색 API (IC/JC/역)
+
+향후 개선 후보:
+  - OSM Overpass API 추가 (노선별 색상 정확화, 지하철 호선 표시)
+  - SVG 벡터 export (Illustrator 편집)
+"""
+import io
+import math
+import requests
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+from matplotlib.patches import Circle, FancyBboxPatch
+from matplotlib.lines import Line2D
+from PIL import Image, ImageEnhance, ImageOps
 from pyproj import Transformer
 from pptx import Presentation
-from pptx.util import Inches, Pt, Cm
+from pptx.util import Cm, Pt, Emu, Inches
 from pptx.enum.shapes import MSO_SHAPE
-from pptx.enum.text import MSO_AUTO_SIZE
+from pptx.enum.text import MSO_AUTO_SIZE, PP_ALIGN
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
-from config import VWORLD_KEY, MAP_SOURCES, VWORLD_DOMAIN
+from pptx.oxml import parse_xml
+from config import VWORLD_KEY, VWORLD_DOMAIN
 
+
+# ──────────────────────────────────────────────────────────────────
+# 타일 좌표 변환
+# ──────────────────────────────────────────────────────────────────
 def deg2num(lat_deg, lon_deg, zoom):
     lat_rad = math.radians(lat_deg)
     n = 2.0 ** zoom
     return (int((lon_deg + 180.0) / 360.0 * n),
             int((1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n))
+
 
 def num2deg(xtile, ytile, zoom):
     n = 2.0 ** zoom
@@ -23,311 +58,508 @@ def num2deg(xtile, ytile, zoom):
     lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * ytile / n)))
     return (math.degrees(lat_rad), lon_deg)
 
+
 class QBSGenerator:
-    def __init__(self, boundary_polygon, visible_layers):
+    """사업지 위치도 (Site Location Map) PPT 생성기."""
+
+    # === 시각 디자인 토큰 ============================================
+    BG_DESATURATION = 0.4       # 배경 채도 (낮을수록 회색)
+    BG_BRIGHTNESS = 1.15        # 배경 밝기 (>1.0 = 더 밝게)
+
+    # 도로 색상/굵기 (등급별)
+    HW_OUTLINE_COLOR = "#ffffff"
+    HW_FILL_COLOR = "#2c3e50"   # 고속도로 (진한 남색)
+    HW_OUTLINE_LW = 5.0
+    HW_FILL_LW = 3.0
+
+    NATL_OUTLINE_COLOR = "#ffffff"
+    NATL_FILL_COLOR = "#444444"  # 국도 (진회색)
+    NATL_OUTLINE_LW = 4.0
+    NATL_FILL_LW = 2.2
+
+    LOCAL_COLOR = "#999999"      # 지방도/일반도로 (옅은 회색)
+    LOCAL_LW = 1.0
+
+    # 철도 (점선)
+    RAIL_OUTLINE_COLOR = "#ffffff"
+    RAIL_FILL_COLOR = "#1a472a"  # 진한 녹색
+    RAIL_OUTLINE_LW = 5.0
+    RAIL_FILL_LW = 2.5
+
+    # 하천
+    WATER_FILL = "#bbdefb"
+    WATER_EDGE = "#64b5f6"
+
+    # 사업지
+    SITE_FILL = "#ff0000"
+    SITE_EDGE = "#b71c1c"
+    SITE_ALPHA = 0.45
+    SITE_LW = 2.5
+    # =============================================================
+
+    def __init__(self, boundary_polygon, visible_layers=None):
         self.boundary_polygon = boundary_polygon
-        self.visible_layers = visible_layers
+        self.visible_layers = visible_layers or []
 
-    def fetch_pois(self, bbox_str, query):
-        pois = []
+    # ─────────────────────────────────────────────────────────────
+    # 배경 타일 다운로드 + 그레이스케일 + 밝기 보정
+    # ─────────────────────────────────────────────────────────────
+    def _fetch_base(self, x0, y0, x1, y1, zoom):
+        nx, ny = x1 - x0 + 1, y1 - y0 + 1
+        base = Image.new("RGBA", (nx * 256, ny * 256), (255, 255, 255, 255))
+        for i, x in enumerate(range(x0, x1 + 1)):
+            for j, y in enumerate(range(y0, y1 + 1)):
+                try:
+                    url = f"http://api.vworld.kr/req/wmts/1.0.0/{VWORLD_KEY}/Base/{zoom}/{y}/{x}.png"
+                    r = requests.get(url, timeout=5)
+                    if r.status_code == 200:
+                        tile = Image.open(io.BytesIO(r.content)).convert("RGBA")
+                        base.paste(tile, (i * 256, j * 256))
+                except Exception:
+                    pass
+
+        # 그레이스케일 변환 (채도 낮추기)
+        rgb = base.convert("RGB")
+        gray = ImageOps.grayscale(rgb).convert("RGB")
+        blended = Image.blend(rgb, gray, 1.0 - self.BG_DESATURATION)
+        # 밝기 살짝 ↑ (전경 가독성)
+        blended = ImageEnhance.Brightness(blended).enhance(self.BG_BRIGHTNESS)
+        # 대비도 약간 ↓
+        blended = ImageEnhance.Contrast(blended).enhance(0.85)
+        return blended.convert("RGBA")
+
+    # ─────────────────────────────────────────────────────────────
+    # V-World WFS 호출 헬퍼
+    # ─────────────────────────────────────────────────────────────
+    @staticmethod
+    def _wfs(typename, bbox3857, maxf=2000):
         try:
-            url = f"http://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:4326&bbox={bbox_str}&type=PLACE&query={query}&key={VWORLD_KEY}&size=30&format=json"
-            res = requests.get(url, timeout=10)
-            if res.status_code == 200:
-                data = res.json()
-                if 'result' in data.get('response', {}):
-                    pois = data['response']['result']['items']
-        except Exception: pass
-        return pois
+            return requests.get(
+                "http://api.vworld.kr/req/wfs",
+                params={
+                    "key": VWORLD_KEY, "SERVICE": "WFS", "version": "1.1.0",
+                    "request": "GetFeature", "TYPENAME": typename,
+                    "BBOX": bbox3857, "outputFormat": "application/json",
+                    "maxFeatures": maxf,
+                },
+                timeout=20,
+            )
+        except Exception:
+            return None
 
-    def _make_layer(self, ax, fig, exp_min_x, exp_max_x, exp_min_y, exp_max_y, SW, SH):
-        """공통 레이어 마무리 → BytesIO 반환"""
-        ax.set_xlim(exp_min_x, exp_max_x); ax.set_ylim(exp_min_y, exp_max_y); ax.axis('off')
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=200, pad_inches=0, transparent=True)
-        plt.close(fig); buf.seek(0)
-        return buf
+    @staticmethod
+    def _lines(feature):
+        g = feature["geometry"]
+        cs = g["coordinates"]
+        return cs if g["type"] == "MultiLineString" else [cs]
 
-    def _new_ax(self, SW, SH):
-        """투명 배경의 새 matplotlib figure+axes 생성"""
-        fig, ax = plt.subplots(figsize=(SW, SH), constrained_layout=True)
-        fig.patch.set_alpha(0.0); ax.set_facecolor((1,1,1,0)); ax.set_position([0, 0, 1, 1])
-        return fig, ax
+    # ─────────────────────────────────────────────────────────────
+    # POI 검색 (IC/JC/역)
+    # ─────────────────────────────────────────────────────────────
+    @staticmethod
+    def _search_pois(bbox_str, query, size=50):
+        try:
+            url = (
+                f"http://api.vworld.kr/req/search?service=search&request=search"
+                f"&version=2.0&crs=EPSG:4326&bbox={bbox_str}&type=PLACE"
+                f"&query={query}&key={VWORLD_KEY}&size={size}&format=json"
+            )
+            r = requests.get(url, timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                if "result" in data.get("response", {}):
+                    return data["response"]["result"]["items"]
+        except Exception:
+            pass
+        return []
 
+    # ─────────────────────────────────────────────────────────────
+    # 메인 생성 함수
+    # ─────────────────────────────────────────────────────────────
     def generate(self):
+        # ── 1. 영역 계산 ──
         min_x, min_y, max_x, max_y = self.boundary_polygon.bounds
         cx, cy = (min_x + max_x) / 2, (min_y + max_y) / 2
 
-        SW_CM, SH_CM = 11.5, 7.0
-        SW, SH = SW_CM / 2.54, SH_CM / 2.54
+        # 슬라이드 크기 (cm) — 세로형 위치도
+        SW_CM, SH_CM = 16.0, 14.0
+        SW, SH = SW_CM / 2.54, SH_CM / 2.54  # inch
 
-        zoom = 13
-        R_KM_Y = 6.0; R_KM_X = R_KM_Y * (SW_CM / SH_CM)
-        lat_km = 111.32; lon_km = 111.32 * math.cos(math.radians(cy))
-        dx, dy = R_KM_X / lon_km, R_KM_Y / lat_km
-        eMinX, eMaxX, eMinY, eMaxY = cx - dx, cx + dx, cy - dy, cy + dy
+        # 표시 반경 — 10km 원이 들어오도록 12km
+        R_KM_Y = 12.0
+        R_KM_X = R_KM_Y * (SW_CM / SH_CM)
+        lat_km = 111.32
+        lon_km = 111.32 * math.cos(math.radians(cy))
+        dx_deg = R_KM_X / lon_km
+        dy_deg = R_KM_Y / lat_km
+        eMinX = cx - dx_deg; eMaxX = cx + dx_deg
+        eMinY = cy - dy_deg; eMaxY = cy + dy_deg
 
+        # ── 2. 배경 타일 ──
+        zoom = 12
         x0, y0 = deg2num(eMaxY, eMinX, zoom)
         x1, y1 = deg2num(eMinY, eMaxX, zoom)
-        x0 -= 2; y0 -= 2; x1 += 2; y1 += 2
-        nx, ny = x1 - x0 + 1, y1 - y0 + 1
-
-        # ── 1. 배경지도 (Base → 그레이스케일 + 밝기보정) ──
-        base = Image.new("RGBA", (nx*256, ny*256), (255,255,255,255))
-        for i, x in enumerate(range(x0, x1+1)):
-            for j, y in enumerate(range(y0, y1+1)):
-                try:
-                    r = requests.get(f"http://api.vworld.kr/req/wmts/1.0.0/{VWORLD_KEY}/Base/{zoom}/{y}/{x}.png", timeout=5)
-                    if r.status_code == 200:
-                        base.paste(Image.open(io.BytesIO(r.content)).convert("RGBA"), (i*256, j*256))
-                except Exception: pass
+        x0 -= 1; y0 -= 1; x1 += 1; y1 += 1
+        base_img = self._fetch_base(x0, y0, x1, y1, zoom)
         iMaxLat, iMinLon = num2deg(x0, y0, zoom)
-        iMinLat, iMaxLon = num2deg(x1+1, y1+1, zoom)
+        iMinLat, iMaxLon = num2deg(x1 + 1, y1 + 1, zoom)
         ext = [iMinLon, iMaxLon, iMinLat, iMaxLat]
 
-        plt.rcParams['font.family'] = 'Malgun Gothic'
-        plt.rcParams['axes.unicode_minus'] = False
-        layer_images = []
+        # ── 3. matplotlib 단일 figure에 모든 레이어 통합 ──
+        plt.rcParams["font.family"] = "Malgun Gothic"
+        plt.rcParams["axes.unicode_minus"] = False
 
-        # 배경지도 레이어 (원본 컬러 유지)
-        fig, ax = self._new_ax(SW, SH)
-        ax.imshow(base, extent=ext, origin='upper', aspect='auto')
-        layer_images.append(("배경지도", self._make_layer(ax, fig, eMinX, eMaxX, eMinY, eMaxY, SW, SH)))
+        fig, ax = plt.subplots(figsize=(SW, SH), dpi=300, constrained_layout=False)
+        fig.patch.set_alpha(0.0)
+        ax.set_position([0, 0, 1, 1])
+        ax.set_xlim(eMinX, eMaxX); ax.set_ylim(eMinY, eMaxY)
+        ax.set_aspect("auto")
+        ax.axis("off")
 
-        # WMS 공통 파라미터
-        wms_url = "http://api.vworld.kr/req/wms"
-        bp = {"key": VWORLD_KEY, "domain": VWORLD_DOMAIN, "service": "WMS",
-              "request": "GetMap", "version": "1.1.1", "srs": "EPSG:4326",
-              "format": "image/png", "width": str(nx*256), "height": str(ny*256),
-              "bbox": f"{iMinLon},{iMinLat},{iMaxLon},{iMaxLat}", "transparent": "true"}
+        # 3-1. 배경 (그레이스케일)
+        ax.imshow(base_img, extent=ext, origin="upper", aspect="auto", zorder=1)
 
-        # 토지이용계획도 레이어 직접 추가 (항상 별도 객체로 포함)
+        # 3-2. 좌표 변환기 (EPSG:4326 ↔ 3857)
+        tp = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+        ti = Transformer.from_crs("EPSG:3857", "EPSG:4326", always_xy=True)
+        m0x, m0y = tp.transform(eMinX, eMinY)
+        m1x, m1y = tp.transform(eMaxX, eMaxY)
+        bb3857 = f"{m0x},{m0y},{m1x},{m1y}"
+
+        # 3-3. 하천망 (zorder 2)
         try:
-            # 주요 후보 레이어 합치기 (토지이용계획 + 사업지구)
-            target_layers = "LT_C_LHBLPN,LT_C_LHZONE"
-            lup = bp.copy()
-            lup.update({
-                "layers": target_layers,
-                "styles": target_layers,
-                "transparent": "true",
-                "bgcolor": "0xFFFFFF",
-                "exceptions": "blank"
-            })
-            r_lup = requests.get(wms_url, params=lup, timeout=15)
-            if r_lup.status_code == 200 and len(r_lup.content) > 1000: # 내용이 있는 경우만
-                lup_img = Image.open(io.BytesIO(r_lup.content)).convert("RGBA")
-                fig_lup, ax_lup = self._new_ax(SW, SH)
-                # 시인성을 위해 투명도를 0.7로 약간 상향
-                ax_lup.imshow(lup_img, extent=ext, origin='upper', alpha=0.7, aspect='auto')
-                layer_images.append(("토지이용계획도", self._make_layer(ax_lup, fig_lup, eMinX, eMaxX, eMinY, eMaxY, SW, SH)))
-        except Exception: pass
-
-        # 기타 WMS 레이어 (토지이용계획도 제외 - 위에서 이미 처리)
-        for sn, cats in MAP_SOURCES.items():
-            if sn != "브이월드 (VWorld)": continue
-            for cn, lyrs in cats.items():
-                for nm, code in lyrs.items():
-                    if (nm in self.visible_layers) and nm != "토지이용계획도" and "READY" not in str(code):
-                        try:
-                            a = 1.0
-                            p = bp.copy(); p["layers"] = code.lower()
-                            r = requests.get(wms_url, params=p, timeout=10)
-                            if r.status_code == 200:
-                                img = Image.open(io.BytesIO(r.content)).convert("RGBA")
-                                fig2, ax2 = self._new_ax(SW, SH)
-                                ax2.imshow(img, extent=ext, origin='upper', alpha=a, aspect='auto')
-                                layer_images.append((nm, self._make_layer(ax2, fig2, eMinX, eMaxX, eMinY, eMaxY, SW, SH)))
-                        except Exception: pass
-
-        # ── 3. 인프라 레이어 (WFS) ──
-        try:
-            tp = Transformer.from_crs("EPSG:4326","EPSG:3857",always_xy=True)
-            ti = Transformer.from_crs("EPSG:3857","EPSG:4326",always_xy=True)
-            m0x, m0y = tp.transform(eMinX, eMinY)
-            m1x, m1y = tp.transform(eMaxX, eMaxY)
-            bb3857 = f"{m0x},{m0y},{m1x},{m1y}"
-
-            def wfs_get(typename, maxf=2000):
-                return requests.get("http://api.vworld.kr/req/wfs",
-                    params={"key":VWORLD_KEY,"SERVICE":"WFS","version":"1.1.0",
-                            "request":"GetFeature","TYPENAME":typename,
-                            "BBOX":bb3857,"outputFormat":"application/json",
-                            "maxFeatures":maxf}, timeout=15)
-
-            def lines_from(feat):
-                g = feat["geometry"]
-                cs = g["coordinates"]
-                return cs if g["type"] == "MultiLineString" else [cs]
-
-            # 3-a) 고속도로 (별도 레이어)
-            r = wfs_get("lt_l_highway", 1000)
-            if r.status_code == 200:
-                fig_h, ax_h = self._new_ax(SW, SH)
-                for f in r.json().get("features",[]):
-                    for ln in lines_from(f):
-                        lons, lats = zip(*[ti.transform(p[0],p[1]) for p in ln])
-                        ax_h.plot(lons, lats, color='white', lw=9, alpha=0.85, solid_capstyle='round')
-                        ax_h.plot(lons, lats, color='#666666', lw=6, alpha=0.95, solid_capstyle='round')
-                layer_images.append(("고속도로망", self._make_layer(ax_h, fig_h, eMinX, eMaxX, eMinY, eMaxY, SW, SH)))
-
-            # 3-b) 국도/주요도로 (별도 레이어)
-            fig_r, ax_r = self._new_ax(SW, SH)
-            for tn in ["lt_l_natlroad","lt_l_moctlink"]:
-                r = wfs_get(tn, 5000)
-                if r.status_code == 200:
-                    for f in r.json().get("features",[]):
-                        rk = f.get("properties",{}).get("rd_rank_h","")
-                        major = tn == "lt_l_natlroad" or "일반" in rk
-                        c, w = ("#777777", 5.0) if major else ("#BBBBBB", 2.0)
-                        for ln in lines_from(f):
-                            lons, lats = zip(*[ti.transform(p[0],p[1]) for p in ln])
-                            if major:
-                                ax_r.plot(lons, lats, color='white', lw=w+3, alpha=0.7, solid_capstyle='round')
-                            ax_r.plot(lons, lats, color=c, lw=w, alpha=0.85, solid_capstyle='round')
-            layer_images.append(("국도/주요도로", self._make_layer(ax_r, fig_r, eMinX, eMaxX, eMinY, eMaxY, SW, SH)))
-
-            # 3-c) 철도망 (별도 레이어)
-            r = wfs_get("lt_l_frstrail", 1000)
-            if r.status_code == 200:
-                fig_t, ax_t = self._new_ax(SW, SH)
-                for f in r.json().get("features",[]):
-                    for ln in lines_from(f):
-                        lons, lats = zip(*[ti.transform(p[0],p[1]) for p in ln])
-                        ax_t.plot(lons, lats, color='white', lw=5, alpha=0.7, solid_capstyle='round')
-                        ax_t.plot(lons, lats, color='#444444', lw=2.5, alpha=0.9, solid_capstyle='round', ls='--')
-                layer_images.append(("철도망", self._make_layer(ax_t, fig_t, eMinX, eMaxX, eMinY, eMaxY, SW, SH)))
-
-            # 3-d) 하천망 (별도 레이어)
-            r = wfs_get("lt_c_wkmstrm", 1000)
-            if r.status_code == 200:
-                fig_w, ax_w = self._new_ax(SW, SH)
-                for f in r.json().get("features",[]):
+            r = self._wfs("lt_c_wkmstrm", bb3857, 1500)
+            if r and r.status_code == 200:
+                for f in r.json().get("features", []):
                     g = f["geometry"]
                     polys = g["coordinates"] if g["type"] == "MultiPolygon" else [g["coordinates"]]
                     for poly in polys:
                         ring = poly[0] if isinstance(poly[0][0], list) else poly
-                        lons, lats = zip(*[ti.transform(p[0],p[1]) for p in ring])
-                        ax_w.fill(lons, lats, color='#B0D4F1', alpha=0.5)
-                        ax_w.plot(lons, lats, color='#7EB8DA', lw=0.8, alpha=0.7)
-                layer_images.append(("하천망", self._make_layer(ax_w, fig_w, eMinX, eMaxX, eMinY, eMaxY, SW, SH)))
-        except Exception: pass
+                        lons, lats = zip(*[ti.transform(p[0], p[1]) for p in ring])
+                        ax.fill(lons, lats, color=self.WATER_FILL, alpha=0.6, zorder=2)
+                        ax.plot(lons, lats, color=self.WATER_EDGE, lw=0.8, alpha=0.8, zorder=2.1)
+        except Exception:
+            pass
 
-        # ── 4. PPT 생성 ──
-        prs = Presentation()
-        prs.slide_width, prs.slide_height = Cm(SW_CM), Cm(SH_CM)
-        slide = prs.slides.add_slide(prs.slide_layouts[6])
-        for nm, buf in layer_images:
-            slide.shapes.add_picture(buf, 0, 0, width=Cm(SW_CM), height=Cm(SH_CM))
+        # 3-4. 일반 도로 (지방도) — 가장 아래 zorder=3
+        try:
+            r = self._wfs("lt_l_moctlink", bb3857, 5000)
+            if r and r.status_code == 200:
+                for f in r.json().get("features", []):
+                    for ln in self._lines(f):
+                        lons, lats = zip(*[ti.transform(p[0], p[1]) for p in ln])
+                        ax.plot(lons, lats, color=self.LOCAL_COLOR,
+                                lw=self.LOCAL_LW, alpha=0.85, zorder=3,
+                                solid_capstyle="round")
+        except Exception:
+            pass
 
-        # 사업구역계 (최상단)
-        empty = Image.new("RGBA", (nx*256, ny*256), (255,255,255,0))
-        fig_p, ax_p = self._new_ax(SW, SH)
-        ax_p.imshow(empty, extent=ext, origin='upper', aspect='auto', alpha=0)
-        for sp in ([self.boundary_polygon] if self.boundary_polygon.geom_type == 'Polygon' else self.boundary_polygon.geoms):
+        # 3-5. 국도 (zorder 4)
+        try:
+            r = self._wfs("lt_l_natlroad", bb3857, 2000)
+            if r and r.status_code == 200:
+                for f in r.json().get("features", []):
+                    for ln in self._lines(f):
+                        lons, lats = zip(*[ti.transform(p[0], p[1]) for p in ln])
+                        # 흰 외곽선 → 진회색 본선 (도로감)
+                        ax.plot(lons, lats, color=self.NATL_OUTLINE_COLOR,
+                                lw=self.NATL_OUTLINE_LW, alpha=1.0, zorder=4,
+                                solid_capstyle="round")
+                        ax.plot(lons, lats, color=self.NATL_FILL_COLOR,
+                                lw=self.NATL_FILL_LW, alpha=1.0, zorder=4.1,
+                                solid_capstyle="round")
+        except Exception:
+            pass
+
+        # 3-6. 고속도로 (zorder 5 — 도로 중 가장 위)
+        try:
+            r = self._wfs("lt_l_highway", bb3857, 800)
+            if r and r.status_code == 200:
+                for f in r.json().get("features", []):
+                    for ln in self._lines(f):
+                        lons, lats = zip(*[ti.transform(p[0], p[1]) for p in ln])
+                        ax.plot(lons, lats, color=self.HW_OUTLINE_COLOR,
+                                lw=self.HW_OUTLINE_LW, alpha=1.0, zorder=5,
+                                solid_capstyle="round")
+                        ax.plot(lons, lats, color=self.HW_FILL_COLOR,
+                                lw=self.HW_FILL_LW, alpha=1.0, zorder=5.1,
+                                solid_capstyle="round")
+        except Exception:
+            pass
+
+        # 3-7. 철도 (zorder 6 — 점선)
+        try:
+            r = self._wfs("lt_l_frstrail", bb3857, 1500)
+            if r and r.status_code == 200:
+                for f in r.json().get("features", []):
+                    for ln in self._lines(f):
+                        lons, lats = zip(*[ti.transform(p[0], p[1]) for p in ln])
+                        # 흰 외곽 → 진녹색 점선
+                        ax.plot(lons, lats, color=self.RAIL_OUTLINE_COLOR,
+                                lw=self.RAIL_OUTLINE_LW, alpha=0.9, zorder=6,
+                                solid_capstyle="round")
+                        ax.plot(lons, lats, color=self.RAIL_FILL_COLOR,
+                                lw=self.RAIL_FILL_LW, alpha=0.95, zorder=6.1,
+                                linestyle=(0, (8, 4)),  # 명확한 점선
+                                solid_capstyle="round")
+        except Exception:
+            pass
+
+        # 3-8. 사업대상지 폴리곤 (zorder 7 — 최상단)
+        polys = [self.boundary_polygon] if self.boundary_polygon.geom_type == "Polygon" \
+            else list(self.boundary_polygon.geoms)
+        for sp in polys:
             bx, by = sp.exterior.xy
-            ax_p.plot(bx, by, color='black', lw=1.5, zorder=10)
-            ax_p.fill(bx, by, color='#888888', alpha=0.4, zorder=9)
-        slide.shapes.add_picture(
-            self._make_layer(ax_p, fig_p, eMinX, eMaxX, eMinY, eMaxY, SW, SH),
-            0, 0, width=Cm(SW_CM), height=Cm(SH_CM))
+            ax.fill(bx, by, color=self.SITE_FILL, alpha=self.SITE_ALPHA, zorder=7)
+            ax.plot(bx, by, color=self.SITE_EDGE, lw=self.SITE_LW, zorder=7.1)
 
-        # ── 5. PPT 도형/텍스트 ──
-        cpx, cpy = Cm(SW_CM)/2, Cm(SH_CM)/2
-        from pptx.oxml import parse_xml
-        def glow(run):
-            # 텍스트에 실제 하얀색 테두리(Outline) 적용
-            xml = """<a:ln w="25400" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-                <a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>
-                <a:round/><a:headEnd/><a:tailEnd/>
-            </a:ln>"""
-            run._r.get_or_add_rPr().append(parse_xml(xml))
-            # 가독성을 위해 그림자나 글로우도 살짝 보강
-            run._r.get_or_add_rPr().append(parse_xml(
-                '<a:effectLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
-                '<a:glow rad="30000"><a:srgbClr val="FFFFFF"/></a:glow></a:effectLst>'))
+        # 3-9. 반경 5km / 10km 점선 동심원
+        for r_km in [5, 10]:
+            # lon/lat 비율 보정한 타원이 아닌 평면 거리상의 원
+            # matplotlib는 axes coordinates 기준이라 ellipse 효과 발생
+            # 단순화: 위도 기준 변환 사용
+            theta = [i * 2 * math.pi / 180 for i in range(180 + 1)]
+            xs = [cx + (r_km / lon_km) * math.cos(t) for t in theta]
+            ys = [cy + (r_km / lat_km) * math.sin(t) for t in theta]
+            ax.plot(xs, ys, color="#666666", lw=1.2, alpha=0.7,
+                    linestyle=(0, (4, 3)), zorder=8)
 
-        # 반경원 + km 텍스트
-        for r_km in [1,2,3,4,5]:
-            rpx = Cm(SH_CM) * (r_km / (R_KM_Y * 2))
-            sh = slide.shapes.add_shape(MSO_SHAPE.OVAL, cpx-rpx, cpy-rpx, rpx*2, rpx*2)
-            sh.fill.background(); sh.line.color.rgb = RGBColor(120,120,120); sh.line.width = Pt(0.75)
-            if r_km % 2 == 1: sh.line.dash_style = 4
-            tb = slide.shapes.add_textbox(cpx-rpx-Cm(1.2), cpy-Cm(0.4), Cm(2.4), Cm(0.8))
-            tb.text_frame.margin_left = Emu(0); tb.text_frame.margin_right = Emu(0)
-            tb.text_frame.margin_top = Emu(0); tb.text_frame.margin_bottom = Emu(0)
-            r = tb.text_frame.paragraphs[0].add_run()
-            r.text = f"{r_km}km"; r.font.size = Pt(6); r.font.bold = True; r.font.color.rgb = RGBColor(0,0,0); r.font.name = '맑은 고딕'
-            tb.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER; glow(r)
+        # ── 4. 결과를 PNG로 export ──
+        buf_map = io.BytesIO()
+        plt.savefig(buf_map, format="png", dpi=300, bbox_inches=None,
+                    pad_inches=0, transparent=False, facecolor="white")
+        plt.close(fig)
+        buf_map.seek(0)
 
-        # 사업대상지 라벨
-        tb = slide.shapes.add_textbox(cpx-Cm(1.5), cpy-Cm(0.8), Cm(3.0), Cm(1.0))
-        tb.text_frame.margin_left = Emu(0); tb.text_frame.margin_right = Emu(0)
-        tb.text_frame.margin_top = Emu(0); tb.text_frame.margin_bottom = Emu(0)
-        r = tb.text_frame.paragraphs[0].add_run()
-        r.text = "사업대상지"; r.font.size = Pt(9); r.font.bold = True; r.font.color.rgb = RGBColor(0,0,0); r.font.name = '맑은 고딕'
-        tb.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER; glow(r)
+        # ── 5. PPT 생성 ──
+        prs = Presentation()
+        prs.slide_width = Cm(SW_CM); prs.slide_height = Cm(SH_CM)
+        slide = prs.slides.add_slide(prs.slide_layouts[6])  # 빈 레이아웃
+        slide.shapes.add_picture(buf_map, 0, 0,
+                                 width=Cm(SW_CM), height=Cm(SH_CM))
 
-        # ── 6. 지도 내 텍스트를 PPT 텍스트로 ──
+        # ── 6. PPT 위에 추가 도형 (편집 가능) ──
+        cpx = Cm(SW_CM) / 2
+        cpy = Cm(SH_CM) / 2
+
+        # 6-1. 반경 라벨 (5km, 10km 텍스트)
+        for r_km in [5, 10]:
+            rpx_y = Cm(SH_CM) * (r_km / (R_KM_Y * 2))
+            tb = slide.shapes.add_textbox(
+                cpx + rpx_y - Cm(0.8), cpy - Cm(0.3),
+                Cm(1.6), Cm(0.6),
+            )
+            self._zero_margins(tb)
+            run = tb.text_frame.paragraphs[0].add_run()
+            run.text = f"{r_km}km"
+            run.font.size = Pt(10); run.font.bold = True
+            run.font.color.rgb = RGBColor(50, 50, 50); run.font.name = "맑은 고딕"
+            tb.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+            self._text_outline_white(run)
+
+        # 6-2. 사업대상지 라벨박스 (빨간색)
+        label_w, label_h = Cm(2.8), Cm(0.75)
+        lb = slide.shapes.add_shape(
+            MSO_SHAPE.RECTANGLE,
+            cpx - label_w / 2, cpy + Cm(0.4),
+            label_w, label_h,
+        )
+        lb.fill.solid(); lb.fill.fore_color.rgb = RGBColor(220, 30, 30)
+        lb.line.color.rgb = RGBColor(255, 255, 255); lb.line.width = Pt(1.2)
+        self._zero_margins(lb)
+        run_lb = lb.text_frame.paragraphs[0].add_run()
+        run_lb.text = "사업대상지"
+        run_lb.font.size = Pt(12); run_lb.font.bold = True
+        run_lb.font.color.rgb = RGBColor(255, 255, 255); run_lb.font.name = "맑은 고딕"
+        lb.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+
+        # 6-3. 방위표 (우상단)
+        self._add_compass(slide, SW_CM)
+
+        # 6-4. 스케일바 (좌하단)
+        self._add_scalebar(slide, SW_CM, SH_CM, R_KM_Y)
+
+        # 6-5. POI 라벨 — IC/JC + 주요 역
         bbox_str = f"{eMinX},{eMinY},{eMaxX},{eMaxY}"
         drawn = set()
-
-        def add_poi_text(query, color, font_sz, strip_words=None, icon_type=None):
-            pois = self.fetch_pois(bbox_str, query)
-            for poi in pois:
-                title = poi['title']
-                if strip_words:
-                    for w in strip_words: title = title.replace(w, "")
-                title = title.strip()
-                if not title or title in drawn or len(title) > 10: continue
-                lon, lat = float(poi['point']['x']), float(poi['point']['y'])
-                px = (lon - eMinX) / (eMaxX - eMinX) * SW
-                py = (eMaxY - lat) / (eMaxY - eMinY) * SH
-                if 0.3 < px < (SW-0.3) and 0.3 < py < (SH-0.3):
-                    # 아이콘 (산 삼각형, IC/JC 사각형 등)
-                    if icon_type == "mountain":
-                        ic = slide.shapes.add_shape(MSO_SHAPE.ISOSCELES_TRIANGLE,
-                            Inches(px)-Inches(0.04), Inches(py)-Inches(0.04), Inches(0.1), Inches(0.08))
-                        ic.fill.solid(); ic.fill.fore_color.rgb = RGBColor(34,139,34)
-                        ic.line.fill.background()
-                    elif icon_type == "ic_jc":
-                        tag = "IC" if "IC" in poi['title'] or "인터체인지" in poi['title'] else "JC"
-                        ic = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
-                            Inches(px)-Inches(0.06), Inches(py)-Inches(0.04), Inches(0.12), Inches(0.08))
-                        ic.fill.solid(); ic.fill.fore_color.rgb = RGBColor(255,140,0)
-                        ic.line.fill.background()
-                        # IC/JC 라벨 (여백 0)
-                        ic.text_frame.margin_left = Emu(0); ic.text_frame.margin_right = Emu(0)
-                        ic.text_frame.margin_top = Emu(0); ic.text_frame.margin_bottom = Emu(0)
-                        ri = ic.text_frame.paragraphs[0].add_run()
-                        ri.text = tag; ri.font.size = Pt(4); ri.font.bold = True
-                        ri.font.color.rgb = RGBColor(255,255,255); ri.font.name = '맑은 고딕'
-                        ic.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
-                    elif icon_type == "station":
-                        ic = slide.shapes.add_shape(MSO_SHAPE.OVAL,
-                            Inches(px)-Inches(0.03), Inches(py)-Inches(0.03), Inches(0.06), Inches(0.06))
-                        ic.fill.solid(); ic.fill.fore_color.rgb = RGBColor(255,255,255)
-                        ic.line.color.rgb = RGBColor(80,80,80); ic.line.width = Pt(0.5)
-                    # 텍스트 상자를 글자 길이에 맞춤 (불필요한 여백 제거)
-                    char_w = Cm(0.35) if font_sz <= Pt(6.5) else Cm(0.4)
-                    box_w = int(char_w * len(title) + Cm(0.15))
-                    box_h = Cm(0.45)
-                    tx = slide.shapes.add_textbox(Inches(px)+Inches(0.06), Inches(py)-Inches(0.04), box_w, box_h)
-                    tx.text_frame.margin_left = Emu(0); tx.text_frame.margin_right = Emu(0)
-                    tx.text_frame.margin_top = Emu(0); tx.text_frame.margin_bottom = Emu(0)
-                    tx.text_frame.word_wrap = False
-                    tx.text_frame.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
-                    rn = tx.text_frame.paragraphs[0].add_run()
-                    rn.text = title; rn.font.size = font_sz; rn.font.bold = True
-                    rn.font.color.rgb = color; rn.font.name = '맑은 고딕'; glow(rn)
-                    drawn.add(title)
-
-        # IC / JC
-        add_poi_text("인터체인지", RGBColor(80,80,80), Pt(6), ["인터체인지","IC ","ic "], "ic_jc")
-        add_poi_text("JC", RGBColor(80,80,80), Pt(6), None, "ic_jc")
-        # 역 (지하철/기차)
-        add_poi_text("역", RGBColor(60,60,60), Pt(6.5), ["지하철"], "station")
-        # 산
-        add_poi_text("산", RGBColor(34,139,34), Pt(7), None, "mountain")
+        self._add_pois(slide, "인터체인지", drawn, bbox_str,
+                       eMinX, eMaxX, eMinY, eMaxY, SW, SH,
+                       icon="ic_jc", color=(255, 140, 0))
+        self._add_pois(slide, "JC", drawn, bbox_str,
+                       eMinX, eMaxX, eMinY, eMaxY, SW, SH,
+                       icon="ic_jc", color=(255, 140, 0))
+        self._add_pois(slide, "역", drawn, bbox_str,
+                       eMinX, eMaxX, eMinY, eMaxY, SW, SH,
+                       icon="station", color=(40, 40, 40))
 
         out = io.BytesIO(); prs.save(out); out.seek(0)
         return out.getvalue()
+
+    # ─────────────────────────────────────────────────────────────
+    # PPT 헬퍼들
+    # ─────────────────────────────────────────────────────────────
+    @staticmethod
+    def _zero_margins(shape):
+        tf = shape.text_frame
+        tf.margin_left = Emu(0); tf.margin_right = Emu(0)
+        tf.margin_top = Emu(0); tf.margin_bottom = Emu(0)
+
+    @staticmethod
+    def _text_outline_white(run):
+        """텍스트에 흰색 테두리 + 글로우 (가독성)."""
+        xml_ln = (
+            '<a:ln w="20000" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+            '<a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill>'
+            '<a:round/></a:ln>'
+        )
+        run._r.get_or_add_rPr().append(parse_xml(xml_ln))
+        run._r.get_or_add_rPr().append(parse_xml(
+            '<a:effectLst xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+            '<a:glow rad="25000"><a:srgbClr val="FFFFFF"/></a:glow></a:effectLst>'
+        ))
+
+    def _add_compass(self, slide, sw_cm):
+        """우상단 방위표 (N)."""
+        size = Cm(1.6)
+        x = Cm(sw_cm) - size - Cm(0.4)
+        y = Cm(0.4)
+
+        # 흰 원 배경
+        bg = slide.shapes.add_shape(MSO_SHAPE.OVAL, x, y, size, size)
+        bg.fill.solid(); bg.fill.fore_color.rgb = RGBColor(255, 255, 255)
+        bg.line.color.rgb = RGBColor(80, 80, 80); bg.line.width = Pt(1.2)
+
+        # 북쪽 화살표 (위쪽 빨간 삼각)
+        aw = Cm(0.5); ah = Cm(0.7)
+        arrow = slide.shapes.add_shape(
+            MSO_SHAPE.ISOSCELES_TRIANGLE,
+            x + size / 2 - aw / 2, y + Cm(0.15),
+            aw, ah,
+        )
+        arrow.fill.solid(); arrow.fill.fore_color.rgb = RGBColor(220, 30, 30)
+        arrow.line.fill.background()
+
+        # 남쪽 회색 삼각 (역삼각)
+        s_arrow_xml = (
+            '<a:prstGeom prst="triangle" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+            '<a:avLst/></a:prstGeom>'
+        )
+        s_arrow = slide.shapes.add_shape(
+            MSO_SHAPE.ISOSCELES_TRIANGLE,
+            x + size / 2 - aw / 2, y + size - ah - Cm(0.15),
+            aw, ah,
+        )
+        s_arrow.fill.solid(); s_arrow.fill.fore_color.rgb = RGBColor(160, 160, 160)
+        s_arrow.line.fill.background()
+        s_arrow.rotation = 180
+
+        # N 글자
+        ntx = slide.shapes.add_textbox(x, y + Cm(0.4), size, Cm(0.5))
+        self._zero_margins(ntx)
+        rn = ntx.text_frame.paragraphs[0].add_run()
+        rn.text = "N"; rn.font.size = Pt(11); rn.font.bold = True
+        rn.font.color.rgb = RGBColor(40, 40, 40); rn.font.name = "맑은 고딕"
+        ntx.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+
+    def _add_scalebar(self, slide, sw_cm, sh_cm, r_km_y):
+        """좌하단 스케일바 (2km)."""
+        sb_km = 2.0
+        sb_len_cm = (sb_km / (r_km_y * 2)) * sh_cm
+        sb_x = Cm(0.6)
+        sb_y = Cm(sh_cm) - Cm(0.9)
+        bar_h = Cm(0.18)
+
+        # 흰 반투명 배경
+        bg = slide.shapes.add_shape(
+            MSO_SHAPE.RECTANGLE,
+            sb_x - Cm(0.15), sb_y - Cm(0.1),
+            Cm(sb_len_cm) + Cm(0.3), Cm(0.8),
+        )
+        bg.fill.solid(); bg.fill.fore_color.rgb = RGBColor(255, 255, 255)
+        bg.fill.transparency = 0.15
+        bg.line.color.rgb = RGBColor(180, 180, 180); bg.line.width = Pt(0.5)
+
+        # 막대 (흑백 2단)
+        sb_half = Cm(sb_len_cm / 2)
+        b1 = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, sb_x, sb_y, sb_half, bar_h)
+        b1.fill.solid(); b1.fill.fore_color.rgb = RGBColor(40, 40, 40)
+        b1.line.color.rgb = RGBColor(40, 40, 40); b1.line.width = Pt(0.4)
+        b2 = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, sb_x + sb_half, sb_y, sb_half, bar_h)
+        b2.fill.solid(); b2.fill.fore_color.rgb = RGBColor(255, 255, 255)
+        b2.line.color.rgb = RGBColor(40, 40, 40); b2.line.width = Pt(0.4)
+
+        # 라벨
+        for ratio, label in [(0.0, "0"), (0.5, "1"), (1.0, "2 km")]:
+            lx = sb_x + Cm(sb_len_cm) * ratio - Cm(0.5)
+            tx = slide.shapes.add_textbox(lx, sb_y + bar_h + Cm(0.02),
+                                          Cm(1.0), Cm(0.45))
+            self._zero_margins(tx)
+            r = tx.text_frame.paragraphs[0].add_run()
+            r.text = label; r.font.size = Pt(8); r.font.bold = True
+            r.font.color.rgb = RGBColor(40, 40, 40); r.font.name = "맑은 고딕"
+            tx.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+
+    def _add_pois(self, slide, query, drawn, bbox_str,
+                  eMinX, eMaxX, eMinY, eMaxY, SW, SH, icon, color):
+        """POI 라벨 추가 (IC/JC/역)."""
+        pois = self._search_pois(bbox_str, query, size=50)
+        col_rgb = RGBColor(*color)
+        for poi in pois:
+            title = poi.get("title", "")
+            if not title or title in drawn or len(title) > 12:
+                continue
+            try:
+                lon = float(poi["point"]["x"])
+                lat = float(poi["point"]["y"])
+            except Exception:
+                continue
+            if not (eMinX < lon < eMaxX and eMinY < lat < eMaxY):
+                continue
+
+            px_inch = (lon - eMinX) / (eMaxX - eMinX) * SW
+            py_inch = (eMaxY - lat) / (eMaxY - eMinY) * SH
+
+            # 아이콘 (Inches)
+            if icon == "ic_jc":
+                tag = "IC" if ("IC" in title or "인터체인지" in title) else "JC"
+                ic = slide.shapes.add_shape(
+                    MSO_SHAPE.DIAMOND,
+                    Inches(px_inch) - Inches(0.08), Inches(py_inch) - Inches(0.08),
+                    Inches(0.16), Inches(0.16),
+                )
+                ic.fill.solid(); ic.fill.fore_color.rgb = col_rgb
+                ic.line.color.rgb = RGBColor(255, 255, 255); ic.line.width = Pt(0.8)
+                # IC/JC 글자 (내부)
+                self._zero_margins(ic)
+                ri = ic.text_frame.paragraphs[0].add_run()
+                ri.text = tag
+                ri.font.size = Pt(5); ri.font.bold = True
+                ri.font.color.rgb = RGBColor(255, 255, 255); ri.font.name = "맑은 고딕"
+                ic.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+            elif icon == "station":
+                ic = slide.shapes.add_shape(
+                    MSO_SHAPE.OVAL,
+                    Inches(px_inch) - Inches(0.04), Inches(py_inch) - Inches(0.04),
+                    Inches(0.08), Inches(0.08),
+                )
+                ic.fill.solid(); ic.fill.fore_color.rgb = RGBColor(255, 255, 255)
+                ic.line.color.rgb = RGBColor(40, 40, 40); ic.line.width = Pt(0.8)
+
+            # 텍스트 라벨 (아이콘 우측)
+            box_w = Cm(0.5 * len(title) + 0.3)
+            box_h = Cm(0.5)
+            tx = slide.shapes.add_textbox(
+                Inches(px_inch) + Inches(0.08), Inches(py_inch) - Inches(0.05),
+                box_w, box_h,
+            )
+            self._zero_margins(tx)
+            tx.text_frame.word_wrap = False
+            tx.text_frame.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
+            rn = tx.text_frame.paragraphs[0].add_run()
+            # 불필요 접두 제거
+            clean_title = title.replace("인터체인지", "").replace("지하철 ", "").strip()
+            rn.text = clean_title or title
+            rn.font.size = Pt(7); rn.font.bold = True
+            rn.font.color.rgb = col_rgb; rn.font.name = "맑은 고딕"
+            self._text_outline_white(rn)
+            drawn.add(title)
