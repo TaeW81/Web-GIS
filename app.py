@@ -21,7 +21,7 @@ from modules.excel_exporter import create_multi_sheet_excel
 from modules.spatial_downloader import fetch_wfs_data, export_to_dxf, export_to_shp
 from modules.vworld_search import search_place
 from analyzers import get_all_analyzers
-from report.word_report import LandReportGenerator
+# (워드 보고서 LandReportGenerator 제거됨 — 현황분석 보고서 Hwp로 대체)
 from report.free_transfer_generator import FreeTransferGenerator
 
 # ============================
@@ -212,6 +212,12 @@ for k, v in [('map_center', DEFAULT_CENTER), ('map_zoom', 16), ('last_uploaded_f
              ('map_layers', ["지적도", "연속지적도"])]: # 기본 렌더링 레이어
     if k not in st.session_state:
         st.session_state[k] = v
+
+# 프로그램 실행(세션)마다 고유 토큰 — 새 세션이면 지도가 현위치를 1회 탐색하도록
+# (create_map의 sync_js에서 localStorage와 비교). rerun에는 값이 유지됨.
+if 'map_session_token' not in st.session_state:
+    import uuid as _uuid
+    st.session_state['map_session_token'] = _uuid.uuid4().hex
 
 dxf_result = {"center": st.session_state.map_center, "gps_points": [], "num_vertices": 0, "polygon": None}
 
@@ -450,16 +456,11 @@ with st.sidebar:
         btn_mountain = st.button("🌲 편입산지조서", use_container_width=True, key="btn_mountain")
         btn_free_transfer = st.button("👥 소유자 구분도", use_container_width=True, key="btn_free_transfer")
     with c2:
-        btn_farmland = st.button("🌾 편입농지조서", use_container_width=True, key="btn_farmland", disabled=True, help="준비중")
         btn_agreement = st.button("📋 무상귀속 협의요청서", use_container_width=True, key="btn_agreement")
 
     # --- 5-3. 보고서 ---
     st.markdown(_SUB.format("③ 현황 분석 보고서"), unsafe_allow_html=True)
-    btn_report = st.button("📄 보고서 (Doc, Hwp)", use_container_width=True, key="btn_report")
-
-    # --- 5-4. 기타 ---
-    st.markdown(_SUB.format("④ 기타"), unsafe_allow_html=True)
-    btn_qbs = st.button("🗺️ QBS 위치도 (PPT)", use_container_width=True, key="btn_qbs")
+    btn_status_report = st.button("🏞 현황분석 보고서 (Hwp)", use_container_width=True, key="btn_status_report")
 
     # --- 버튼 핸들러 ---
     # ★ 5번 섹션의 모든 버튼은 그리기 모드에서도 동작하도록:
@@ -492,19 +493,11 @@ with st.sidebar:
             _ensure_pnu_extract()
             st.session_state.do_mountain_report = True
 
-    if btn_report:
+    if btn_status_report:
         if not _has_boundary:
             st.warning("구역계 범위를 먼저 지정해주세요 (DXF 업로드 또는 지도에서 그리기).")
         else:
-            _ensure_pnu_extract()
-            st.session_state.do_word_report = True
-
-    if btn_qbs:
-        if not _has_boundary:
-            st.warning("구역계 범위를 먼저 지정해주세요 (DXF 업로드 또는 지도에서 그리기).")
-        else:
-            _ensure_pnu_extract()
-            st.session_state.do_qbs = True
+            st.session_state.do_status_report = True
 
     if btn_free_transfer:
         if not _has_boundary:
@@ -524,7 +517,37 @@ with st.sidebar:
     # 6. 기타 프로그램 (웹 변환기 - 가벼운 버전)
     # ----------------------------------------
     st.markdown("<p class='kh-section'>4. 기타 도구</p>", unsafe_allow_html=True)
-    
+
+    # [로컬] SHP to DXF 변환기 (기존 데스크톱 프로그램 실행)
+    if st.button("🖥️ [로컬] SHP to DXF 변환기", use_container_width=True):
+        import subprocess
+        import sys
+        program_path = os.path.join(os.getcwd(), "tools", "shp_to_dxf.py")
+        if os.path.exists(program_path):
+            try:
+                subprocess.Popen([sys.executable, program_path],
+                                 creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0)
+            except Exception as e:
+                st.error(f"❌ 실행 오류: {e}")
+
+    # ----------------------------------------
+    # 🚧 (개발 진행중) — 기타 도구와 구분되는 별도 섹션 (추후 개발/보강 예정 기능)
+    # ----------------------------------------
+    st.markdown("<hr style='margin: 10px 0 6px 0; border: none; border-top: 1px dashed #cbd5e1;'>", unsafe_allow_html=True)
+    st.markdown("<p class='kh-section'>🚧 (개발 진행중)</p>", unsafe_allow_html=True)
+
+    # 편입농지조서 (준비중)
+    btn_farmland = st.button("🌾 편입농지조서", use_container_width=True, key="btn_farmland", disabled=True, help="준비중")
+
+    # QBS 위치도 (PPT) — 동작
+    btn_qbs = st.button("🗺️ QBS 위치도 (PPT)", use_container_width=True, key="btn_qbs")
+    if btn_qbs:
+        if not _has_boundary:
+            st.warning("구역계 범위를 먼저 지정해주세요 (DXF 업로드 또는 지도에서 그리기).")
+        else:
+            _ensure_pnu_extract()
+            st.session_state.do_qbs = True
+
     with st.expander("🛠️ SHP to DXF 웹 변환기", expanded=False):
         st.markdown("<p style='font-size:12px; color:gray;'>방법 1: 아래 박스에 <b>폴더를 통째로 드래그</b>하세요.<br>방법 2: [로컬 전용] 버튼을 눌러 내 컴퓨터 폴더를 선택하세요.</p>", unsafe_allow_html=True)
         
@@ -652,17 +675,6 @@ with st.sidebar:
             else:
                 st.info("💡 SHP, SHX, DBF 파일 3개를 모두 업로드해 주세요.")
 
-    if st.button("🖥️ [로컬] 기존 프로그램 실행", use_container_width=True):
-        import subprocess
-        import sys
-        program_path = os.path.join(os.getcwd(), "tools", "shp_to_dxf.py")
-        if os.path.exists(program_path):
-            try:
-                subprocess.Popen([sys.executable, program_path], 
-                                 creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0)
-            except Exception as e:
-                st.error(f"❌ 실행 오류: {e}")
-
 # ============================
 # DXF 해석 파트
 # ============================
@@ -683,13 +695,13 @@ if uploaded_file:
                 # 새로운 파일이나 좌표계가 변경되면 이전 분석 결과를 초기화 및 PNU 자동 추출 시작
                 st.session_state.do_pnu_extract = True
                 st.session_state.do_status_analysis = False
-                st.session_state.do_word_report = False
+                st.session_state.do_status_report = False
                 st.session_state.do_qbs = False
                 st.session_state.do_free_transfer = False
                 st.session_state.pnu_list = None
                 st.session_state.all_sheets = None
                 if "excel_bytes" in st.session_state: del st.session_state["excel_bytes"]
-                if "report_bytes" in st.session_state: del st.session_state["report_bytes"]
+                if "status_report_hwpx" in st.session_state: del st.session_state["status_report_hwpx"]
         except Exception as e:
             st.error(f"❌ DXF 파일 오류: {e}")
             st.stop()
@@ -819,6 +831,9 @@ with map_col:
     
     # 지도 빌드 — 앱에서 관리하는 선택된 렌더링 레이어 배열 전달
     _draw_mode = (st.session_state.get("boundary_mode") == "🖌️ 지도에서 직접 그리기")
+    # 현위치 자동 탐색 허용 조건(파일/검색/그리기 없는 자유 탐색 상태).
+    #   실제 "세션당 1회" 제한은 create_map의 sync_js가 session_token+localStorage로
+    #   처리하므로, rerun에 흔들리지 않고 시작 시 1회만 현위치로 이동한다.
     _locate_auto = (not uploaded_file) and (not st.session_state.get("search_marker")) and (not _draw_mode)
 
     # ★ 그리기 모드 — 지도 바로 위에 [✅ 그린 영역 적용] [🗑️ 그린 영역 지움] 버튼 배치
@@ -888,6 +903,57 @@ with map_col:
     if _draw_mode and st.session_state.get("drawn_dxf_result"):
         dxf_result = st.session_state.drawn_dxf_result
 
+    # ----------------------------------------
+    # 🛰️ 프로그램 시작 시 현위치로 지도 이동 (부모 창 Geolocation → 쿼리파라미터)
+    #   st_folium은 iframe 안에서 동작 → iframe 내부 navigator.geolocation은
+    #   브라우저 권한정책(Permissions Policy)으로 차단됨. 따라서 부모(top) 창의
+    #   geolocation으로 좌표를 받아 쿼리파라미터로 전달하여 지도 중심을 잡는다.
+    # ----------------------------------------
+    _qp = st.query_params
+    if ("mylat" in _qp) and ("mylon" in _qp) and not st.session_state.get("geo_located_applied"):
+        try:
+            _glat = float(_qp["mylat"]); _glon = float(_qp["mylon"])
+            st.session_state.map_center = [_glat, _glon]
+            st.session_state.map_zoom = 16
+            st.session_state.map_force_center_id += 1
+            st.session_state.geo_located_applied = True
+            try:
+                del st.query_params["mylat"]
+                del st.query_params["mylon"]
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    # 자유 탐색 상태(파일/검색/그리기 없음)에서 아직 현위치를 못 받았으면 1회만 시도
+    if _locate_auto and (not st.session_state.get("geo_located_applied")) and (not st.session_state.get("geo_located_attempted")):
+        st.session_state.geo_located_attempted = True
+        components.html(
+            """
+            <script>
+            (function(){
+              try {
+                var top = window.parent;
+                if (!top || !top.navigator || !top.navigator.geolocation) return;
+                top.navigator.geolocation.getCurrentPosition(
+                  function(pos){
+                    var lat = pos.coords.latitude.toFixed(7);
+                    var lon = pos.coords.longitude.toFixed(7);
+                    var url = new URL(top.location.href);
+                    url.searchParams.set('mylat', lat);
+                    url.searchParams.set('mylon', lon);
+                    top.location.replace(url.toString());
+                  },
+                  function(err){ try{ console.warn('[khgis] 현위치 권한/실패:', err && err.message); }catch(e){} },
+                  {enableHighAccuracy:true, timeout:8000, maximumAge:0}
+                );
+              } catch(e){ try{ console.warn('[khgis] geolocation 예외:', e); }catch(_){} }
+            })();
+            </script>
+            """,
+            height=0,
+        )
+
     # ★ 명시적 이동 요청(DXF 업로드/장소 검색/좌표계 변경/그린영역 적용) 감지하여
     #   view_center를 map_center로 동기화 → 명시적 이동 시점에만 view_center 강제 갱신.
     if st.session_state.get("_applied_force_id") != st.session_state.get("map_force_center_id"):
@@ -905,11 +971,13 @@ with map_col:
         gps_points=dxf_result["gps_points"],
         base_map=base_map if base_map else "일반지도",
         zoom_start=_map_render_zoom,
-        locate_on_start=_locate_auto,
+        locate_on_start=False,  # iframe 내부 geolocation은 권한정책으로 차단 → 부모창 방식 사용
         visible_layers=st.session_state.map_layers,
         legend_layer_name=st.session_state.get("last_checked_layer"),
         force_center_id=st.session_state.map_force_center_id,
         enable_draw=_draw_mode,
+        session_token=st.session_state.map_session_token,
+        location_locked=st.session_state.get("geo_located_applied", False),
     )
 
     # 검색 마커가 있다면 지도에 표시 (아이콘 핀)
@@ -932,14 +1000,15 @@ with map_col:
             unsafe_allow_html=True,
         )
 
-    # ★ 모드별 returned_objects 분기 — 점프와 깜빡임 둘 다 최소화
-    #   - DXF 모드: center/zoom 캡처 → 사용자가 본 마지막 위치를 Python에 저장 →
-    #              라디오/체크박스 클릭 시에도 그 위치 유지 (그리기 모드 진입 시 점프 방지)
-    #   - 그리기 모드: all_drawings만 → 도형 그리는 동안 페이지 재실행 X (깜빡임/점 손실 방지)
+    # ★ 모드별 returned_objects 분기 — 깜빡임 최소화
+    #   - 일반 모드: [] → 패닝/줌해도 st_folium이 rerun을 트리거하지 않음 →
+    #               지도 재빌드(타일 리로드)로 인한 깜빡임 제거. 위치 유지는
+    #               create_map의 sync_js(localStorage)가 담당한다.
+    #   - 그리기 모드: all_drawings만 → 그린 도형 캡처 (깜빡임/점 손실 방지)
     if _draw_mode:
         _returned = ["all_drawings", "last_active_drawing"]
     else:
-        _returned = ["center", "zoom"]
+        _returned = []
 
     map_data = st_folium(
         vworld_map,
@@ -948,15 +1017,6 @@ with map_col:
         returned_objects=_returned,
         key="main_map",
     )
-
-    # DXF 모드에서만 사용자 위치 캡처 (그리기 모드는 깜빡임 방지를 위해 캡처 안 함)
-    if not _draw_mode and map_data:
-        new_center = map_data.get("center")
-        new_zoom = map_data.get("zoom")
-        if new_center:
-            st.session_state.view_center = [new_center["lat"], new_center["lng"]]
-        if new_zoom:
-            st.session_state.view_zoom = int(new_zoom)
 
     # 그린 도형을 dxf_result 호환 형식으로 변환하여 캐싱 (그리기 모드만)
     if _draw_mode and map_data and map_data.get("all_drawings"):
@@ -1093,61 +1153,53 @@ if st.session_state.get("all_sheets"):
                 use_container_width=True,
             )
 
-# 3. 워드 보고서 생성 실행
-if st.session_state.get("do_word_report"):
-    st.session_state.do_word_report = False
-    
-    if not st.session_state.get("pnu_list") or not st.session_state.get("all_sheets"):
-        st.warning("⚠️ 대상지 현황 분석결과 보고서를 생성하려면 먼저 '자동현황 분석결과' 버튼을 눌러 분석을 완료해주세요.")
+# 3-a. 현황분석 보고서 (Hwp) 생성 실행 — 표고 분석 우선
+if st.session_state.get("do_status_report"):
+    st.session_state.do_status_report = False
+    if not dxf_result.get("polygon"):
+        st.warning("⚠️ 구역계 범위를 먼저 지정해주세요.")
     else:
         with panel_status_container:
-            with st.status("📄 보고서 생성 중...", expanded=True) as status:
-                st.info("🎨 테마 지도 및 표 데이터 병합 중...")
+            with st.status("🏞 현황분석 보고서 (Hwp) 생성 중...", expanded=True) as status:
                 try:
+                    from report.status_report_generator import generate_status_report_hwpx
+                    # 토지대장 분석결과 병합 (소유자별 분석용)
                     land_data = []
-                    for p in st.session_state.pnu_list:
-                        p_copy = p.copy()
-                        if "토지조서 (편입면적/공시지가 등)" in st.session_state.all_sheets:
-                            for row in st.session_state.all_sheets["토지조서 (편입면적/공시지가 등)"]:
-                                if row["PNU"] == p["PNU"]:
-                                    p_copy["analysis_attr"] = row
-                                    break
-                        land_data.append(p_copy)
-                    
-                    st.write("🗺️ 테마 지도 생성 중...")
-                    owner_img, jimok_img = None, None
-                    try:
-                        from modules.map_builder import create_thematic_map
-                        owner_img = create_thematic_map(dxf_result["polygon"], land_data, "소유자")
-                        jimok_img = create_thematic_map(dxf_result["polygon"], land_data, "지목")
-                    except Exception as me:
-                        st.warning(f"테마 지도 건너뜀: {me}")
-    
-                    st.write("✍️ 문서 렌더링 중...")
-                    report_gen = LandReportGenerator(
-                        analysis_data=land_data,
-                        boundary_polygon=dxf_result["polygon"],
-                        owner_map_bytes=owner_img,
-                        jimok_map_bytes=jimok_img
-                    )
-                    st.session_state.report_bytes = report_gen.generate()
-                    status.update(label="✅ 보고서 생성 완료!", state="complete", expanded=False)
-                except Exception as re:
-                    status.update(label="❌ 오류 발생", state="error", expanded=True)
-                    st.error(str(re))
-                    st.session_state.report_bytes = None
+                    if st.session_state.get("pnu_list") and st.session_state.get("all_sheets"):
+                        for p in st.session_state.pnu_list:
+                            p_copy = p.copy()
+                            if "토지조서 (편입면적/공시지가 등)" in st.session_state.all_sheets:
+                                for row in st.session_state.all_sheets["토지조서 (편입면적/공시지가 등)"]:
+                                    if row["PNU"] == p["PNU"]:
+                                        p_copy["analysis_attr"] = row
+                                        break
+                            land_data.append(p_copy)
+                    st.write("👥 지목별·소유자별 분석 + 현황도 생성 ...")
+                    hwpx_bytes = generate_status_report_hwpx(dxf_result["polygon"],
+                                                             land_data=land_data,
+                                                             include_elevation=False,
+                                                             include_owner=True,
+                                                             include_jimok=True)
+                    if hwpx_bytes:
+                        st.session_state.status_report_hwpx = hwpx_bytes
+                        status.update(label="✅ 현황분석 보고서 생성 완료",
+                                      state="complete", expanded=False)
+                    else:
+                        status.update(label="❌ 생성 실패", state="error", expanded=True)
+                except Exception as e:
+                    status.update(label="❌ 생성 실패", state="error", expanded=True)
+                    st.error(f"오류: {e}")
+                    import traceback; traceback.print_exc()
 
-if st.session_state.get("report_bytes"):
+if st.session_state.get("status_report_hwpx"):
     with panel_download_container:
-        # 파일 내용은 docx 그대로, 확장자만 .hwpx — 한글에서 자동으로 열림
-        # (한글이 OOXML 호환으로 docx 콘텐츠 인식)
         st.download_button(
-            "📥 대상지현황 분석결과 보고서(Hwp)",
-            data=st.session_state.report_bytes,
+            "📥 현황분석 보고서 (Hwp)",
+            data=st.session_state.status_report_hwpx,
             file_name="현황분석보고서.hwpx",
             mime="application/octet-stream",
-            type="primary",
             use_container_width=True,
+            key="dl_status_report",
         )
 
 # 3. QBS 위치도 삽도 실행

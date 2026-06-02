@@ -4,8 +4,9 @@ import ezdxf
 import zipfile
 from io import BytesIO, StringIO
 from pyproj import Transformer
-from shapely.geometry import shape, Polygon, MultiPolygon
-from config import VWORLD_KEY, VWORLD_WFS_LAYERS, NIE_KEY, NIE_WMS_URL, NIE_WFS_URL, ECVAM_KEY, ECVAM_WMS_URL
+from shapely.geometry import shape, Polygon, MultiPolygon, Point
+from config import (VWORLD_KEY, VWORLD_WFS_LAYERS, VWORLD_WMS_LAYERS, VWORLD_WMS_URL,
+                    NIE_KEY, NIE_WMS_URL, NIE_WFS_URL, ECVAM_KEY, ECVAM_WMS_URL)
 
 
 # ========================================================
@@ -196,6 +197,123 @@ def _make_boundary_feature(polygon_lonlat_points: list, target_epsg: str) -> dic
 # ========================================================
 # 3. DXF 내보내기
 # ========================================================
+# ========================================================
+#  WMS 화면 색상 샘플링 — 토지이용계획도 등 서버 렌더링 주제도
+# ========================================================
+def _sample_feature_colors(geojson_4326: dict, wms_layer_code: str) -> list:
+    """각 피처의 색을 VWorld WMS(지도 화면과 동일 렌더링) 이미지에서 추출.
+
+    토지이용계획도처럼 색상이 WFS 속성이 아니라 WMS 서버 렌더링으로만
+    정해지는 레이어용. 데이터 bbox 전체를 한 장의 WMS GetMap(PNG)으로 받아
+    각 피처 내부 점들의 픽셀 색을 읽고 최빈색을 그 피처 색으로 사용한다.
+
+    Args:
+        geojson_4326: 원본 GeoJSON (EPSG:4326)
+        wms_layer_code: VWorld WMS 레이어 코드 (예: "lt_c_lhblpn")
+
+    Returns:
+        list: features 순서와 동일한 [(r,g,b) | None, ...]
+              (None = 샘플 실패 → 호출측에서 ByLayer 처리)
+    """
+    feats = geojson_4326.get("features", [])
+    if not feats:
+        return []
+
+    geoms = []
+    for f in feats:
+        try:
+            g = shape(f.get("geometry"))
+            geoms.append(g if (g and not g.is_empty) else None)
+        except Exception:
+            geoms.append(None)
+    valid = [g for g in geoms if g is not None]
+    if not valid:
+        return [None] * len(feats)
+
+    minx = min(g.bounds[0] for g in valid)
+    miny = min(g.bounds[1] for g in valid)
+    maxx = max(g.bounds[2] for g in valid)
+    maxy = max(g.bounds[3] for g in valid)
+    dx = (maxx - minx) * 0.02 or 1e-4
+    dy = (maxy - miny) * 0.02 or 1e-4
+    minx -= dx; maxx += dx; miny -= dy; maxy += dy
+
+    # WMS는 지도 화면과 같은 웹 메르카토르(EPSG:3857)로 요청 → 축 순서 혼동 없음
+    to3857 = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+    x0, y0 = to3857.transform(minx, miny)
+    x1, y1 = to3857.transform(maxx, maxy)
+    bminx, bmaxx = min(x0, x1), max(x0, x1)
+    bminy, bmaxy = min(y0, y1), max(y0, y1)
+    bw = bmaxx - bminx; bh = bmaxy - bminy
+    if bw <= 0 or bh <= 0:
+        return [None] * len(feats)
+
+    MAXPX = 2048
+    if bw >= bh:
+        W = MAXPX; H = max(64, int(round(MAXPX * bh / bw)))
+    else:
+        H = MAXPX; W = max(64, int(round(MAXPX * bw / bh)))
+
+    params = {
+        "key": VWORLD_KEY, "domain": "http://localhost",
+        "SERVICE": "WMS", "VERSION": "1.3.0", "REQUEST": "GetMap",
+        "LAYERS": wms_layer_code, "STYLES": "",
+        "CRS": "EPSG:3857",
+        "BBOX": f"{bminx},{bminy},{bmaxx},{bmaxy}",
+        "WIDTH": str(W), "HEIGHT": str(H),
+        "FORMAT": "image/png", "TRANSPARENT": "TRUE",
+    }
+    try:
+        resp = requests.get(VWORLD_WMS_URL, params=params, timeout=30)
+        resp.raise_for_status()
+        from PIL import Image
+        img = Image.open(BytesIO(resp.content)).convert("RGBA")
+    except Exception as e:
+        print(f"[dxf] WMS 색상 샘플링 실패: {e}")
+        return [None] * len(feats)
+
+    px = img.load()
+    IW, IH = img.size
+
+    def _to_px(lon, lat):
+        x, y = to3857.transform(lon, lat)
+        ix = int((x - bminx) / bw * (IW - 1))
+        iy = int((bmaxy - y) / bh * (IH - 1))   # 이미지 y축은 아래로 증가
+        return ix, iy
+
+    def _sample(g):
+        from collections import Counter
+        pts = []
+        try:
+            rp = g.representative_point(); pts.append((rp.x, rp.y))
+            c = g.centroid; pts.append((c.x, c.y))
+        except Exception:
+            pass
+        gminx, gminy, gmaxx, gmaxy = g.bounds
+        steps = 6
+        for i in range(1, steps):
+            for j in range(1, steps):
+                xx = gminx + (gmaxx - gminx) * i / steps
+                yy = gminy + (gmaxy - gminy) * j / steps
+                try:
+                    if g.contains(Point(xx, yy)):
+                        pts.append((xx, yy))
+                except Exception:
+                    pass
+        cnt = Counter()
+        for lon, lat in pts:
+            ix, iy = _to_px(lon, lat)
+            if 0 <= ix < IW and 0 <= iy < IH:
+                r_, g_, b_, a_ = px[ix, iy]
+                if a_ >= 128:           # 투명(피처 없음) 픽셀 제외
+                    cnt[(r_, g_, b_)] += 1
+        if not cnt:
+            return None
+        return cnt.most_common(1)[0][0]
+
+    return [(_sample(g) if g is not None else None) for g in geoms]
+
+
 def export_to_dxf(
     geojson_data: dict,
     layer_name: str,
@@ -221,6 +339,19 @@ def export_to_dxf(
     # 좌표 변환
     transformed = _transform_geojson_coords(geojson_data, target_epsg)
 
+    # 토지이용계획도: 색이 WFS 속성이 아닌 WMS 서버 렌더링으로만 정해지므로
+    # 화면과 동일한 WMS 이미지를 샘플링해 피처별 해치 색(RGB)을 만든다.
+    # (features 순서와 동일한 [(r,g,b)|None, ...] — 원본 4326 좌표로 샘플)
+    feature_rgbs = None
+    if layer_name == "토지이용계획도":
+        wms_code = (VWORLD_WMS_LAYERS.get(layer_name) or "").lower()
+        if wms_code:
+            try:
+                feature_rgbs = _sample_feature_colors(geojson_data, wms_code)
+            except Exception as e:
+                print(f"[dxf] 토지이용계획도 색상 샘플링 건너뜀: {e}")
+                feature_rgbs = None
+
     doc = ezdxf.new("R2010")
     msp = doc.modelspace()
 
@@ -243,12 +374,17 @@ def export_to_dxf(
     }
 
     # 피처 처리
-    for feature in transformed.get("features", []):
+    for _feat_idx, feature in enumerate(transformed.get("features", [])):
         geom = feature.get("geometry", {})
         props = feature.get("properties", {})
 
         if not geom:
             continue
+
+        # 토지이용계획도: WMS에서 샘플한 화면 색(RGB)
+        feat_rgb = None
+        if feature_rgbs is not None and _feat_idx < len(feature_rgbs):
+            feat_rgb = feature_rgbs[_feat_idx]
 
         gtype = geom.get("type")
         coords = geom.get("coordinates", [])
@@ -295,8 +431,8 @@ def export_to_dxf(
             except Exception:
                 pass  # 텍스트 생성 실패 시 무시
 
-        def _add_hatch(rings, layer_name_dxf, color_index=None):
-            """폴리곤에 해치 추가"""
+        def _add_hatch(rings, layer_name_dxf, color_index=None, rgb=None):
+            """폴리곤에 해치 추가. rgb=(r,g,b)면 화면과 동일한 트루컬러로 채움."""
             if not rings or not rings[0] or not layer_name_dxf:
                 return
             try:
@@ -306,7 +442,9 @@ def export_to_dxf(
                     }
                 )
                 # Solid fill 설정 (색상 지정)
-                if color_index is not None:
+                if rgb is not None:
+                    hatch.set_solid_fill(rgb=rgb)   # 트루컬러(화면 WMS 색과 일치)
+                elif color_index is not None:
                     hatch.set_solid_fill(color=color_index)
                 else:
                     hatch.set_solid_fill(color=256) # 256: ByLayer
@@ -352,7 +490,7 @@ def export_to_dxf(
                 _add_polygon_ring(ring, current_boundary_layer)
             _add_label(coords, label_text, dxf_layers["text"])
             if current_hatch_layer:
-                _add_hatch(coords, current_hatch_layer, hatch_color)
+                _add_hatch(coords, current_hatch_layer, hatch_color, rgb=feat_rgb)
 
         elif gtype == "MultiPolygon":
             for poly_coords in coords:
@@ -360,7 +498,7 @@ def export_to_dxf(
                     _add_polygon_ring(ring, current_boundary_layer)
                 _add_label(poly_coords, label_text, dxf_layers["text"])
                 if current_hatch_layer:
-                    _add_hatch(poly_coords, current_hatch_layer, hatch_color)
+                    _add_hatch(poly_coords, current_hatch_layer, hatch_color, rgb=feat_rgb)
 
     # 구역계 추가
     if boundary_points:

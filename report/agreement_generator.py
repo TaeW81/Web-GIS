@@ -655,7 +655,7 @@ def _make_parcel_map_image(target_parcel: Dict[str, Any],
                         ctr = vpoly.representative_point() if vpoly.geom_type == "Polygon" else vpoly.centroid
                         if ex_minx <= ctr.x <= ex_maxx and ex_miny <= ctr.y <= ex_maxy:
                             ax.text(ctr.x, ctr.y, lbl,
-                                    fontsize=28, color="black",
+                                    fontsize=22, color="black",
                                     ha="center", va="center", zorder=4,
                                     fontproperties=font_prop,
                                     linespacing=0.95)
@@ -711,7 +711,7 @@ def _make_parcel_map_image(target_parcel: Dict[str, Any],
                         ctr = poly.representative_point() if poly.geom_type == "Polygon" else poly.centroid
                         if ex_minx <= ctr.x <= ex_maxx and ex_miny <= ctr.y <= ex_maxy:
                             ax.text(ctr.x, ctr.y, lbl,
-                                    fontsize=28, color="black",
+                                    fontsize=22, color="black",
                                     ha="center", va="center", zorder=5,
                                     fontproperties=font_prop,
                                     linespacing=0.95)
