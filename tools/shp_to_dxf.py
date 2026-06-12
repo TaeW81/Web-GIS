@@ -11,6 +11,13 @@ try:
 except ImportError:
     pass
 
+# 드래그 앤 드롭 지원 (선택 사항: pip install tkinterdnd2)
+try:
+    from tkinterdnd2 import TkinterDnD, DND_FILES
+    DND_AVAILABLE = True
+except Exception:
+    DND_AVAILABLE = False
+
 # --- 모던 라이트 테마 (Slate + Blue) ---
 COLOR_BG = "#f1f5f9"          # 전체 배경 (slate-100)
 COLOR_CARD = "#ffffff"        # 카드/프레임 배경 (화이트)
@@ -158,8 +165,8 @@ class ConverterApp:
     def __init__(self, root):
         self.root = root
         self.root.title("SHP → DXF Converter")
-        self.root.geometry("880x900")
-        self.root.minsize(720, 560)
+        self.root.geometry("1080x860")
+        self.root.minsize(900, 560)
         self.root.configure(bg=COLOR_BG)
         
         self.all_files = {}
@@ -210,15 +217,15 @@ class ConverterApp:
                         bordercolor=COLOR_BORDER, lightcolor=COLOR_BORDER, darkcolor=COLOR_BORDER,
                         relief="flat", padding=5)
         style.map("TEntry", bordercolor=[("focus", COLOR_ACCENT)])
-        style.configure("TSpinbox", fieldbackground="white", foreground=COLOR_TEXT, arrowsize=12,
-                        bordercolor=COLOR_BORDER, lightcolor=COLOR_BORDER, darkcolor=COLOR_BORDER,
-                        relief="flat", padding=4)
+        style.configure("TSpinbox", fieldbackground="white", foreground=COLOR_TEXT, arrowsize=11,
+                        font=(FONT, 9), bordercolor=COLOR_BORDER, lightcolor=COLOR_BORDER,
+                        darkcolor=COLOR_BORDER, relief="flat", padding=1)
         style.map("TSpinbox", bordercolor=[("focus", COLOR_ACCENT)])
 
         # 체크박스 (카드 배경) — 선택 시 액센트로 채움
         for cb_style, bg in [("TCheckbutton", COLOR_CARD), ("Panel.TCheckbutton", COLOR_CARD)]:
-            style.configure(cb_style, background=bg, foreground=COLOR_TEXT, font=(FONT, 10),
-                            focuscolor=bg, indicatorrelief="flat", indicatorsize=11, padding=2)
+            style.configure(cb_style, background=bg, foreground=COLOR_TEXT, font=(FONT, 9),
+                            focuscolor=bg, indicatorrelief="flat", indicatorsize=10, padding=0)
             style.map(cb_style,
                       background=[("active", bg)],
                       indicatorbackground=[("selected", COLOR_ACCENT), ("!selected", "white")],
@@ -251,10 +258,10 @@ class ConverterApp:
         head = tk.Frame(card, bg=COLOR_SECTION)
         head.pack(fill="x")
         tk.Label(head, text=title, bg=COLOR_SECTION, fg=COLOR_TEXT,
-                 font=(FONT, 11, "bold"), anchor="w").pack(side="left", padx=14, pady=9)
+                 font=(FONT, 10, "bold"), anchor="w").pack(side="left", padx=12, pady=5)
         tk.Frame(card, bg=COLOR_BORDER, height=1).pack(fill="x")  # 헤더-본문 구분선
         body = tk.Frame(card, bg=COLOR_CARD)
-        body.pack(fill="both", expand=True, padx=14, pady=12)
+        body.pack(fill="both", expand=True, padx=12, pady=8)
         return card, body
 
     def create_widgets(self):
@@ -269,16 +276,26 @@ class ConverterApp:
                  bg=COLOR_HEADER, fg=COLOR_SUBTEXT).pack(side="left", padx=(12, 0), pady=(6, 0))
         tk.Frame(header, bg=COLOR_BORDER, height=1).pack(fill="x")
 
-        # 하단 바 + 좌표계 패널 (가운데 영역보다 먼저 배치 → 창을 줄여도 항상 보임)
-        self.create_bottom_bar()
-        self.create_crs_panel()
+        # 본문: 좌측(파일목록 + 길게 늘어난 필드설정) | 우측(설정 사이드바)
+        body = tk.Frame(self.root, bg=COLOR_BG)
+        body.pack(fill="both", expand=True)
 
-        paned = ttk.Panedwindow(self.root, orient=tk.VERTICAL)
-        paned.pack(fill="both", expand=True, padx=20, pady=16)
+        # 우측 사이드바 (고정 폭) — 먼저 배치하여 우측 고정, 항상 보임
+        sidebar = tk.Frame(body, bg=COLOR_BG, width=320)
+        sidebar.pack(side="right", fill="y", padx=(8, 18), pady=16)
+        sidebar.pack_propagate(False)
+        self.create_sidebar(sidebar)
 
-        # 1. 파일 선택
+        # 좌측 메인 (가로/세로로 확장)
+        left = tk.Frame(body, bg=COLOR_BG)
+        left.pack(side="left", fill="both", expand=True, padx=(18, 0), pady=16)
+
+        paned = ttk.Panedwindow(left, orient=tk.VERTICAL)
+        paned.pack(fill="both", expand=True)
+
+        # 1. 파일 선택 (위쪽, 작게)
         self.f_frame, f_body = self._make_card(paned, "1. 변환 대상 SHP 파일 목록")
-        paned.add(self.f_frame, weight=2)
+        paned.add(self.f_frame, weight=1)
 
         b_frame = tk.Frame(f_body, bg=COLOR_CARD)
         b_frame.pack(fill="x", pady=(0, 10))
@@ -295,9 +312,9 @@ class ConverterApp:
         self.f_canvas.pack(side="left", fill="both", expand=True)
         self.f_sb.pack(side="right", fill="y")
 
-        # 2. 필드 설정
+        # 2. 필드 설정 (아래쪽, 세로로 길게)
         self.fd_frame, fd_body = self._make_card(paned, "2. 파일별 속성 필드 및 소수점 설정")
-        paned.add(self.fd_frame, weight=4)
+        paned.add(self.fd_frame, weight=5)
 
         self.fd_canvas = tk.Canvas(fd_body, bg=COLOR_CARD, highlightthickness=0, bd=0)
         self.fd_sb = ttk.Scrollbar(fd_body, orient="vertical", command=self.fd_canvas.yview)
@@ -307,82 +324,89 @@ class ConverterApp:
         self.fd_canvas.pack(side="left", fill="both", expand=True)
         self.fd_sb.pack(side="right", fill="y")
 
-        # 캔버스 폭에 맞춰 내부 프레임 늘리기 (행 전체폭 hover/정렬)
+        # 캔버스 폭에 맞춰 내부 프레임 늘리기 (행 전체폭 정렬)
         self.f_canvas.bind("<Configure>", lambda e: self.f_canvas.itemconfig("all", width=e.width))
         self.fd_canvas.bind("<Configure>", lambda e: self.fd_canvas.itemconfig("all", width=e.width))
 
         self._bind_mouse_wheel(self.f_canvas)
         self._bind_mouse_wheel(self.fd_canvas)
 
-    def create_bottom_bar(self):
-        tk.Frame(self.root, bg=COLOR_BORDER, height=1).pack(fill="x", side="bottom")  # 상단 구분선
-        bottom_frame = tk.Frame(self.root, bg=COLOR_CARD, pady=16, padx=28)
-        bottom_frame.pack(fill="x", side="bottom")
+        # 드래그 앤 드롭 등록
+        self.setup_dnd()
 
-        # 저장 위치
-        out_line = tk.Frame(bottom_frame, bg=COLOR_CARD)
-        out_line.pack(fill="x", pady=(0, 12))
-        tk.Label(out_line, text="저장 위치", bg=COLOR_CARD, fg=COLOR_SUBTEXT,
-                 font=(FONT, 9, "bold"), width=8, anchor="w").pack(side="left")
-        out_entry = tk.Entry(out_line, textvariable=self.output_folder, bg=COLOR_SECTION, fg=COLOR_TEXT,
-                             relief="flat", readonlybackground=COLOR_SECTION,
-                             highlightthickness=1, highlightbackground=COLOR_BORDER,
-                             highlightcolor=COLOR_ACCENT, font=(FONT, 10))
-        out_entry.pack(side="left", fill="x", expand=True, padx=10, ipady=5)
-        ttk.Button(out_line, text="폴더 선택", command=self.browse_output).pack(side="left")
-
-        # 옵션 및 실행
-        exec_line = tk.Frame(bottom_frame, bg=COLOR_CARD)
-        exec_line.pack(fill="x")
-
-        tk.Label(exec_line, text="글자 크기", bg=COLOR_CARD, fg=COLOR_SUBTEXT,
-                 font=(FONT, 9, "bold")).pack(side="left")
-        self.txt_size = tk.DoubleVar(value=2.0)
-        ttk.Spinbox(exec_line, from_=0.1, to=100.0, increment=0.5, textvariable=self.txt_size,
-                    width=6).pack(side="left", padx=(10, 0))
-
+    def create_sidebar(self, parent):
+        # 실행 버튼 (사이드바 맨 아래 고정, 항상 보임)
+        ttk.Button(parent, text="일괄 변환 시작  →", style="Accent.TButton",
+                   command=self.run_batch).pack(side="bottom", fill="x", ipady=6)
         self.status_var = tk.StringVar(value="● 준비 완료")
-        self.status_label = tk.Label(exec_line, textvariable=self.status_var, bg=COLOR_CARD,
+        self.status_label = tk.Label(parent, textvariable=self.status_var, bg=COLOR_BG,
                                      fg=COLOR_SUCCESS, font=(FONT, 10, "bold"))
-        self.status_label.pack(side="left", padx=20)
+        self.status_label.pack(side="bottom", pady=10)
 
-        ttk.Button(exec_line, text="일괄 변환 시작  →", style="Accent.TButton",
-                   command=self.run_batch).pack(side="right", ipadx=18)
+        # 설정 카드들 (위에서부터)
+        self.create_crs_panel(parent)
+        self.create_output_panel(parent)
 
-    def create_crs_panel(self):
-        panel_card, panel = self._make_card(self.root, "출력 도면 좌표계  ·  원본 .prj → 선택 좌표계로 변환")
-        panel_card.pack(fill="x", side="bottom", padx=20, pady=(0, 4))
+    def create_crs_panel(self, parent):
+        card, body = self._make_card(parent, "출력 도면 좌표계")
+        card.pack(fill="x", pady=(0, 12))
+        tk.Label(body, text="원본 .prj → 선택 좌표계로 변환", bg=COLOR_CARD, fg=COLOR_SUBTEXT,
+                 font=(FONT, 8)).pack(anchor="w", pady=(0, 8))
 
-        def row(label):
-            line = tk.Frame(panel, bg=COLOR_CARD)
-            line.pack(fill="x", pady=3)
-            tk.Label(line, text=label, bg=COLOR_CARD, fg=COLOR_SUBTEXT,
-                     font=(FONT, 9, "bold"), width=7, anchor="w").pack(side="left")
-            return line
+        # 데이텀 (2열 그리드)
+        tk.Label(body, text="데이텀", bg=COLOR_CARD, fg=COLOR_SUBTEXT,
+                 font=(FONT, 9, "bold")).pack(anchor="w")
+        dgrid = tk.Frame(body, bg=COLOR_CARD)
+        dgrid.pack(fill="x", pady=(3, 10))
+        for i, (val, txt) in enumerate([("grs80_current", "GRS80(현행)"), ("bessel", "베셀(Bessel)"),
+                                        ("wgs84", "WGS84/Google"), ("grs80_old", "GRS80(과거)")]):
+            ttk.Radiobutton(dgrid, text=txt, variable=self.datum_var, value=val,
+                            style="Panel.TRadiobutton", command=self.update_epsg
+                            ).grid(row=i // 2, column=i % 2, sticky="w", padx=(0, 10), pady=2)
 
-        # 데이텀 선택
-        datum_line = row("데이텀")
-        for val, txt in [("grs80_current", "GRS80(현행)"), ("bessel", "베셀(Bessel)"),
-                         ("wgs84", "WGS84/Google"), ("grs80_old", "GRS80(과거)")]:
-            ttk.Radiobutton(datum_line, text=txt, variable=self.datum_var, value=val,
-                            style="Panel.TRadiobutton", command=self.update_epsg).pack(side="left", padx=(0, 14))
-
-        # 원점 선택
-        origin_line = row("원점")
+        # 원점 (3열 그리드)
+        tk.Label(body, text="원점", bg=COLOR_CARD, fg=COLOR_SUBTEXT,
+                 font=(FONT, 9, "bold")).pack(anchor="w")
+        ogrid = tk.Frame(body, bg=COLOR_CARD)
+        ogrid.pack(fill="x", pady=(3, 10))
         self.origin_radios = []
-        for val, txt in [("west", "서부"), ("central", "중부"), ("east", "동부"),
-                         ("eastsea", "동해"), ("jeju", "제주")]:
-            rb = ttk.Radiobutton(origin_line, text=txt, variable=self.origin_var, value=val,
+        for i, (val, txt) in enumerate([("west", "서부"), ("central", "중부"), ("east", "동부"),
+                                        ("eastsea", "동해"), ("jeju", "제주")]):
+            rb = ttk.Radiobutton(ogrid, text=txt, variable=self.origin_var, value=val,
                                  style="Panel.TRadiobutton", command=self.update_epsg)
-            rb.pack(side="left", padx=(0, 14))
+            rb.grid(row=i // 3, column=i % 3, sticky="w", padx=(0, 12), pady=2)
             self.origin_radios.append(rb)
 
         # EPSG 코드 (직접 입력 가능)
-        epsg_line = row("EPSG")
-        tk.Label(epsg_line, text="코드 직접 입력 가능", bg=COLOR_CARD, fg=COLOR_SUBTEXT,
-                 font=(FONT, 9)).pack(side="left", padx=(0, 12))
-        ttk.Entry(epsg_line, textvariable=self.epsg_var, width=12,
-                  font=(FONT, 11, "bold")).pack(side="left")
+        eline = tk.Frame(body, bg=COLOR_CARD)
+        eline.pack(fill="x")
+        tk.Label(eline, text="EPSG", bg=COLOR_CARD, fg=COLOR_SUBTEXT,
+                 font=(FONT, 9, "bold")).pack(side="left")
+        ttk.Entry(eline, textvariable=self.epsg_var, width=10,
+                  font=(FONT, 11, "bold")).pack(side="left", padx=(8, 6))
+        tk.Label(eline, text="직접 입력 가능", bg=COLOR_CARD, fg=COLOR_SUBTEXT,
+                 font=(FONT, 8)).pack(side="left")
+
+    def create_output_panel(self, parent):
+        card, body = self._make_card(parent, "저장 위치 / 옵션")
+        card.pack(fill="x", pady=(0, 12))
+
+        tk.Label(body, text="저장 위치 (비우면 원본 폴더)", bg=COLOR_CARD, fg=COLOR_SUBTEXT,
+                 font=(FONT, 9, "bold")).pack(anchor="w")
+        out_entry = tk.Entry(body, textvariable=self.output_folder, bg=COLOR_SECTION, fg=COLOR_TEXT,
+                             relief="flat", readonlybackground=COLOR_SECTION,
+                             highlightthickness=1, highlightbackground=COLOR_BORDER,
+                             highlightcolor=COLOR_ACCENT, font=(FONT, 9))
+        out_entry.pack(fill="x", pady=(3, 5), ipady=5)
+        ttk.Button(body, text="폴더 선택", command=self.browse_output).pack(anchor="w", pady=(0, 10))
+
+        sline = tk.Frame(body, bg=COLOR_CARD)
+        sline.pack(fill="x")
+        tk.Label(sline, text="글자 크기", bg=COLOR_CARD, fg=COLOR_SUBTEXT,
+                 font=(FONT, 9, "bold")).pack(side="left")
+        self.txt_size = tk.DoubleVar(value=2.0)
+        ttk.Spinbox(sline, from_=0.1, to=100.0, increment=0.5, textvariable=self.txt_size,
+                    width=6).pack(side="left", padx=(10, 0))
 
     def update_epsg(self):
         d = self.datum_var.get()
@@ -407,21 +431,54 @@ class ConverterApp:
         d = filedialog.askdirectory()
         if d: self.output_folder.set(d)
 
+    def add_paths(self, paths):
+        """파일/폴더 경로 목록을 받아 .shp만 골라 목록에 추가한다 (폴더는 재귀 탐색)."""
+        added = 0
+        for p in paths:
+            p = p.strip()
+            if not p:
+                continue
+            if os.path.isdir(p):
+                for r, ds, fs in os.walk(p):
+                    for f in fs:
+                        if f.lower().endswith(".shp"):
+                            fp = os.path.join(r, f)
+                            if fp not in self.all_files:
+                                self.all_files[fp] = tk.BooleanVar(value=True); added += 1
+            elif os.path.isfile(p) and p.lower().endswith(".shp"):
+                if p not in self.all_files:
+                    self.all_files[p] = tk.BooleanVar(value=True); added += 1
+        if added:
+            self.refresh_ui()
+        return added
+
     def add_files(self):
         ps = filedialog.askopenfilenames(filetypes=[("Shapefiles", "*.shp")])
-        for p in ps:
-            if p not in self.all_files: self.all_files[p] = tk.BooleanVar(value=True)
-        self.refresh_ui()
+        self.add_paths(ps)
 
     def add_folder(self):
         d = filedialog.askdirectory()
         if d:
-            for r, ds, fs in os.walk(d):
-                for f in fs:
-                    if f.lower().endswith(".shp"):
-                        p = os.path.join(r, f)
-                        if p not in self.all_files: self.all_files[p] = tk.BooleanVar(value=True)
-            self.refresh_ui()
+            self.add_paths([d])
+
+    def _on_drop(self, event):
+        """드롭된 파일/폴더 처리. event.data는 공백/중괄호로 구분된 경로 문자열."""
+        try:
+            paths = self.root.tk.splitlist(event.data)
+        except Exception:
+            paths = event.data.split()
+        self.add_paths(paths)
+
+    def setup_dnd(self):
+        """파일 목록 영역을 드롭 타깃으로 등록 (tkinterdnd2 있을 때만)."""
+        if not DND_AVAILABLE:
+            return
+        for w in (self.f_frame, self.f_canvas, self.f_scroll):
+            try:
+                w.drop_target_register(DND_FILES)
+                w.dnd_bind("<<Drop>>", self._on_drop)
+            except Exception:
+                pass
 
     def set_all_files(self, v):
         for var in self.all_files.values(): var.set(v)
@@ -436,18 +493,20 @@ class ConverterApp:
         for w in self.f_scroll.winfo_children(): w.destroy()
         items = sorted(self.all_files.items())
         if not items:
-            tk.Label(self.f_scroll, text="파일 추가 또는 폴더 추가 버튼으로 SHP를 불러오세요.",
-                     bg=COLOR_CARD, fg=COLOR_SUBTEXT, font=(FONT, 10), pady=24).pack(fill="x")
+            hint = ("이곳에 SHP 파일이나 폴더를 끌어다 놓으세요.\n또는 위의 [＋ 파일 추가] · [＋ 폴더 추가] 버튼 사용"
+                    if DND_AVAILABLE else "파일 추가 또는 폴더 추가 버튼으로 SHP를 불러오세요.")
+            tk.Label(self.f_scroll, text=hint, bg=COLOR_CARD, fg=COLOR_SUBTEXT,
+                     font=(FONT, 10), pady=24, justify="center").pack(fill="x")
         for idx, (p, v) in enumerate(items):
             r = tk.Frame(self.f_scroll, bg=COLOR_CARD)
             r.pack(fill="x")
-            ttk.Checkbutton(r, variable=v, command=self.refresh_field_ui).pack(side="left", padx=(6, 8), pady=8)
+            ttk.Checkbutton(r, variable=v, command=self.refresh_field_ui).pack(side="left", padx=(4, 6), pady=1)
             tk.Label(r, text=os.path.basename(p), bg=COLOR_CARD, fg=COLOR_TEXT,
-                     font=(FONT, 10, "bold"), anchor="w").pack(side="left")
+                     font=(FONT, 9, "bold"), anchor="w").pack(side="left")
             tk.Label(r, text=os.path.dirname(p), bg=COLOR_CARD, fg=COLOR_SUBTEXT,
-                     font=(FONT, 8), anchor="w").pack(side="left", padx=12)
+                     font=(FONT, 8), anchor="w").pack(side="left", padx=8)
             if idx < len(items) - 1:
-                tk.Frame(self.f_scroll, bg=COLOR_BORDER, height=1).pack(fill="x", padx=6)
+                tk.Frame(self.f_scroll, bg=COLOR_BORDER, height=1).pack(fill="x", padx=4)
         self.f_scroll.update_idletasks()
         self.f_canvas.config(scrollregion=self.f_canvas.bbox("all"))
         self.refresh_field_ui()
@@ -461,27 +520,27 @@ class ConverterApp:
         for p in sorted(checked_paths):
             # 파일 헤더 (액센트 소프트 배경 + 좌측 액센트 바)
             f_header = tk.Frame(self.fd_scroll, bg=COLOR_ACCENT_SOFT)
-            f_header.pack(fill="x", pady=(16, 0))
+            f_header.pack(fill="x", pady=(8, 0))
             tk.Frame(f_header, bg=COLOR_ACCENT, width=3).pack(side="left", fill="y")
-            tk.Label(f_header, text=os.path.basename(p), font=(FONT, 10, "bold"),
-                     bg=COLOR_ACCENT_SOFT, fg=COLOR_ACCENT, anchor="w").pack(side="left", padx=10, pady=7)
+            tk.Label(f_header, text=os.path.basename(p), font=(FONT, 9, "bold"),
+                     bg=COLOR_ACCENT_SOFT, fg=COLOR_ACCENT, anchor="w").pack(side="left", padx=8, pady=3)
 
             if p not in self.file_field_controls:
                 fields = get_shp_fields(p)
                 self.file_field_controls[p] = {f: (tk.BooleanVar(value=False), tk.IntVar(value=0)) for f in fields}
 
             f_area = tk.Frame(self.fd_scroll, bg=COLOR_CARD)
-            f_area.pack(fill="x", pady=(0, 4))
+            f_area.pack(fill="x", pady=(0, 2))
 
             for f_name, (cv, pv) in self.file_field_controls[p].items():
                 row = tk.Frame(f_area, bg=COLOR_CARD)
-                row.pack(fill="x", padx=14, pady=1)
-                ttk.Checkbutton(row, variable=cv).pack(side="left", padx=(0, 8), pady=3)
+                row.pack(fill="x", padx=12, pady=0)
+                ttk.Checkbutton(row, variable=cv).pack(side="left", padx=(0, 6), pady=0)
                 tk.Label(row, text=f_name, bg=COLOR_CARD, fg=COLOR_TEXT,
-                         font=(FONT, 10), width=32, anchor="w").pack(side="left")
+                         font=(FONT, 9), width=30, anchor="w").pack(side="left")
                 tk.Label(row, text="소수점", bg=COLOR_CARD, fg=COLOR_SUBTEXT,
-                         font=(FONT, 9)).pack(side="left")
-                ttk.Spinbox(row, from_=0, to=10, textvariable=pv, width=4).pack(side="left", padx=10)
+                         font=(FONT, 8)).pack(side="left")
+                ttk.Spinbox(row, from_=0, to=10, textvariable=pv, width=4).pack(side="left", padx=8)
         self.fd_scroll.update_idletasks()
         self.fd_canvas.config(scrollregion=self.fd_canvas.bbox("all"))
 
@@ -567,7 +626,8 @@ if __name__ == "__main__":
         import shapefile
         import ezdxf
         import pyproj
-        root = tk.Tk()
+        # 드래그 앤 드롭을 위해 TkinterDnD 루트 사용 (없으면 일반 Tk)
+        root = TkinterDnD.Tk() if DND_AVAILABLE else tk.Tk()
         app = ConverterApp(root)
         root.mainloop()
     except ImportError:

@@ -8,7 +8,7 @@ from config import (VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_URL, VWORLD_WMS_CAT
 NGII_TOPO_CATEGORIES = {"교통", "건물", "시설", "식생", "수계", "지형", "경계", "주기", "표고점"}
 
 
-def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locate_on_start=False, visible_layers=None, legend_layer_name=None, force_center_id=1, enable_draw=False, session_token="", location_locked=False):
+def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locate_on_start=False, visible_layers=None, legend_layer_name=None, force_center_id=1, enable_draw=False, session_token="", location_locked=False, is_explicit_move=False):
     """
     VWorld 배경지도 위에 구역계 및 여러 레이어를 표시하는 지도를 만듭니다.
     - 사이드바 설정값에 동기화되어 필요한 WMS 항목만 렌더링
@@ -230,44 +230,20 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
     #     위치/탐색이력을 폐기하고 현위치를 1회 탐색 → 시작 시 항상 현위치.
     #   force_center_id: 파일업로드/검색 등 명시 이동 시 증가 → 그 위치로 이동.
     #   그 외(레이어 토글로 인한 리로드 등)에는 사용자가 보던 위치를 복원.
-    locate_js = "true" if locate_on_start else "false"
     locked_js = "true" if location_locked else "false"
+    # 지도 위치 유지는 Python 측 캡처(st_folium center/zoom)가 담당한다.
+    #   여기 스크립트는 '내 위치로 이동' 버튼 상태 제어만 한다(격리 프레임에서 localStorage 차단 대비).
     sync_js = f"""
     <script>
-    window.addEventListener('load', function() {{
-        setTimeout(function() {{
-            var mapId = Object.keys(window).find(key => key.startsWith('map_') && window[key] instanceof L.Map);
-            if(!mapId) return;
+    (function() {{
+        var _tries = 0;
+        function _initSync() {{
+            var mapId = (typeof L !== 'undefined')
+                ? Object.keys(window).find(key => key.startsWith('map_') && window[key] instanceof L.Map)
+                : null;
+            if(!mapId) {{ if(_tries++ < 60) {{ setTimeout(_initSync, 50); }} return; }}
             var map = window[mapId];
-            var sessTok = "{session_token}";
-            var moveId  = "{force_center_id}";
-            var allowLocate = {locate_js};
 
-            var savedSess = localStorage.getItem('khgis_sess');
-            if (savedSess !== sessTok) {{
-                // 새 프로그램 세션 → 지난 세션 저장위치/탐색이력 폐기 (시작=현위치)
-                localStorage.setItem('khgis_sess', sessTok);
-                localStorage.setItem('khgis_move', moveId);
-                localStorage.removeItem('khgis_center');
-                localStorage.removeItem('khgis_zoom');
-                localStorage.removeItem('khgis_located');
-            }} else {{
-                var moveSaved = localStorage.getItem('khgis_move');
-                if (moveSaved === moveId) {{
-                    // 명시 이동 없음 → 사용자가 보던 위치 복원 (레이어 토글 등 리로드 시)
-                    var sc = localStorage.getItem('khgis_center');
-                    var sz = localStorage.getItem('khgis_zoom');
-                    if (sc && sz) {{ map.setView(JSON.parse(sc), parseInt(sz), {{animate: false}}); }}
-                }} else {{
-                    // 새 명시 이동(파일업로드/검색) → Python center 사용, 패닝 저장 폐기
-                    localStorage.setItem('khgis_move', moveId);
-                    localStorage.removeItem('khgis_center');
-                    localStorage.removeItem('khgis_zoom');
-                }}
-            }}
-
-            // 세션당 1회 현위치 탐색 (rerun에 안 흔들림 — 토큰으로 1회 보장)
-            // Leaflet 표준 API map.locate(setView)로 직접 이동 (버튼 클릭보다 확실).
             // "내 위치로 이동" 버튼 비활성화/활성화 헬퍼
             function setLocateBtnDisabled(disabled) {{
                 var ctrl = document.querySelector('.leaflet-control-locate');
@@ -276,58 +252,25 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
                 if (disabled) {{
                     ctrl.classList.add('leaflet-disabled');
                     if (a) {{
-                        a.style.pointerEvents = 'none';
-                        a.style.opacity = '0.45';
-                        a.style.cursor = 'default';
-                        a.setAttribute('aria-disabled', 'true');
+                        a.style.pointerEvents = 'none'; a.style.opacity = '0.45';
+                        a.style.cursor = 'default'; a.setAttribute('aria-disabled', 'true');
                         a.title = '현위치로 이동되었습니다';
                     }}
                 }} else {{
                     ctrl.classList.remove('leaflet-disabled');
                     if (a) {{
-                        a.style.pointerEvents = '';
-                        a.style.opacity = '';
-                        a.style.cursor = '';
-                        a.removeAttribute('aria-disabled');
+                        a.style.pointerEvents = ''; a.style.opacity = '';
+                        a.style.cursor = ''; a.removeAttribute('aria-disabled');
                         a.title = '내 위치로 이동';
                     }}
                 }}
             }}
-
-            map.on('locationerror', function(e) {{
-                try {{ console.warn('[khgis] 현위치 탐색 실패:', e.message); }} catch(_e) {{}}
-                // 탐색 실패 시에는 버튼을 다시 쓸 수 있도록 활성 상태 유지
-                setLocateBtnDisabled(false);
-            }});
-            map.on('locationfound', function(e) {{
-                try {{ console.log('[khgis] 현위치 탐색 성공:', e.latlng); }} catch(_e) {{}}
-                // 현위치로 이동 완료 → 버튼 비활성화 (이미 내 위치이므로 재클릭 불필요)
-                setLocateBtnDisabled(true);
-            }});
-
-            // 부모 창 Geolocation으로 이미 현위치에 도달한 경우 → 시작부터 버튼 비활성화
-            if ({locked_js}) {{
-                setLocateBtnDisabled(true);
-            }}
-            if (allowLocate && localStorage.getItem('khgis_located') !== sessTok) {{
-                localStorage.setItem('khgis_located', sessTok);
-                try {{
-                    console.log('[khgis] 현위치 탐색 시도...');
-                    map.locate({{setView: true, maxZoom: 17, enableHighAccuracy: true}});
-                }} catch(e) {{
-                    console.warn('[khgis] map.locate 예외, 버튼 클릭 폴백:', e);
-                    var lb = document.querySelector('.leaflet-control-locate a');
-                    if (lb) {{ lb.click(); }}
-                }}
-            }}
-
-            // 이동 시 위치 저장 (다음 리로드에서 복원)
-            map.on('moveend', function() {{
-                localStorage.setItem('khgis_center', JSON.stringify(map.getCenter()));
-                localStorage.setItem('khgis_zoom', map.getZoom());
-            }});
-        }}, 100);
-    }});
+            map.on('locationerror', function(e) {{ setLocateBtnDisabled(false); }});
+            map.on('locationfound', function(e) {{ setLocateBtnDisabled(true); }});
+            if ({locked_js}) {{ setLocateBtnDisabled(true); }}
+        }}
+        _initSync();
+    }})();
     </script>
     """
     m.get_root().html.add_child(folium.Element(sync_js))

@@ -306,12 +306,8 @@ with st.sidebar:
         crs_changed = True
         st.session_state.last_crs_origin = crs_origin
         st.session_state.last_crs_cat = crs_cat
-        if not uploaded_file and crs_origin in KOREA_CRS_ORIGINS:
-            lon, lat = KOREA_CRS_ORIGINS[crs_origin]
-            st.session_state.map_center = [lat, lon]
-            st.session_state.map_zoom = 10
-            st.session_state.map_force_center_id += 1
-            dxf_result["center"] = [lat, lon]
+        # ★ 좌표계 원점을 바꿔도 지도를 원점 좌표로 강제 이동시키지 않는다.
+        #   (기본값이 '서부'라 첫 실행 시 백령도/서해로 튀던 문제 + 임의 이동 제거)
 
     # 좌표계 목록 및 동기화 인덱스 계산
     dl_crs_options = {
@@ -519,7 +515,7 @@ with st.sidebar:
     st.markdown("<p class='kh-section'>4. 기타 도구</p>", unsafe_allow_html=True)
 
     # [로컬] SHP to DXF 변환기 (기존 데스크톱 프로그램 실행)
-    if st.button("🖥️ [로컬] SHP to DXF 변환기", use_container_width=True):
+    if st.button("🖥️ SHP to DXF 변환기", use_container_width=True):
         import subprocess
         import sys
         program_path = os.path.join(os.getcwd(), "tools", "shp_to_dxf.py")
@@ -956,28 +952,53 @@ with map_col:
 
     # ★ 명시적 이동 요청(DXF 업로드/장소 검색/좌표계 변경/그린영역 적용) 감지하여
     #   view_center를 map_center로 동기화 → 명시적 이동 시점에만 view_center 강제 갱신.
+    _force_moved_this_run = False
     if st.session_state.get("_applied_force_id") != st.session_state.get("map_force_center_id"):
         st.session_state.view_center = list(st.session_state.map_center)
         st.session_state.view_zoom = st.session_state.map_zoom
         st.session_state._applied_force_id = st.session_state.map_force_center_id
+        _force_moved_this_run = True  # 이번 렌더는 검색/업로드/현위치 등 '의도적 이동'
 
-    # ★ 지도 초기 위치 결정 — view_center(사용자가 본 마지막 위치) 우선
-    #   라디오/체크박스 클릭으로 페이지 재실행 시에도 사용자가 보던 위치 유지 (점프 방지)
-    _map_render_center = st.session_state.get("view_center") or st.session_state.map_center
-    _map_render_zoom = st.session_state.get("view_zoom") or st.session_state.map_zoom
+    # ★ 깜빡임/점프 동시 해결 ★
+    #   지도 내용(레이어/모드/마커/폴리곤/범례)이 바뀌면 어차피 재렌더가 일어난다.
+    #   바로 그때만 '빌드 기준 위치(map_center)'를 '사용자가 보던 위치(view_center)'로 갱신한다.
+    #   → 패닝/줌 같은 단순 이동에선 map_center가 그대로라 지도 내용 해시가 안정 → 재렌더(깜빡임) 없음.
+    #   → 내용 변경으로 재렌더될 땐 보던 위치에서 다시 그려져 점프가 없음.
+    _gps_pts = dxf_result.get("gps_points") or []
+    _gps_sig = hashlib.md5(
+        repr([(round(float(p[0]), 6), round(float(p[1]), 6)) for p in _gps_pts]).encode("utf-8")
+    ).hexdigest() if _gps_pts else ""
+    _content_sig = hashlib.md5(repr({
+        "layers": sorted(st.session_state.map_layers or []),
+        "draw": bool(_draw_mode),
+        "base": base_map or "일반지도",
+        "gps": _gps_sig,
+        "marker": st.session_state.get("search_marker"),
+        "legend": st.session_state.get("last_checked_layer"),
+        "locked": bool(st.session_state.get("geo_located_applied", False)),
+    }).encode("utf-8")).hexdigest()
+
+    if (not _force_moved_this_run) and (st.session_state.get("_map_content_sig") != _content_sig):
+        # 내용 변경 → 보던 위치(view_center)에서 다시 그린다(점프 방지)
+        if st.session_state.get("view_center"):
+            st.session_state.map_center = list(st.session_state.view_center)
+        if st.session_state.get("view_zoom"):
+            st.session_state.map_zoom = st.session_state.view_zoom
+    st.session_state._map_content_sig = _content_sig
 
     vworld_map = create_map(
-        center=_map_render_center,
+        center=list(st.session_state.map_center),
         gps_points=dxf_result["gps_points"],
         base_map=base_map if base_map else "일반지도",
-        zoom_start=_map_render_zoom,
-        locate_on_start=False,  # iframe 내부 geolocation은 권한정책으로 차단 → 부모창 방식 사용
+        zoom_start=st.session_state.map_zoom,
+        locate_on_start=False,
         visible_layers=st.session_state.map_layers,
         legend_layer_name=st.session_state.get("last_checked_layer"),
         force_center_id=st.session_state.map_force_center_id,
         enable_draw=_draw_mode,
         session_token=st.session_state.map_session_token,
         location_locked=st.session_state.get("geo_located_applied", False),
+        is_explicit_move=_force_moved_this_run,
     )
 
     # 검색 마커가 있다면 지도에 표시 (아이콘 핀)
@@ -1000,15 +1021,10 @@ with map_col:
             unsafe_allow_html=True,
         )
 
-    # ★ 모드별 returned_objects 분기 — 깜빡임 최소화
-    #   - 일반 모드: [] → 패닝/줌해도 st_folium이 rerun을 트리거하지 않음 →
-    #               지도 재빌드(타일 리로드)로 인한 깜빡임 제거. 위치 유지는
-    #               create_map의 sync_js(localStorage)가 담당한다.
-    #   - 그리기 모드: all_drawings만 → 그린 도형 캡처 (깜빡임/점 손실 방지)
     if _draw_mode:
-        _returned = ["all_drawings", "last_active_drawing"]
+        _returned = ["all_drawings", "last_active_drawing", "center", "zoom"]
     else:
-        _returned = []
+        _returned = ["center", "zoom"]
 
     map_data = st_folium(
         vworld_map,
@@ -1017,6 +1033,17 @@ with map_col:
         returned_objects=_returned,
         key="main_map",
     )
+
+    # ★ 라이브 위치 캡처 — view_center/view_zoom만 갱신한다(빌드 기준 map_center는 건드리지 않음).
+    #   map_center를 바꾸면 지도 내용 해시가 변해 깜빡임이 생기므로 절대 캡처로 덮어쓰지 않는다.
+    #   '의도적 이동' 런에서는 프런트가 아직 안 옮겨졌을 수 있어 캡처를 건너뛴다.
+    if not _force_moved_this_run:
+        _rc = (map_data or {}).get("center")
+        _rz = (map_data or {}).get("zoom")
+        if isinstance(_rc, dict) and ("lat" in _rc) and ("lng" in _rc):
+            st.session_state.view_center = [_rc["lat"], _rc["lng"]]
+            if _rz:
+                st.session_state.view_zoom = _rz
 
     # 그린 도형을 dxf_result 호환 형식으로 변환하여 캐싱 (그리기 모드만)
     if _draw_mode and map_data and map_data.get("all_drawings"):
@@ -1051,9 +1078,7 @@ with map_col:
         st.session_state.apply_drawn_pending = False
         st.session_state.do_pnu_extract = True
         dxf_result = st.session_state.drawn_dxf_result
-        # 그린 폴리곤 중심으로 이동 (사용자가 명시적으로 "적용"한 경우만)
-        st.session_state.view_center = list(dxf_result["center"])
-        st.session_state.map_center = list(dxf_result["center"])
+        # 지도 위치는 위의 '실제뷰 캡처' 로직이 그대로 유지하므로 여기서 따로 이동시키지 않는다.
         st.success(f"✅ 그린 영역 적용됨 ({dxf_result['num_vertices']}꼭짓점). PNU 추출 시작...")
 
     # 기존 그린 결과가 있으면 dxf_result에 주입 (분석 파이프라인 호환)
