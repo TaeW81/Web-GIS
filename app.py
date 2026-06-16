@@ -13,7 +13,7 @@ import hashlib
 import pickle
 import traceback
 
-from config import VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_CATEGORIES, MAP_SOURCES, KOREA_CRS, KOREA_CRS_ORIGINS, VWORLD_WFS_LAYERS, IS_WEB_MODE
+from config import VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_CATEGORIES, MAP_SOURCES, KOREA_CRS, KOREA_CRS_ORIGINS, VWORLD_WFS_LAYERS, IS_WEB_MODE, get_secret
 from modules.dxf_parser import parse_dxf
 from modules.pnu_extractor import extract_pnu_list
 from modules.map_builder import create_map
@@ -33,52 +33,29 @@ st.set_page_config(page_title="KH LandHub | 통합 토지 분석 플랫폼", lay
 #   - 라이브러리/설정이 없으면 안전하게 안내 후 중단
 # ============================
 if IS_WEB_MODE:
-    try:
-        import streamlit_authenticator as stauth
-        from collections.abc import Mapping as _Mapping
-
-        def _to_plain(obj):
-            # Streamlit Secrets(수정 불가 객체)를 일반 dict/list로 '깊게' 변환
-            #   → streamlit-authenticator가 자격증명 dict에 해시를 다시 쓸 수 있게 함
-            if isinstance(obj, _Mapping):
-                return {k: _to_plain(v) for k, v in obj.items()}
-            if isinstance(obj, (list, tuple)):
-                return [_to_plain(v) for v in obj]
-            return obj
-
-        _auth = _to_plain(st.secrets.get("auth", {}))
-        _cookie = _auth.get("cookie", {}) if isinstance(_auth, dict) else {}
-        _creds = _auth.get("credentials", {}) if isinstance(_auth, dict) else {}
-        authenticator = stauth.Authenticate(
-            _creds,
-            _cookie.get("name", "kh_landhub_auth"),
-            _cookie.get("key", "kh_landhub_signature_key"),
-            int(_cookie.get("expiry_days", 7)),
-        )
-        try:
-            authenticator.login(location="main")   # streamlit-authenticator 0.3+ API
-        except TypeError:
-            authenticator.login("로그인", "main")    # 구버전 호환
-        _auth_status = st.session_state.get("authentication_status")
-        if _auth_status is False:
-            st.error("❌ 아이디 또는 비밀번호가 올바르지 않습니다.")
+    # 🔐 간단 비밀번호 보호 — Secrets의 APP_PASSWORD 한 줄로 관리.
+    #   비밀번호를 잊으면 Secrets에서 APP_PASSWORD 값만 새로 바꾸면 됨(해시 불필요).
+    _APP_PW = str(get_secret("APP_PASSWORD", "")).strip()
+    if _APP_PW:  # 비밀번호가 설정된 경우에만 보호 활성화
+        if not st.session_state.get("_authed"):
+            _c1, _c2, _c3 = st.columns([1, 1.2, 1])
+            with _c2:
+                st.markdown("### 🔐 KH LandHub")
+                st.caption("이용하려면 비밀번호를 입력하세요.")
+                _pw = st.text_input("비밀번호", type="password", label_visibility="collapsed", placeholder="비밀번호")
+                if st.button("로그인", use_container_width=True, type="primary"):
+                    if _pw == _APP_PW:
+                        st.session_state["_authed"] = True
+                        st.rerun()
+                    else:
+                        st.error("❌ 비밀번호가 올바르지 않습니다.")
             st.stop()
-        elif _auth_status is None:
-            st.info("🔐 KH LandHub — 로그인이 필요합니다.")
-            st.stop()
-        # 로그인 성공 → 사이드바에 로그아웃 버튼
-        with st.sidebar:
-            try:
-                authenticator.logout("로그아웃", "sidebar")
-            except Exception:
-                pass
-            st.caption(f"👤 {st.session_state.get('name', '사용자')} 님")
-    except ModuleNotFoundError:
-        st.error("로그인 모듈(streamlit-authenticator)이 설치되지 않았습니다. requirements.txt를 확인하세요.")
-        st.stop()
-    except Exception as _auth_err:
-        st.error(f"로그인 설정 오류: {_auth_err}\n\nsecrets.toml의 [auth] 설정을 확인하세요.")
-        st.stop()
+        else:
+            # 로그인 상태 → 사이드바에 로그아웃 버튼
+            with st.sidebar:
+                if st.button("🔓 로그아웃", use_container_width=True):
+                    st.session_state["_authed"] = False
+                    st.rerun()
 
 st.title("🌏 KH LandHub : 통합 토지 분석 플랫폼")
 st.caption("건화(KH)의 공간정보 정밀 스캔 기술이 집약된 GIS 기반 토지·건축물 현황분석 자동화 솔루션")
