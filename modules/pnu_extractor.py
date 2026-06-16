@@ -39,12 +39,20 @@ def extract_pnu_list(boundary_polygon, api_key):
         }
         
         # 네트워크/파싱 오류: 1페이지면 원인을 알 수 있게 전파, 이후 페이지면 가진 데이터로 마무리
+        res = None
         try:
             res = requests.get(VWORLD_DATA_URL, params=params, timeout=30)
             data = res.json()
         except Exception as net_err:
             if page == 1:
-                raise RuntimeError(f"브이월드 연결/응답 오류: {net_err}")
+                _info = ""
+                if res is not None:
+                    _body = (res.text or "").strip()[:200].replace("\n", " ")
+                    _info = f" | HTTP {res.status_code} | 응답앞부분: {_body!r}"
+                raise RuntimeError(
+                    f"브이월드 연결/응답 오류: {net_err}{_info} | 요청 domain='{VWORLD_DOMAIN}' "
+                    f"(빈/비정상 응답이면 도메인 미등록·인증 거부·서버측 차단 가능성)"
+                )
             break
 
         status = data.get("response", {}).get("status")
