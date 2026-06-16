@@ -95,7 +95,9 @@ KOREA_CRS_ORIGINS = {
 }
 
 # ===== API End Points =====
-VWORLD_DOMAIN = "http://localhost"
+# V-World 인증키에 등록한 도메인과 '일치'해야 함.
+#   로컬: http://localhost (기본) / 웹 배포: secrets에 VWORLD_DOMAIN="https://...streamlit.app"
+VWORLD_DOMAIN = get_secret("VWORLD_DOMAIN", "http://localhost")
 VWORLD_DATA_URL = "https://api.vworld.kr/req/data"
 VWORLD_SEARCH_URL = "https://api.vworld.kr/req/search"
 VWORLD_WMS_URL = "https://api.vworld.kr/req/wms"

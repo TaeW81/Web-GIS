@@ -1,6 +1,6 @@
 import folium
 from folium.plugins import GroupedLayerControl, LocateControl
-from config import (VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_URL, VWORLD_WMS_CATEGORIES, VWORLD_LEGEND_URL,
+from config import (VWORLD_KEY, VWORLD_DOMAIN, VWORLD_TILE_URLS, VWORLD_WMS_URL, VWORLD_WMS_CATEGORIES, VWORLD_LEGEND_URL,
                      MAP_SOURCES, NIE_KEY, NIE_WMS_URL, NIE_LEGEND_URL,
                      ECVAM_KEY, ECVAM_WMS_URL, ECVAM_LEGEND_URL)
 
@@ -87,7 +87,7 @@ def create_map(center, gps_points, base_map="일반지도", zoom_start=16, locat
             continue  # "READY" 레이어만 있으므로 스킵
         else: # 브이월드 기본 (국토정보플랫폼 포함)
             base_url = VWORLD_WMS_URL
-            extra_params = f"?key={VWORLD_KEY}&domain=http://localhost"
+            extra_params = f"?key={VWORLD_KEY}&domain={VWORLD_DOMAIN}"
             wms_version = '1.3.0'
 
         for cat_name, layers in categories.items():
