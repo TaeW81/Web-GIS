@@ -35,10 +35,22 @@ st.set_page_config(page_title="KH LandHub | 통합 토지 분석 플랫폼", lay
 if IS_WEB_MODE:
     try:
         import streamlit_authenticator as stauth
-        _auth = dict(st.secrets.get("auth", {}))
-        _cookie = dict(_auth.get("cookie", {}))
+        from collections.abc import Mapping as _Mapping
+
+        def _to_plain(obj):
+            # Streamlit Secrets(수정 불가 객체)를 일반 dict/list로 '깊게' 변환
+            #   → streamlit-authenticator가 자격증명 dict에 해시를 다시 쓸 수 있게 함
+            if isinstance(obj, _Mapping):
+                return {k: _to_plain(v) for k, v in obj.items()}
+            if isinstance(obj, (list, tuple)):
+                return [_to_plain(v) for v in obj]
+            return obj
+
+        _auth = _to_plain(st.secrets.get("auth", {}))
+        _cookie = _auth.get("cookie", {}) if isinstance(_auth, dict) else {}
+        _creds = _auth.get("credentials", {}) if isinstance(_auth, dict) else {}
         authenticator = stauth.Authenticate(
-            dict(_auth.get("credentials", {})),
+            _creds,
             _cookie.get("name", "kh_landhub_auth"),
             _cookie.get("key", "kh_landhub_signature_key"),
             int(_cookie.get("expiry_days", 7)),
