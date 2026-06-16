@@ -13,7 +13,7 @@ import hashlib
 import pickle
 import traceback
 
-from config import VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_CATEGORIES, MAP_SOURCES, KOREA_CRS, KOREA_CRS_ORIGINS, VWORLD_WFS_LAYERS
+from config import VWORLD_KEY, VWORLD_TILE_URLS, VWORLD_WMS_CATEGORIES, MAP_SOURCES, KOREA_CRS, KOREA_CRS_ORIGINS, VWORLD_WFS_LAYERS, IS_WEB_MODE
 from modules.dxf_parser import parse_dxf
 from modules.pnu_extractor import extract_pnu_list
 from modules.map_builder import create_map
@@ -26,6 +26,48 @@ from report.free_transfer_generator import FreeTransferGenerator
 
 # ============================
 st.set_page_config(page_title="KH LandHub | 통합 토지 분석 플랫폼", layout="wide", page_icon="🌏")
+
+# ============================
+# 🔐 웹 배포 모드: 로그인 보호 (로컬 실행 시에는 IS_WEB_MODE=False라 전혀 동작 안 함)
+#   - secrets.toml의 [auth] 자격증명을 사용 (streamlit-authenticator)
+#   - 라이브러리/설정이 없으면 안전하게 안내 후 중단
+# ============================
+if IS_WEB_MODE:
+    try:
+        import streamlit_authenticator as stauth
+        _auth = dict(st.secrets.get("auth", {}))
+        _cookie = dict(_auth.get("cookie", {}))
+        authenticator = stauth.Authenticate(
+            dict(_auth.get("credentials", {})),
+            _cookie.get("name", "kh_landhub_auth"),
+            _cookie.get("key", "kh_landhub_signature_key"),
+            int(_cookie.get("expiry_days", 7)),
+        )
+        try:
+            authenticator.login(location="main")   # streamlit-authenticator 0.3+ API
+        except TypeError:
+            authenticator.login("로그인", "main")    # 구버전 호환
+        _auth_status = st.session_state.get("authentication_status")
+        if _auth_status is False:
+            st.error("❌ 아이디 또는 비밀번호가 올바르지 않습니다.")
+            st.stop()
+        elif _auth_status is None:
+            st.info("🔐 KH LandHub — 로그인이 필요합니다.")
+            st.stop()
+        # 로그인 성공 → 사이드바에 로그아웃 버튼
+        with st.sidebar:
+            try:
+                authenticator.logout("로그아웃", "sidebar")
+            except Exception:
+                pass
+            st.caption(f"👤 {st.session_state.get('name', '사용자')} 님")
+    except ModuleNotFoundError:
+        st.error("로그인 모듈(streamlit-authenticator)이 설치되지 않았습니다. requirements.txt를 확인하세요.")
+        st.stop()
+    except Exception as _auth_err:
+        st.error(f"로그인 설정 오류: {_auth_err}\n\nsecrets.toml의 [auth] 설정을 확인하세요.")
+        st.stop()
+
 st.title("🌏 KH LandHub : 통합 토지 분석 플랫폼")
 st.caption("건화(KH)의 공간정보 정밀 스캔 기술이 집약된 GIS 기반 토지·건축물 현황분석 자동화 솔루션")
 
@@ -514,17 +556,18 @@ with st.sidebar:
     # ----------------------------------------
     st.markdown("<p class='kh-section'>4. 기타 도구</p>", unsafe_allow_html=True)
 
-    # [로컬] SHP to DXF 변환기 (기존 데스크톱 프로그램 실행)
-    if st.button("🖥️ SHP to DXF 변환기", use_container_width=True):
-        import subprocess
-        import sys
-        program_path = os.path.join(os.getcwd(), "tools", "shp_to_dxf.py")
-        if os.path.exists(program_path):
-            try:
-                subprocess.Popen([sys.executable, program_path],
-                                 creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0)
-            except Exception as e:
-                st.error(f"❌ 실행 오류: {e}")
+    # SHP to DXF 변환기 (데스크톱 프로그램 실행) — 웹 배포에서는 숨김(서버에서 실행 불가)
+    if not IS_WEB_MODE:
+        if st.button("🖥️ SHP to DXF 변환기", use_container_width=True):
+            import subprocess
+            import sys
+            program_path = os.path.join(os.getcwd(), "tools", "shp_to_dxf.py")
+            if os.path.exists(program_path):
+                try:
+                    subprocess.Popen([sys.executable, program_path],
+                                     creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0)
+                except Exception as e:
+                    st.error(f"❌ 실행 오류: {e}")
 
     # ----------------------------------------
     # 🚧 (개발 진행중) — 기타 도구와 구분되는 별도 섹션 (추후 개발/보강 예정 기능)
@@ -545,31 +588,35 @@ with st.sidebar:
             st.session_state.do_qbs = True
 
     with st.expander("🛠️ SHP to DXF 웹 변환기", expanded=False):
-        st.markdown("<p style='font-size:12px; color:gray;'>방법 1: 아래 박스에 <b>폴더를 통째로 드래그</b>하세요.<br>방법 2: [로컬 전용] 버튼을 눌러 내 컴퓨터 폴더를 선택하세요.</p>", unsafe_allow_html=True)
-        
-        # --- [로컬 전용] 폴더 선택 기능 ---
-        col_local1, col_local2 = st.columns([1.8, 1])
-        local_path_input = col_local1.text_input("내 컴퓨터 폴더 경로 직접 입력", value=st.session_state.get("local_selected_path", ""), placeholder="예: D:/GIS_Data", label_visibility="collapsed")
-        btn_local_select = col_local2.button("📁 폴더 선택창", use_container_width=True)
-        
-        selected_path = None
-        if btn_local_select:
-            try:
-                import tkinter as tk
-                from tkinter import filedialog
-                root = tk.Tk()
-                root.withdraw()
-                root.attributes('-topmost', True) # 창을 최상단으로
-                selected_path = filedialog.askdirectory()
-                root.destroy()
-                if selected_path:
-                    st.session_state.local_selected_path = selected_path
-            except Exception as tk_err:
-                st.warning("💡 스레드 제한으로 선택창이 열리지 않을 수 있습니다. 왼쪽 칸에 경로를 직접 입력(복사+붙여넣기)해 주세요.")
-                
-        # 텍스트 입력값 변경 시 세션 상태 동기화
-        if local_path_input and local_path_input != st.session_state.get("local_selected_path"):
-            st.session_state.local_selected_path = local_path_input
+        if IS_WEB_MODE:
+            st.markdown("<p style='font-size:12px; color:gray;'>아래 박스에 <b>SHP/SHX/DBF 파일을 드래그</b>하거나 선택해 업로드하세요.</p>", unsafe_allow_html=True)
+        else:
+            st.markdown("<p style='font-size:12px; color:gray;'>방법 1: 아래 박스에 <b>폴더를 통째로 드래그</b>하세요.<br>방법 2: [로컬 전용] 버튼을 눌러 내 컴퓨터 폴더를 선택하세요.</p>", unsafe_allow_html=True)
+
+        # --- [로컬 전용] 폴더 선택 기능 — 웹 배포에서는 숨김(서버 파일시스템 접근/창 생성 불가) ---
+        if not IS_WEB_MODE:
+            col_local1, col_local2 = st.columns([1.8, 1])
+            local_path_input = col_local1.text_input("내 컴퓨터 폴더 경로 직접 입력", value=st.session_state.get("local_selected_path", ""), placeholder="예: D:/GIS_Data", label_visibility="collapsed")
+            btn_local_select = col_local2.button("📁 폴더 선택창", use_container_width=True)
+
+            selected_path = None
+            if btn_local_select:
+                try:
+                    import tkinter as tk
+                    from tkinter import filedialog
+                    root = tk.Tk()
+                    root.withdraw()
+                    root.attributes('-topmost', True) # 창을 최상단으로
+                    selected_path = filedialog.askdirectory()
+                    root.destroy()
+                    if selected_path:
+                        st.session_state.local_selected_path = selected_path
+                except Exception as tk_err:
+                    st.warning("💡 스레드 제한으로 선택창이 열리지 않을 수 있습니다. 왼쪽 칸에 경로를 직접 입력(복사+붙여넣기)해 주세요.")
+
+            # 텍스트 입력값 변경 시 세션 상태 동기화
+            if local_path_input and local_path_input != st.session_state.get("local_selected_path"):
+                st.session_state.local_selected_path = local_path_input
             
         if st.session_state.get("local_selected_path"):
             path_to_check = st.session_state.local_selected_path.strip()
@@ -986,92 +1033,105 @@ with map_col:
             st.session_state.map_zoom = st.session_state.view_zoom
     st.session_state._map_content_sig = _content_sig
 
-    vworld_map = create_map(
-        center=list(st.session_state.map_center),
-        gps_points=dxf_result["gps_points"],
-        base_map=base_map if base_map else "일반지도",
-        zoom_start=st.session_state.map_zoom,
-        locate_on_start=False,
-        visible_layers=st.session_state.map_layers,
-        legend_layer_name=st.session_state.get("last_checked_layer"),
-        force_center_id=st.session_state.map_force_center_id,
-        enable_draw=_draw_mode,
-        session_token=st.session_state.map_session_token,
-        location_locked=st.session_state.get("geo_located_applied", False),
-        is_explicit_move=_force_moved_this_run,
-    )
+    # ★ 깜빡임 해결 핵심 — 지도 영역을 st.fragment로 격리 ★
+    #   center/zoom을 returned_objects로 받으면 팬/줌마다 rerun이 발생하는데,
+    #   fragment 안에서는 그 rerun이 '지도 영역만' 다시 실행된다 →
+    #   사이드바/결과패널(대용량 다운로드 버튼 포함)이 다시 그려지지 않아
+    #   전체 화면이 어두워지며 깜빡이는 현상이 사라진다.
+    #   '의도적 이동' 직후 1회는 캡처를 건너뛰도록 플래그를 세션에 전달.
+    st.session_state._skip_capture_once = _force_moved_this_run
 
-    # 검색 마커가 있다면 지도에 표시 (아이콘 핀)
-    if st.session_state.get("search_marker"):
-        marker_data = st.session_state.search_marker
-        folium.Marker(
-            location=[marker_data['lat'], marker_data['lon']],
-            popup=f"<b>{marker_data['name']}</b>",
-            tooltip=marker_data['name'],
-            icon=folium.Icon(color="blue", icon="info-sign")
-        ).add_to(vworld_map)
-
-    # ★ 그리기 모드 안내 (드로잉 도구 사용법)
-    if _draw_mode:
-        st.markdown(
-            "<p style='font-size:12px; color:#ff5722; margin: 4px 0;'>"
-            "🖌️ <b>그리기 모드</b>: 지도 좌상단 도구로 다각형/사각형을 그린 후 사이드바의 "
-            "<b>'✅ 그린 영역 적용'</b> 버튼을 누르세요."
-            "</p>",
-            unsafe_allow_html=True,
+    @st.fragment
+    def _render_map_area(dxf_result_f, draw_mode_f, base_map_f, force_moved_f):
+        vworld_map = create_map(
+            center=list(st.session_state.map_center),
+            gps_points=dxf_result_f["gps_points"],
+            base_map=base_map_f if base_map_f else "일반지도",
+            zoom_start=st.session_state.map_zoom,
+            locate_on_start=False,
+            visible_layers=st.session_state.map_layers,
+            legend_layer_name=st.session_state.get("last_checked_layer"),
+            force_center_id=st.session_state.map_force_center_id,
+            enable_draw=draw_mode_f,
+            session_token=st.session_state.map_session_token,
+            location_locked=st.session_state.get("geo_located_applied", False),
+            is_explicit_move=force_moved_f,
         )
 
-    if _draw_mode:
-        _returned = ["all_drawings", "last_active_drawing", "center", "zoom"]
-    else:
-        _returned = ["center", "zoom"]
+        # 검색 마커가 있다면 지도에 표시 (아이콘 핀)
+        if st.session_state.get("search_marker"):
+            marker_data = st.session_state.search_marker
+            folium.Marker(
+                location=[marker_data['lat'], marker_data['lon']],
+                popup=f"<b>{marker_data['name']}</b>",
+                tooltip=marker_data['name'],
+                icon=folium.Icon(color="blue", icon="info-sign")
+            ).add_to(vworld_map)
 
-    map_data = st_folium(
-        vworld_map,
-        width=1200,
-        height=750,
-        returned_objects=_returned,
-        key="main_map",
-    )
+        # ★ 그리기 모드 안내 (드로잉 도구 사용법)
+        if draw_mode_f:
+            st.markdown(
+                "<p style='font-size:12px; color:#ff5722; margin: 4px 0;'>"
+                "🖌️ <b>그리기 모드</b>: 지도 좌상단 도구로 다각형/사각형을 그린 후 사이드바의 "
+                "<b>'✅ 그린 영역 적용'</b> 버튼을 누르세요."
+                "</p>",
+                unsafe_allow_html=True,
+            )
 
-    # ★ 라이브 위치 캡처 — view_center/view_zoom만 갱신한다(빌드 기준 map_center는 건드리지 않음).
-    #   map_center를 바꾸면 지도 내용 해시가 변해 깜빡임이 생기므로 절대 캡처로 덮어쓰지 않는다.
-    #   '의도적 이동' 런에서는 프런트가 아직 안 옮겨졌을 수 있어 캡처를 건너뛴다.
-    if not _force_moved_this_run:
-        _rc = (map_data or {}).get("center")
-        _rz = (map_data or {}).get("zoom")
-        if isinstance(_rc, dict) and ("lat" in _rc) and ("lng" in _rc):
-            st.session_state.view_center = [_rc["lat"], _rc["lng"]]
-            if _rz:
-                st.session_state.view_zoom = _rz
+        if draw_mode_f:
+            _returned = ["all_drawings", "last_active_drawing", "center", "zoom"]
+        else:
+            _returned = ["center", "zoom"]
 
-    # 그린 도형을 dxf_result 호환 형식으로 변환하여 캐싱 (그리기 모드만)
-    if _draw_mode and map_data and map_data.get("all_drawings"):
-        from shapely.geometry import shape as _shp_shape
-        try:
-            drawings = map_data["all_drawings"] or []
-            if drawings:
-                last_geom_dict = (map_data.get("last_active_drawing") or drawings[-1]).get("geometry")
-                if last_geom_dict:
-                    poly_wgs84 = _shp_shape(last_geom_dict)
-                    if poly_wgs84.geom_type in ("Polygon", "MultiPolygon"):
-                        if poly_wgs84.geom_type == "Polygon":
-                            coords = list(poly_wgs84.exterior.coords)
-                        else:
-                            coords = list(list(poly_wgs84.geoms)[0].exterior.coords)
-                        gps_pts = [(lat, lon) for lon, lat in coords]
-                        lonlat_pts = [(lon, lat) for lon, lat in coords]
-                        centroid = poly_wgs84.centroid
-                        st.session_state.drawn_polygon = poly_wgs84
-                        st.session_state.drawn_dxf_result = {
-                            "polygon": poly_wgs84,
-                            "gps_points": gps_pts,
-                            "lonlat_points": lonlat_pts,
-                            "center": (centroid.y, centroid.x),
-                            "num_vertices": len(coords),
-                        }
-        except Exception as draw_err:
-            st.warning(f"⚠️ 그린 도형 처리 오류: {draw_err}")
+        map_data = st_folium(
+            vworld_map,
+            width=1200,
+            height=750,
+            returned_objects=_returned,
+            key="main_map",
+        )
+
+        # ★ 라이브 위치 캡처 — view_center/view_zoom만 갱신(빌드 기준 map_center는 불변 → 해시 안정).
+        #   '의도적 이동' 직후 1회는 프런트가 아직 안 옮겨졌을 수 있어 캡처를 건너뛴다.
+        if st.session_state.pop("_skip_capture_once", False):
+            pass
+        else:
+            _rc = (map_data or {}).get("center")
+            _rz = (map_data or {}).get("zoom")
+            if isinstance(_rc, dict) and ("lat" in _rc) and ("lng" in _rc):
+                st.session_state.view_center = [_rc["lat"], _rc["lng"]]
+                if _rz:
+                    st.session_state.view_zoom = _rz
+
+        # 그린 도형을 dxf_result 호환 형식으로 변환하여 세션에 캐싱 (그리기 모드만)
+        if draw_mode_f and map_data and map_data.get("all_drawings"):
+            from shapely.geometry import shape as _shp_shape
+            try:
+                drawings = map_data["all_drawings"] or []
+                if drawings:
+                    last_geom_dict = (map_data.get("last_active_drawing") or drawings[-1]).get("geometry")
+                    if last_geom_dict:
+                        poly_wgs84 = _shp_shape(last_geom_dict)
+                        if poly_wgs84.geom_type in ("Polygon", "MultiPolygon"):
+                            if poly_wgs84.geom_type == "Polygon":
+                                coords = list(poly_wgs84.exterior.coords)
+                            else:
+                                coords = list(list(poly_wgs84.geoms)[0].exterior.coords)
+                            gps_pts = [(lat, lon) for lon, lat in coords]
+                            lonlat_pts = [(lon, lat) for lon, lat in coords]
+                            centroid = poly_wgs84.centroid
+                            st.session_state.drawn_polygon = poly_wgs84
+                            st.session_state.drawn_dxf_result = {
+                                "polygon": poly_wgs84,
+                                "gps_points": gps_pts,
+                                "lonlat_points": lonlat_pts,
+                                "center": (centroid.y, centroid.x),
+                                "num_vertices": len(coords),
+                            }
+            except Exception as draw_err:
+                st.warning(f"⚠️ 그린 도형 처리 오류: {draw_err}")
+
+    _render_map_area(dxf_result, _draw_mode, base_map, _force_moved_this_run)
 
     # 사이드바에서 "그린 영역 적용" 버튼을 눌렀을 때 분석 트리거
     if _draw_mode and st.session_state.get("apply_drawn_pending") and st.session_state.get("drawn_dxf_result"):

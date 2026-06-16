@@ -1,19 +1,44 @@
 """
 프로젝트 전역 설정 파일
 - API 키, 좌표계, 레이어 코드 등을 한 곳에서 관리합니다.
-- .env 파일에서 환경변수를 로드합니다.
+- 키 우선순위: ① Streamlit secrets(웹 배포) → ② .env/환경변수(로컬) → ③ 기본값
 """
 import os
 from dotenv import load_dotenv
 
-# .env 파일에서 환경변수 로드
+# .env 파일에서 환경변수 로드 (로컬 실행용)
 load_dotenv()
 
+
+def _load_st_secrets():
+    """Streamlit secrets를 dict로 안전 로드 (secrets.toml 없으면 빈 dict)."""
+    try:
+        import streamlit as st
+        return dict(st.secrets)
+    except Exception:
+        return {}
+
+
+_ST_SECRETS = _load_st_secrets()
+
+
+def get_secret(name, default=""):
+    """① Streamlit secrets → ② 환경변수/.env → ③ 기본값 순으로 값을 가져온다."""
+    if name in _ST_SECRETS:
+        return _ST_SECRETS[name]
+    return os.getenv(name, default)
+
+
+# ===== 웹 배포 모드 플래그 =====
+#   로컬 실행 시 미설정(0) → 데스크톱 기능 사용 가능
+#   웹 배포 시 secrets/env에 KH_WEB_MODE=1 → 데스크톱 전용 기능 숨김 + 로그인 보호
+IS_WEB_MODE = str(get_secret("KH_WEB_MODE", "0")).strip().lower() in ("1", "true", "yes", "on")
+
 # ===== API 키 =====
-VWORLD_KEY = os.getenv("VWORLD_KEY", "F9BD8BC9-6646-3DD4-AA3C-C80E6D45BFB1")
-NIE_KEY = os.getenv("NIE_KEY", "0b1a73c4402f5cc749ca03709d2850131f4c1e62b27c87ea7bdbe8dd19299bd7")
-NGII_KEY = os.getenv("NGII_KEY", "05A66BC66F48B4624F486A8590E4A98810E0DFB7B3")
-ECVAM_KEY = os.getenv("ECVAM_KEY", "GGDM-AU7W-FRD0-UPSC")
+VWORLD_KEY = get_secret("VWORLD_KEY", "F9BD8BC9-6646-3DD4-AA3C-C80E6D45BFB1")
+NIE_KEY = get_secret("NIE_KEY", "0b1a73c4402f5cc749ca03709d2850131f4c1e62b27c87ea7bdbe8dd19299bd7")
+NGII_KEY = get_secret("NGII_KEY", "05A66BC66F48B4624F486A8590E4A98810E0DFB7B3")
+ECVAM_KEY = get_secret("ECVAM_KEY", "GGDM-AU7W-FRD0-UPSC")
 
 # ===== 분석 및 보고서 설정 =====
 CADASTRAL_LAYER = "LP_PA_CBND_BUBUN"
