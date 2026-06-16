@@ -38,27 +38,41 @@ def extract_pnu_list(boundary_polygon, api_key):
             "geometry": "true", "size": str(page_size), "page": str(page)
         }
         
+        # 네트워크/파싱 오류: 1페이지면 원인을 알 수 있게 전파, 이후 페이지면 가진 데이터로 마무리
         try:
             res = requests.get(VWORLD_DATA_URL, params=params, timeout=30)
             data = res.json()
-            status = data.get("response", {}).get("status")
-            if status != "OK":
-                if page == 1:
-                    error_text = data.get("response", {}).get("error", {}).get("text", "알 수 없음")
-                    raise RuntimeError(f"브이월드 응답 오류: {status} - {error_text}")
-                else: break
-            
-            features = data.get("response", {}).get("result", {}).get("featureCollection", {}).get("features", [])
-            if not features: break
-            all_features.extend(features)
-            
-            record_info = data.get("response", {}).get("record", {})
-            total_count = int(record_info.get("total", 0))
-            if len(all_features) >= total_count or len(features) < page_size:
+        except Exception as net_err:
+            if page == 1:
+                raise RuntimeError(f"브이월드 연결/응답 오류: {net_err}")
+            break
+
+        status = data.get("response", {}).get("status")
+        if status != "OK":
+            if page == 1:
+                err = data.get("response", {}).get("error", {})
+                error_text = err.get("text") or err.get("code") or "알 수 없음"
+                # 도메인/인증키 미등록 시 흔히 여기서 막힘 → 원인을 명확히 안내
+                raise RuntimeError(
+                    f"브이월드 응답 오류: {status} - {error_text}\n"
+                    f"(요청 domain='{VWORLD_DOMAIN}') — 인증키에 이 도메인이 등록됐는지, "
+                    f"웹 배포 시 VWORLD_DOMAIN secrets 설정이 배포 주소와 일치하는지 확인하세요."
+                )
+            else:
                 break
-            page += 1
-            if page > 100: break # 최대 10만 필지
-        except: break
+
+        features = data.get("response", {}).get("result", {}).get("featureCollection", {}).get("features", [])
+        if not features:
+            break
+        all_features.extend(features)
+
+        record_info = data.get("response", {}).get("record", {})
+        total_count = int(record_info.get("total", 0))
+        if len(all_features) >= total_count or len(features) < page_size:
+            break
+        page += 1
+        if page > 100:
+            break  # 최대 10만 필지
 
     # 3. 정밀 필터링 및 중복 제거
     included = []
